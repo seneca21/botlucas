@@ -21,7 +21,7 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// 2) TESTE DE CONEXÃO E SYNC (Opcional, se já faz em outro lugar)
+// 2) TESTE DE CONEXÃO E SYNC
 //------------------------------------------------------
 sequelize.authenticate()
     .then(() => console.log('✅ Conexão com o DB estabelecida.'))
@@ -53,7 +53,7 @@ app.get('/api/bots-stats', async (req, res) => {
         const endDate = new Date(selectedDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // 1) totalUsers = contagem de usuários que tiveram lastInteraction no dia
+        // (A) totalUsers = contagem de usuários que tiveram lastInteraction no dia
         const totalUsers = await User.count({
             where: {
                 lastInteraction: {
@@ -62,8 +62,7 @@ app.get('/api/bots-stats', async (req, res) => {
             }
         });
 
-        // 2) totalPurchases = contagem de usuários que compraram nesse dia
-        //    (aqui assumimos hasPurchased = true e lastInteraction dentro do dia)
+        // (B) totalPurchases = contagem de usuários que compraram nesse dia
         const totalPurchases = await User.count({
             where: {
                 hasPurchased: true,
@@ -73,19 +72,24 @@ app.get('/api/bots-stats', async (req, res) => {
             }
         });
 
-        // 3) taxa de conversão
+        // (C) taxa de conversão (%)
         const conversionRate = totalUsers > 0
             ? (totalPurchases / totalUsers) * 100
             : 0;
 
-        // ---------------------------------------------------------------
-        // 4) ESTATÍSTICAS DO DIA (DETALHADO)
-        //    - totalLeads: vamos usar o mesmo valor de totalUsers
-        //    - pagamentosConfirmados: vamos usar totalPurchases
-        //    - taxaConversao: podemos reaproveitar conversionRate
-        //    - totalVendasGeradas: soma planValue de todos lastInteraction no dia
-        //    - totalVendasConvertidas: soma planValue só de quem hasPurchased no dia
-        // ---------------------------------------------------------------
+        //---------------------------------------------------------------
+        // Estatísticas do Dia (Detalhado)
+        // - totalLeads = totalUsers
+        // - pagamentosConfirmados = totalPurchases
+        // - taxaConversao = conversionRate
+        // - totalVendasGeradas = soma planValue de TODOS
+        // - totalVendasConvertidas = soma planValue de QUEM comprou
+        //---------------------------------------------------------------
+        const totalLeads = totalUsers;
+        const pagamentosConfirmados = totalPurchases;
+        const taxaConversao = conversionRate;
+
+        // totalVendasGeradas -> soma planValue de todos com lastInteraction no dia
         const totalVendasGeradas = await User.sum('planValue', {
             where: {
                 lastInteraction: {
@@ -95,6 +99,7 @@ app.get('/api/bots-stats', async (req, res) => {
             }
         }) || 0;
 
+        // totalVendasConvertidas -> soma planValue dos que compraram no dia
         const totalVendasConvertidas = await User.sum('planValue', {
             where: {
                 hasPurchased: true,
@@ -105,14 +110,9 @@ app.get('/api/bots-stats', async (req, res) => {
             }
         }) || 0;
 
-        // Podíamos customizar o "Leads", mas aqui igualamos:
-        const totalLeads = totalUsers;
-        const pagamentosConfirmados = totalPurchases;
-        const taxaConversao = conversionRate; // ou se quiser outro nome
-
-        // ----------------------------------------------------------------
-        // RANKING SIMPLES (botRanking): Bot x Quantidade de Vendas
-        // ----------------------------------------------------------------
+        //---------------------------------------------------------------
+        // RANKING SIMPLES (botRanking)
+        //---------------------------------------------------------------
         const botRankingRaw = await User.findAll({
             attributes: [
                 'botName',
@@ -135,9 +135,9 @@ app.get('/api/bots-stats', async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0
         }));
 
-        // ----------------------------------------------------------------
+        //---------------------------------------------------------------
         // RANKING DETALHADO (botDetails)
-        // ----------------------------------------------------------------
+        //---------------------------------------------------------------
         // a) Compras por bot
         const botsWithPurchases = await User.findAll({
             attributes: [
@@ -195,12 +195,8 @@ app.get('/api/bots-stats', async (req, res) => {
                 lastInteraction: {
                     [Op.between]: [startDate, endDate]
                 },
-                planName: {
-                    [Op.ne]: null
-                },
-                botName: {
-                    [Op.ne]: null
-                }
+                planName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']]
@@ -229,7 +225,6 @@ app.get('/api/bots-stats', async (req, res) => {
                 ? (totalPurchasesBot / totalUsersBot) * 100
                 : 0;
 
-            // Valor médio
             const averageValueBot = totalPurchasesBot > 0
                 ? totalValueBot / totalPurchasesBot
                 : 0;
@@ -248,10 +243,9 @@ app.get('/api/bots-stats', async (req, res) => {
                 });
             }
 
-            // push no array final
             botDetails.push({
                 botName: bName,
-                valorGerado: totalValueBot,     // totalValue no dia
+                valorGerado: totalValueBot,
                 totalPurchases: totalPurchasesBot,
                 totalUsers: totalUsersBot,
                 conversionRate: conversionRateBot,
@@ -260,30 +254,24 @@ app.get('/api/bots-stats', async (req, res) => {
             });
         });
 
-        // Ordena desc por valorGerado (opcional)
+        // Ordena desc por valorGerado
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
         // Retorna ao front-end
         res.json({
-            // ----------------------
             // Estatísticas básicas
-            // ----------------------
             totalUsers,
             totalPurchases,
             conversionRate,
 
-            // ----------------------
             // Estatísticas Detalhadas do Dia
-            // ----------------------
-            totalLeads,             // OK
-            pagamentosConfirmados,  // OK
-            taxaConversao,          // OK (igual a conversionRate)
-            totalVendasGeradas,     // soma planValue
-            totalVendasConvertidas, // soma planValue comprada
+            totalLeads,
+            pagamentosConfirmados,
+            taxaConversao,
+            totalVendasGeradas,
+            totalVendasConvertidas,
 
-            // ----------------------
-            // Ranking
-            // ----------------------
+            // Rankings
             botRanking,
             botDetails
         });
