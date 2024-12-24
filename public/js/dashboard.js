@@ -1,33 +1,43 @@
+// public/js/dashboard.js
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
-    let salesChart;
+    let salesChart; // Gráfico principal (Usuários x Compras)
 
-    // Função principal de atualização
+    // Gráficos da aba "Estatísticas do Dia Detalhado"
+    let chartLeads;
+    let chartPagamentos;
+    let chartTaxaConversao;
+    let chartVendasGeradas;
+    let chartVendasConvertidas;
+
     async function updateDashboard(date) {
         try {
             const response = await fetch(`/api/bots-stats?date=${date}`);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
-
             const data = await response.json();
             console.log('Dados recebidos:', data);
 
-            // Estatísticas básicas
+            //-----------------------------------------
+            // SEÇÃO 1: Estatísticas do Dia (statsSection)
+            //-----------------------------------------
             $('#totalUsers').text(data.totalUsers);
             $('#totalPurchases').text(data.totalPurchases);
             $('#conversionRate').text(data.conversionRate.toFixed(2) + '%');
 
-            // Gráfico
+            // Gráfico principal
             const chartData = {
                 labels: ['Usuários', 'Compras'],
-                datasets: [{
-                    label: 'Quantidade',
-                    data: [data.totalUsers, data.totalPurchases],
-                    backgroundColor: ['#36A2EB', '#4BC0C0']
-                }]
+                datasets: [
+                    {
+                        label: 'Quantidade',
+                        data: [data.totalUsers, data.totalPurchases],
+                        backgroundColor: ['#36A2EB', '#4BC0C0']
+                    }
+                ]
             };
             const ctx = document.getElementById('salesChart').getContext('2d');
             if (salesChart) {
@@ -45,36 +55,32 @@ $(document).ready(function () {
                 });
             }
 
-            // Ranking Simples (botRanking)
+            //-----------------------------------------
+            // RANKING SIMPLES (rankingSimplesSection)
+            //-----------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
-            // Se quiser exibir um ranking simples,
-            // podemos criar um "botRanking" no backend (ARRAY) ou exibir parte do "botDetails".
-            // Exemplo hipotético: data.botRanking
-            // Mas no seu app, você não tinha "botRanking"? Então crie no backend ou aproveite data.botDetails.
-
-            // Exemplo: se usarmos data.botDetails para exibir "botName" e "totalPurchases":
-            // Filtra para Ranking Simples
-            if (data.botDetails) {
-                data.botDetails.forEach(bot => {
+            // data.botRanking é do "ranking simples"
+            if (data.botRanking && data.botRanking.length) {
+                data.botRanking.forEach((rank) => {
                     botRankingTbody.append(`
                         <tr>
-                            <td>${bot.botName}</td>
-                            <td>${bot.totalPurchases}</td>
+                            <td>${rank.botName || 'N/A'}</td>
+                            <td>${rank.vendas}</td>
                         </tr>
                     `);
                 });
             }
 
-            // Ranking Detalhado (botDetailsBody)
+            //-----------------------------------------
+            // RANKING DETALHADO (rankingDetalhadoSection)
+            //-----------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
-
-            if (data.botDetails) {
-                data.botDetails.forEach(bot => {
-                    // Monta a lista de planos
+            if (data.botDetails && data.botDetails.length) {
+                data.botDetails.forEach((bot) => {
                     let plansHtml = '';
-                    bot.plans.forEach(plan => {
+                    bot.plans.forEach((plan) => {
                         plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
 
@@ -91,33 +97,194 @@ $(document).ready(function () {
                 });
             }
 
-        } catch (error) {
-            console.error('Erro ao atualizar o dashboard:', error);
+            //-----------------------------------------
+            // ABA "Estatísticas do Dia Detalhado"
+            // Precisamos de:
+            //  data.totalLeads,
+            //  data.pagamentosConfirmados,
+            //  data.taxaConversao,
+            //  data.totalVendasGeradas,
+            //  data.totalVendasConvertidas
+            //-----------------------------------------
+            const totalLeads = data.totalLeads || 0;
+            const pagamentosConfirmados = data.pagamentosConfirmados || 0;
+            const taxaConversao = data.taxaConversao || 0;
+            const totalVendasGeradas = data.totalVendasGeradas || 0;
+            const totalVendasConvertidas = data.totalVendasConvertidas || 0;
+
+            // chartLeads
+            const leadsCtx = document.getElementById('chartLeads').getContext('2d');
+            const leadsConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: ['Leads'],
+                    datasets: [
+                        {
+                            data: [totalLeads],
+                            backgroundColor: ['#FF6384']
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Total de Leads'
+                        }
+                    }
+                }
+            };
+            if (chartLeads) {
+                chartLeads.data = leadsConfig.data;
+                chartLeads.update();
+            } else {
+                chartLeads = new Chart(leadsCtx, leadsConfig);
+            }
+
+            // chartPagamentos
+            const pgCtx = document.getElementById('chartPagamentos').getContext('2d');
+            const pgConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pagamentos'],
+                    datasets: [
+                        {
+                            data: [pagamentosConfirmados],
+                            backgroundColor: ['#36A2EB']
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Pagamentos Confirmados'
+                        }
+                    }
+                }
+            };
+            if (chartPagamentos) {
+                chartPagamentos.data = pgConfig.data;
+                chartPagamentos.update();
+            } else {
+                chartPagamentos = new Chart(pgCtx, pgConfig);
+            }
+
+            // chartTaxaConversao
+            const txCtx = document.getElementById('chartTaxaConversao').getContext('2d');
+            const txConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: ['Taxa %'],
+                    datasets: [
+                        {
+                            data: [taxaConversao],
+                            backgroundColor: ['#FFCE56']
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Taxa de Conversão (%)'
+                        }
+                    }
+                }
+            };
+            if (chartTaxaConversao) {
+                chartTaxaConversao.data = txConfig.data;
+                chartTaxaConversao.update();
+            } else {
+                chartTaxaConversao = new Chart(txCtx, txConfig);
+            }
+
+            // chartVendasGeradas
+            const vgCtx = document.getElementById('chartVendasGeradas').getContext('2d');
+            const vgConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: ['Vendas Geradas (R$)'],
+                    datasets: [
+                        {
+                            data: [totalVendasGeradas],
+                            backgroundColor: ['#4BC0C0']
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Total Vendas Geradas (R$)'
+                        }
+                    }
+                }
+            };
+            if (chartVendasGeradas) {
+                chartVendasGeradas.data = vgConfig.data;
+                chartVendasGeradas.update();
+            } else {
+                chartVendasGeradas = new Chart(vgCtx, vgConfig);
+            }
+
+            // chartVendasConvertidas
+            const vcCtx = document.getElementById('chartVendasConvertidas').getContext('2d');
+            const vcConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: ['Vendas Convertidas (R$)'],
+                    datasets: [
+                        {
+                            data: [totalVendasConvertidas],
+                            backgroundColor: ['#9966FF']
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Vendas Convertidas (R$)'
+                        }
+                    }
+                }
+            };
+            if (chartVendasConvertidas) {
+                chartVendasConvertidas.data = vcConfig.data;
+                chartVendasConvertidas.update();
+            } else {
+                chartVendasConvertidas = new Chart(vcCtx, vcConfig);
+            }
+
+        } catch (err) {
+            console.error('Erro no updateDashboard:', err);
         }
     }
 
-    // 1) Atualiza ao carregar
+    // Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // 2) Atualiza ao mudar data
+    // Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // 3) Lógica de Sidebar: troca visibilidade das sections
+    // Sidebar: troca as seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
 
-        // Remove 'active' das links
+        // remove active
         $('#sidebarNav .nav-link').removeClass('active');
         $(this).addClass('active');
 
-        // Esconde todas as sections
+        // esconde as sections
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
+        $('#statsDayDetailSection').addClass('d-none'); // nova aba
 
-        // Mostra apenas a section clicada
+        // mostra a section alvo
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });

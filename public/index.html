@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <title>Dashboard de Vendas</title>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="/css/style.css" />
+    <!-- Bootstrap CSS (ex.: versão 4.6) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/style.css"> <!-- seu CSS -->
 </head>
 
 <body>
@@ -31,6 +31,12 @@
                             Ranking de Bots Detalhado
                         </a>
                     </li>
+                    <!-- NOVA ABA -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="statsDetailedSection">
+                            Estatísticas do Dia (Detalhado)
+                        </a>
+                    </li>
                 </ul>
             </nav>
 
@@ -39,26 +45,20 @@
                 <div class="py-3">
                     <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
-                    <!-- Seletor de data -->
+                    <!-- Seletor de Data -->
                     <div class="form-group">
                         <label for="datePicker">Selecione a Data:</label>
-                        <input type="date" id="datePicker" class="form-control" value="" />
+                        <input type="date" id="datePicker" class="form-control" value="">
                     </div>
 
                     <!-- SEÇÃO 1: Estatísticas do Dia -->
                     <section id="statsSection">
                         <h3>Estatísticas do Dia</h3>
-                        <p>
-                            Usuários que Geraram Pix: <span id="totalUsers">0</span>
-                        </p>
-                        <p>
-                            Total de Compras: <span id="totalPurchases">0</span>
-                        </p>
-                        <p>
-                            Taxa de Conversão: <span id="conversionRate">0%</span>
-                        </p>
+                        <p>Usuários que Geraram Pix: <span id="totalUsers">0</span></p>
+                        <p>Total de Compras: <span id="totalPurchases">0</span></p>
+                        <p>Taxa de Conversão: <span id="conversionRate">0%</span></p>
 
-                        <!-- Gráfico de Vendas -->
+                        <!-- Gráfico (exemplo) -->
                         <canvas id="salesChart" width="400" height="200"></canvas>
                     </section>
 
@@ -73,7 +73,7 @@
                                 </tr>
                             </thead>
                             <tbody id="botRanking">
-                                <!-- Preenchido dinamicamente -->
+                                <!-- Dados preenchidos dinamicamente -->
                             </tbody>
                         </table>
                     </section>
@@ -93,21 +93,81 @@
                                 </tr>
                             </thead>
                             <tbody id="botDetailsBody">
-                                <!-- Preenchido dinamicamente -->
+                                <!-- Dados preenchidos dinamicamente -->
                             </tbody>
                         </table>
+                    </section>
+
+                    <!-- SEÇÃO 4: Estatísticas do Dia (Detalhado) -->
+                    <section id="statsDetailedSection" class="d-none">
+                        <h3>Estatísticas do Dia (Detalhado)</h3>
+
+                        <!-- Cards em linhas de 4 colunas -->
+                        <div class="row">
+                            <!-- Card 1 -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Total de Leads</h5>
+                                        <p class="card-text" id="cardTotalLeads">0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2 -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Pagamentos Confirmados</h5>
+                                        <p class="card-text" id="cardPaymentsConfirmed">0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3 -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Taxa de Conversão</h5>
+                                        <p class="card-text" id="cardConversionRateDetailed">0%</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 4 -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Volume Gerado (R$)</h5>
+                                        <p class="card-text" id="cardTotalVolume">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Segunda linha (caso queira 5º card separado) -->
+                        <div class="row">
+                            <!-- Card 5 -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Vendas Convertidas (R$)</h5>
+                                        <p class="card-text" id="cardTotalPaidVolume">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Se quiser mais cards, repita col-md-3 -->
+                        </div>
                     </section>
                 </div>
             </main>
         </div>
     </div>
 
-    <!-- jQuery + Bootstrap JS -->
+    <!-- Scripts Bootstrap + jQuery + Chart.js etc. -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
-    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Seu script de dashboard -->
     <script src="/js/dashboard.js"></script>
 </body>
 
