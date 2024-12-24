@@ -1,0 +1,25 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram com funcionalidades de pagamento e remarketing",
+  "main": "services/bot.service.js",
+  "scripts": {
+    "start": "node services/bot.service.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.12.3",
+    "sequelize": "^6.32.1",
+    "pg": "^8.10.0",
+    "pg-hstore": "^2.3.4",
+    "axios": "^1.4.0",
+    "https-proxy-agent": "^5.0.0"
+  },
+  "devDependencies": {
+    "sequelize-cli": "^6.6.0"
+  },
+  "engines": {
+    "node": "16.x"
+  },
+  "author": "Seu Nome",
+  "license": "ISC"
+}
