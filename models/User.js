@@ -9,12 +9,30 @@ module.exports = (sequelize) => {
             unique: true,
             allowNull: false,
         },
-        username: DataTypes.STRING,
-        firstName: DataTypes.STRING,
-        lastName: DataTypes.STRING,
-        languageCode: DataTypes.STRING,
-        isBot: DataTypes.BOOLEAN,
-        lastInteraction: DataTypes.DATE,
+        username: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        firstName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        lastName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        languageCode: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        isBot: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
+        lastInteraction: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
         remarketingSent: {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
@@ -32,6 +50,7 @@ module.exports = (sequelize) => {
 
     }, {
         tableName: 'Users',
+        // timestamps: true, // se quiser createdAt / updatedAt
     });
 
     return User;
