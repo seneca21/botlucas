@@ -9,7 +9,7 @@ const { Sequelize } = require('sequelize');
 const UserModel = require('../models/User');
 
 /**
- * Função auxiliar para converter boolean para texto
+ * Função auxiliar para converter boolean para texto (logs)
  */
 function booleanParaTexto(value, verdadeiro, falso) {
   return value ? verdadeiro : falso;
@@ -17,7 +17,7 @@ function booleanParaTexto(value, verdadeiro, falso) {
 
 // Carrega o config.json
 const config = ConfigService.loadConfig();
-// Carrega as configs de banco (DATABASE_URL, etc)
+// Carrega configs de banco (DATABASE_URL, etc)
 const dbConfig = ConfigService.getDbConfig();
 
 // Inicializa Sequelize
@@ -27,10 +27,10 @@ const sequelize = new Sequelize(dbConfig.connectionString, {
   logging: false, // Desativa logs do Sequelize
 });
 
-// Puxa o model User (você já incluiu botName no model!)
+// Model User (com botName, planName, planValue, etc.)
 const User = UserModel(sequelize);
 
-// Sincroniza o banco (cria/altera tabelas conforme o model)
+// Sincroniza o banco
 sequelize.sync({ alter: true })
   .then(() => {
     console.log('✅ Modelos sincronizados e tabelas alteradas conforme necessário.');
@@ -39,25 +39,25 @@ sequelize.sync({ alter: true })
     console.error('❌ Erro ao sincronizar os modelos:', err);
   });
 
-// Array de bots e sessões de usuários em memória
+// Armazena as instâncias de bots e sessões em memória
 const bots = [];
 const userSessions = {};
 
 /**
- * Inicializa cada bot configurado no config.json
+ * Inicializa cada bot configurado em config.json
  */
 function initializeBot(botConfig) {
   const bot = new Telegraf(botConfig.token);
   console.log(`🚀 Bot ${botConfig.name} em execução.`);
 
   /**
-   * Registra ou atualiza o usuário no banco
+   * Registra ou atualiza o usuário
    */
   async function registerUser(ctx) {
     try {
       const telegramId = ctx.from.id.toString();
 
-      // Tenta encontrar ou criar
+      // Tenta criar ou encontrar
       const [user, created] = await User.findOrCreate({
         where: { telegramId },
         defaults: {
@@ -69,27 +69,23 @@ function initializeBot(botConfig) {
           lastInteraction: new Date(),
           remarketingSent: false,
           hasPurchased: false,
-
-          // Importante: salva o nome do bot
-          botName: botConfig.name,
+          botName: botConfig.name, // registra qual bot o user está usando
         },
       });
 
-      // Info de remarketing e compra para logs
       const statusRemarketing = booleanParaTexto(user.remarketingSent, 'Enviado', 'Não Enviado');
       const statusCompra = booleanParaTexto(user.hasPurchased, 'Comprado', 'Sem Compra');
 
       if (created) {
-        console.log(`✅ Usuário registrado: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
+        console.log(`✅ Novo usuário: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
       } else {
         user.lastInteraction = new Date();
-        // Se quiser garantir sempre o botName atualizado, faça:
-        user.botName = botConfig.name;
+        user.botName = botConfig.name; // se quiser sempre atualizar o nome do bot
         await user.save();
         console.log(`🔄 Usuário atualizado: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
       }
 
-      // Dispara uma mensagem de remarketing se ele não comprou depois de X minutos
+      // Dispara remarketing para não-comprados após X minutos
       const notPurchasedInterval = botConfig.remarketing.intervals.not_purchased_minutes || 5;
       setTimeout(async () => {
         try {
@@ -101,7 +97,7 @@ function initializeBot(botConfig) {
             console.log(`✅ Mensagem de remarketing enviada para ${telegramId}`);
           }
         } catch (err) {
-          console.error(`❌ Erro ao enviar mensagem de remarketing para ${telegramId}:`, err);
+          console.error(`❌ Erro ao enviar remarketing para ${telegramId}:`, err);
         }
       }, notPurchasedInterval * 60 * 1000);
 
@@ -111,67 +107,61 @@ function initializeBot(botConfig) {
   }
 
   /**
-   * Envia mensagens de remarketing conforme a condição
+   * Envia mensagens de remarketing
    */
   async function sendRemarketingMessage(user, condition) {
     try {
-      // Localiza a config da mensagem
       const messageConfig = botConfig.remarketing.messages.find(msg => msg.condition === condition);
       if (!messageConfig) {
-        console.error(`❌ Mensagem de remarketing não encontrada para a condição: ${condition}`);
+        console.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
 
       const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
       if (!fs.existsSync(videoPath)) {
-        console.error(`❌ Arquivo de vídeo não encontrado: ${videoPath}`);
+        console.error(`❌ Vídeo não encontrado: ${videoPath}`);
         return;
       }
 
-      // Confere se todo botão tem "name"
       for (const button of messageConfig.buttons) {
         if (!button.name) {
-          console.error(`❌ Um dos botões de remarketing está sem 'name'.`);
+          console.error(`❌ Botão de remarketing sem 'name'.`);
           return;
         }
       }
 
-      // Cria o markup dos botões
-      const remarketingButtonMarkup = messageConfig.buttons.map((button) =>
-        Markup.button.callback(button.name, `remarketing_select_plan_${button.value}`)
+      const remarketingButtons = messageConfig.buttons.map((btn) =>
+        Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
 
-      // Envia a mensagem de remarketing com vídeo
       await bot.telegram.sendVideo(user.telegramId, { source: videoPath }, {
         caption: messageConfig.text,
         parse_mode: 'HTML',
-        ...Markup.inlineKeyboard(remarketingButtonMarkup, { columns: 1 }),
+        ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
       });
     } catch (error) {
-      console.error(`❌ Erro ao enviar mensagem de remarketing:`, error);
+      console.error(`❌ Erro remarketing:`, error);
     }
   }
 
-  /**
-   * Tratamento global de erros do Telegraf
-   */
+  // Tratamento de erros geral
   bot.catch((err, ctx) => {
     console.error(`❌ Erro no bot:`, err);
     if (err.response && err.response.error_code === 403) {
-      console.warn(`🚫 Bot bloqueado pelo usuário ${ctx.chat.id}.`);
+      console.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
     } else {
-      ctx.reply('⚠️ Ocorreu um erro inesperado. Tente novamente mais tarde.');
+      ctx.reply('⚠️ Erro inesperado. Tente mais tarde.');
     }
   });
 
   /**
-   * Ação "remarketing_select_plan_X" - user clica em um botão de remarketing
+   * Ação remarketing_select_plan_X
    */
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const planValue = parseFloat(ctx.match[1]);
 
-    // Procura esse plano tanto no array principal quanto no remarketing
+    // Tenta achar esse plano nas configs
     const mainPlan = botConfig.buttons.find(btn => btn.value === planValue);
     const remarketingPlan = botConfig.remarketing.messages
       .flatMap(msg => msg.buttons)
@@ -179,24 +169,25 @@ function initializeBot(botConfig) {
 
     const plan = mainPlan || remarketingPlan;
     if (!plan) {
-      console.error(`❌ Plano com valor ${planValue} não encontrado.`);
-      await ctx.reply('⚠️ Plano não encontrado. Tente novamente.');
+      console.error(`❌ Plano valor ${planValue} não encontrado.`);
+      await ctx.reply('⚠️ Plano inexistente. Tente novamente.');
       await ctx.answerCbQuery();
       return;
     }
 
-    // Salva no user o plano escolhido (opcional)
+    // Seta planName e planValue no user, se existir
     const user = await User.findOne({ where: { telegramId: chatId.toString() } });
     if (user) {
+      user.planName = plan.name;    // Ex.: "Plano Mensal"
+      user.planValue = plan.value;  // Ex.: 49.90
       user.lastInteraction = new Date();
-      user.botName = botConfig.name; // caso queria manter atualizado
+      user.botName = botConfig.name;
       await user.save();
     }
 
-    console.log(`✅ Plano ${plan.name} (${plan.value} R$) enviado com sucesso ✅`);
+    console.log(`✅ Plano remarketing ${plan.name} R$${plan.value} selecionado.`);
 
     try {
-      // Gera a cobrança
       const chargeData = {
         value: plan.value * 100,
         webhook_url: null,
@@ -205,17 +196,14 @@ function initializeBot(botConfig) {
       const chargeId = chargeResult.id;
       const emv = chargeResult.qr_code;
 
-      // Salva na sessão
       if (!userSessions[chatId]) userSessions[chatId] = {};
       userSessions[chatId].chargeId = chargeId;
       userSessions[chatId].selectedPlan = plan;
 
-      // Envia o PIX
       await ctx.reply(
-        `📄 Código PIX gerado com sucesso!\n\`\`\`\n${emv}\n\`\`\``,
+        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
         { parse_mode: 'Markdown' }
       );
-      // Botão de verificar pagamento
       await ctx.reply(
         '⚠️ Após pagamento, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -223,12 +211,12 @@ function initializeBot(botConfig) {
         ])
       );
     } catch (error) {
-      console.error('❌ Erro ao criar a cobrança via remarketing:', error);
+      console.error('❌ Erro cobrança (remarketing):', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado pelo usuário ${ctx.chat.id}.`);
+        console.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
         delete userSessions[chatId];
       } else {
-        await ctx.reply('⚠️ Erro ao criar a cobrança. Tente mais tarde.');
+        await ctx.reply('⚠️ Erro ao criar cobrança. Tente mais tarde.');
       }
     }
 
@@ -240,22 +228,20 @@ function initializeBot(botConfig) {
    */
   bot.start(async (ctx) => {
     try {
-      console.info('📩 Comando /start recebido');
+      console.info('📩 /start recebido');
       await registerUser(ctx);
 
       const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
       if (!fs.existsSync(videoPath)) {
-        console.error(`❌ Vídeo não encontrado: ${videoPath}`);
-        await ctx.reply('⚠️ Erro ao carregar o vídeo.');
+        console.error(`❌ Vídeo não achado: ${videoPath}`);
+        await ctx.reply('⚠️ Erro ao carregar vídeo.');
         return;
       }
 
-      // Botões de planos
-      const buttonMarkup = botConfig.buttons.map((button, index) =>
-        Markup.button.callback(button.name, `select_plan_${index}`)
+      const buttonMarkup = botConfig.buttons.map((btn, idx) =>
+        Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
 
-      // Envia o vídeo inicial
       await ctx.replyWithVideo(
         { source: videoPath },
         {
@@ -265,11 +251,11 @@ function initializeBot(botConfig) {
         }
       );
 
-      console.log(`🎥 Vídeo e botões de plano enviados para ${ctx.chat.id}`);
+      console.log(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
     } catch (error) {
-      console.error('❌ Erro no /start:', error);
+      console.error('❌ Erro /start:', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado pelo usuário ${ctx.chat.id}.`);
+        console.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
       } else {
         await ctx.reply('⚠️ Erro ao processar /start.');
       }
@@ -285,24 +271,25 @@ function initializeBot(botConfig) {
     const buttonConfig = botConfig.buttons[buttonIndex];
 
     if (!buttonConfig) {
-      console.error(`❌ Plano índice ${buttonIndex} não encontrado.`);
-      await ctx.reply('⚠️ Plano não encontrado.');
+      console.error(`❌ Plano index ${buttonIndex} não achado.`);
+      await ctx.reply('⚠️ Plano inexistente.');
       await ctx.answerCbQuery();
       return;
     }
 
-    // Atualiza user com a última interação e o botName, se quiser
+    // Seta planName, planValue no user
     const user = await User.findOne({ where: { telegramId: chatId.toString() } });
     if (user) {
+      user.planName = buttonConfig.name;   // ex.: "Mensal"
+      user.planValue = buttonConfig.value; // ex.: 49.90
       user.lastInteraction = new Date();
       user.botName = botConfig.name;
       await user.save();
     }
 
-    console.log(`✅ Plano ${buttonConfig.name} (${buttonConfig.value} R$) enviado com sucesso ✅`);
+    console.log(`✅ Plano ${buttonConfig.name} (R$${buttonConfig.value}) enviado.`);
 
     try {
-      // Cria cobrança
       const chargeData = {
         value: buttonConfig.value * 100,
         webhook_url: null,
@@ -320,7 +307,7 @@ function initializeBot(botConfig) {
         { parse_mode: 'Markdown' }
       );
       await ctx.reply(
-        '⚠️ Após pagar, clique em "Verificar Pagamento".',
+        '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
           Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
         ])
@@ -328,7 +315,7 @@ function initializeBot(botConfig) {
     } catch (error) {
       console.error('❌ Erro ao criar cobrança:', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
+        console.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
         delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao criar cobrança.');
@@ -346,7 +333,7 @@ function initializeBot(botConfig) {
     const session = userSessions[chatId];
 
     if (!session || !session.chargeId) {
-      await ctx.reply('⚠️ Nenhuma cobrança em andamento.');
+      await ctx.reply('⚠️ Não há cobrança em andamento.');
       return;
     }
 
@@ -361,19 +348,19 @@ function initializeBot(botConfig) {
           user.hasPurchased = true;
           await user.save();
           const statusCompra = booleanParaTexto(user.hasPurchased, 'Comprado', 'Sem Compra');
-          console.log(`✅ Usuário ${chatId} marcado como ${statusCompra}. Plano: ${user.planName} R$${user.planValue}`);
+          console.log(`✅ ${chatId} -> ${statusCompra}. Plano: ${user.planName} R$${user.planValue}`);
 
-          // Dispara upsell
+          // Envia upsell depois de X seg
           const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
           setTimeout(async () => {
             try {
               const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
               if (currentUser && currentUser.hasPurchased) {
                 await sendRemarketingMessage(currentUser, 'purchased');
-                console.log(`✅ Upsell enviado para ${chatId}`);
+                console.log(`✅ Upsell enviado -> ${chatId}`);
               }
             } catch (err) {
-              console.error(`❌ Erro upsell ${chatId}:`, err);
+              console.error(`❌ Erro upsell -> ${chatId}:`, err);
             }
           }, purchasedInterval * 1000);
         }
@@ -388,15 +375,15 @@ function initializeBot(botConfig) {
 
         delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
-        await ctx.reply('❌ A cobrança expirou.');
+        await ctx.reply('❌ Cobrança expirou.');
         delete userSessions[chatId];
       } else {
-        await ctx.reply('⏳ Aguardando pagamento...');
+        await ctx.reply('⏳ Ainda aguardando pagamento...');
       }
     } catch (error) {
       console.error('❌ Erro ao verificar pagamento:', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
+        console.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
         delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao verificar pagamento.');
@@ -405,7 +392,7 @@ function initializeBot(botConfig) {
   });
 
   /**
-   * Ação check_payment_X
+   * Ação "check_payment_X"
    */
   bot.action(/check_payment_(.+)/, async (ctx) => {
     const chatId = ctx.chat.id;
@@ -418,7 +405,7 @@ function initializeBot(botConfig) {
     }
 
     try {
-      console.info('🔍 Verificando pagamento...');
+      console.info('🔍 Ver status pagamento...');
       const paymentStatus = await checkPaymentStatus(chargeId);
 
       if (paymentStatus.status === 'paid') {
@@ -428,19 +415,19 @@ function initializeBot(botConfig) {
           user.hasPurchased = true;
           await user.save();
           const statusCompra = booleanParaTexto(user.hasPurchased, 'Comprado', 'Sem Compra');
-          console.log(`✅ Usuário ${chatId} ${statusCompra}.`);
+          console.log(`✅ ${chatId} -> ${statusCompra}. Plano: ${user.planName} R$${user.planValue}`);
 
-          // Envia upsell
+          // Upsell
           const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
           setTimeout(async () => {
             try {
               const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
               if (currentUser && currentUser.hasPurchased) {
                 await sendRemarketingMessage(currentUser, 'purchased');
-                console.log(`✅ Upsell enviado ${chatId}`);
+                console.log(`✅ Upsell enviado -> ${chatId}`);
               }
             } catch (err) {
-              console.error(`❌ Erro upsell ${chatId}:`, err);
+              console.error(`❌ Erro upsell -> ${chatId}:`, err);
             }
           }, purchasedInterval * 1000);
 
@@ -460,9 +447,9 @@ function initializeBot(botConfig) {
         await ctx.reply('⏳ Pagamento pendente.');
       }
     } catch (error) {
-      console.error('❌ Erro status pagamento:', error);
+      console.error('❌ Erro ao verificar pagamento:', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado ${ctx.chat.id}`);
+        console.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
         delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao verificar pagamento.');
@@ -478,18 +465,18 @@ function initializeBot(botConfig) {
       console.info(`🚀 Bot ${botConfig.name} iniciado com sucesso.`);
     })
     .catch((error) => {
-      console.error(`🔥 Erro ao iniciar ${botConfig.name}:`, error);
+      console.error(`🔥 Erro ao iniciar bot ${botConfig.name}:`, error);
     });
 
-  // Permite encerramento gracioso
+  // Encerramento gracioso
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-  // Guarda no array
+  // Salva no array
   bots.push(bot);
 }
 
-// Inicia cada bot configurado
+// Inicia cada bot do array config.bots
 for (const botConfig of config.bots) {
   initializeBot(botConfig);
 }

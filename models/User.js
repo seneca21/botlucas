@@ -42,15 +42,25 @@ module.exports = (sequelize) => {
             defaultValue: false,
         },
 
-        // Adicione a coluna botName:
+        // BotName (nome do bot, se você quiser rastrear qual bot).
         botName: {
             type: DataTypes.STRING,
             allowNull: true,
         },
 
+        // IMPORTANTE: planName e planValue
+        planName: {
+            type: DataTypes.STRING,
+            allowNull: true, // Ex.: "Plano Mensal", "Plano Anual", etc.
+        },
+        planValue: {
+            type: DataTypes.FLOAT,
+            allowNull: true, // Ex.: 49.90, 99.00 etc.
+        },
+
     }, {
         tableName: 'Users',
-        // timestamps: true, // se quiser createdAt / updatedAt
+        // timestamps: true, // se quiser createdAt e updatedAt automáticos
     });
 
     return User;
