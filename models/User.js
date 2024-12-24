@@ -2,6 +2,7 @@
 
 module.exports = (sequelize) => {
     const { DataTypes } = require('sequelize');
+
     const User = sequelize.define('User', {
         telegramId: {
             type: DataTypes.STRING,
@@ -20,8 +21,15 @@ module.exports = (sequelize) => {
         },
         hasPurchased: {
             type: DataTypes.BOOLEAN,
-            defaultValue: false, // Inicialmente, o usuário não comprou
+            defaultValue: false,
         },
+
+        // Adicione a coluna botName:
+        botName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+
     }, {
         tableName: 'Users',
     });
