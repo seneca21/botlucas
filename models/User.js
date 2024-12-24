@@ -41,21 +41,19 @@ module.exports = (sequelize) => {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
         },
-
-        // BotName (nome do bot, se você quiser rastrear qual bot).
+        // BotName (nome do bot)
         botName: {
             type: DataTypes.STRING,
             allowNull: true,
         },
-
-        // IMPORTANTE: planName e planValue
+        // planName e planValue
         planName: {
             type: DataTypes.STRING,
-            allowNull: true, // Ex.: "Plano Mensal", "Plano Anual", etc.
+            allowNull: true,
         },
         planValue: {
             type: DataTypes.FLOAT,
-            allowNull: true, // Ex.: 49.90, 99.00 etc.
+            allowNull: true,
         },
 
     }, {

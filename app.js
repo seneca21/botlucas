@@ -11,7 +11,7 @@ const { Op, Sequelize } = require('sequelize');
 // Importa a instância do Sequelize configurada em db.js
 const sequelize = require('./db');
 
-// Importa o model User (que já tem botName e planName etc)
+// Importa o model User (que já tem botName, planName, planValue, etc.)
 const UserModel = require('./models/User');
 const User = UserModel(sequelize);
 
@@ -80,7 +80,37 @@ app.get('/api/bots-stats', async (req, res) => {
             ? (totalPurchases / totalUsers) * 100
             : 0;
 
-        // 4) Ranking de bots -> quantas compras por bot + soma do planValue
+        // ----------------------------------------------------------------
+        // RANKING SIMPLES (botRanking): Bot x Quantidade de Vendas
+        // ----------------------------------------------------------------
+        const botRankingRaw = await User.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas']
+            ],
+            where: {
+                hasPurchased: true,
+                lastInteraction: {
+                    [Op.between]: [startDate, endDate]
+                },
+                botName: {
+                    [Op.ne]: null
+                }
+            },
+            group: ['botName'],
+            order: [[Sequelize.literal('"vendas"'), 'DESC']]
+        });
+
+        // Transforma em array simples
+        const botRanking = botRankingRaw.map(item => ({
+            botName: item.botName,
+            vendas: parseInt(item.getDataValue('vendas'), 10) || 0
+        }));
+
+        // ----------------------------------------------------------------
+        // RANKING DETALHADO (botDetails)
+        // ----------------------------------------------------------------
+        // a) Compras por bot
         const botsWithPurchases = await User.findAll({
             attributes: [
                 'botName',
@@ -99,7 +129,7 @@ app.get('/api/bots-stats', async (req, res) => {
             group: ['botName']
         });
 
-        // 5) totalUsers por bot
+        // b) totalUsers por bot
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -116,7 +146,7 @@ app.get('/api/bots-stats', async (req, res) => {
             group: ['botName']
         });
 
-        // Monta um map (botName -> totalUsers)
+        // Monta map (botName -> totalUsers)
         const botUsersMap = {};
         botsWithInteractions.forEach(item => {
             const bName = item.botName;
@@ -124,7 +154,7 @@ app.get('/api/bots-stats', async (req, res) => {
             botUsersMap[bName] = uCount;
         });
 
-        // 6) Vendas detalhadas por plano e por bot
+        // c) Vendas por plano (planName) e por bot
         const planSalesByBot = await User.findAll({
             attributes: [
                 'botName',
@@ -159,7 +189,7 @@ app.get('/api/bots-stats', async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
-        // 7) Monta array final "botDetails" para Ranking Detalhado
+        // d) Monta array final "botDetails" para Ranking Detalhado
         const botDetails = [];
         botsWithPurchases.forEach(bot => {
             const bName = bot.botName;
@@ -205,12 +235,13 @@ app.get('/api/bots-stats', async (req, res) => {
         // Ordena desc por valorGerado (opcional)
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Retorna ao front-end
+        // Retorna ao front-end (incluindo ranking simples e detalhado)
         res.json({
             totalUsers,
             totalPurchases,
             conversionRate,
-            botDetails
+            botRanking,  // <--- Ranking SIMPLES
+            botDetails   // <--- Ranking DETALHADO
         });
     } catch (error) {
         console.error('❌ Erro ao obter estatísticas:', error);

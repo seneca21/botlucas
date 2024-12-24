@@ -1,3 +1,5 @@
+// public/js/dashboard.js
+
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
@@ -20,7 +22,7 @@ $(document).ready(function () {
             $('#totalPurchases').text(data.totalPurchases);
             $('#conversionRate').text(data.conversionRate.toFixed(2) + '%');
 
-            // Montar ranking simples (botRanking)
+            // 1) Montar ranking simples (botRanking)
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -34,7 +36,7 @@ $(document).ready(function () {
                 });
             }
 
-            // Gráfico (usuários X compras)
+            // 2) Montar/atualizar gráfico (usuários X compras)
             const chartData = {
                 labels: ['Usuários (Geraram Pix)', 'Compras'],
                 datasets: [{
@@ -62,27 +64,29 @@ $(document).ready(function () {
                 });
             }
 
-            // Caso queira exibir mais detalhes em "botDetailsBody", implemente aqui
-            // Exemplo:
-            /*
+            // 3) Montar Ranking de Bots com Mais Vendas - Detalhado (botDetails)
             const botDetailsBody = $('#botDetailsBody');
             botDetailsBody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
                 data.botDetails.forEach(bot => {
                     // Exemplo de colunas
+                    // "plans" => array com {planName, salesCount, conversionRate}
+                    const plansInfo = bot.plans.map(p => {
+                        return `<strong>${p.planName}</strong>: ${p.salesCount} vendas (${p.conversionRate.toFixed(2)}%)`;
+                    }).join('<br>');
+
                     botDetailsBody.append(`
                         <tr>
                             <td>${bot.botName}</td>
                             <td>R$${bot.valorGerado.toFixed(2)}</td>
                             <td>${bot.totalPurchases}</td>
-                            <td>--Planos e conversão--</td>
+                            <td>${plansInfo}</td>
                             <td>${bot.conversionRate.toFixed(2)}%</td>
                             <td>R$${bot.averageValue.toFixed(2)}</td>
                         </tr>
                     `);
                 });
             }
-            */
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }

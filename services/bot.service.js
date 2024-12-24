@@ -383,7 +383,7 @@ function initializeBot(botConfig) {
     } catch (error) {
       console.error('❌ Erro ao verificar pagamento:', error);
       if (error.response && error.response.error_code === 403) {
-        console.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
+        console.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
         delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao verificar pagamento.');
