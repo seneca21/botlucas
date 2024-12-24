@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Dashboard de Vendas</title>
+
+    <!-- Bootstrap CSS (opcional) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Seu arquivo CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="my-4 text-center">Dashboard de Vendas</h1>
+
+        <!-- Seletor de Data -->
+        <div class="form-group">
+            <label for="datePicker">Selecione a Data:</label>
+            <input type="date" id="datePicker" class="form-control" value="">
+        </div>
+
+        <!-- Gráfico de Vendas -->
+        <canvas id="salesChart" width="400" height="200"></canvas>
+
+        <!-- Estatísticas -->
+        <div class="mt-4">
+            <h3>Estatísticas do Dia</h3>
+            <p>Total de Usuários que Geraram Pix: <span id="totalUsers">0</span></p>
+            <p>Total de Compras: <span id="totalPurchases">0</span></p>
+            <p>Taxa de Conversão: <span id="conversionRate">0%</span></p>
+        </div>
+
+        <!-- Ranking de Bots (Simples) -->
+        <div class="mt-4">
+            <h3>Ranking de Bots (Simples)</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Vendas</th>
+                    </tr>
+                </thead>
+                <tbody id="botRanking">
+                    <!-- Preenchido dinamicamente pelo JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Tabela Detalhada de Bots (Opcional) -->
+        <div class="mt-4">
+            <h3>Ranking de Bots com Mais Vendas - Detalhado</h3>
+            <table class="table table-striped" id="botDetailsTable">
+                <thead>
+                    <tr>
+                        <th>Bot Name</th>
+                        <th>Total do Valor Convertido (R$)</th>
+                        <th>Vendas Convertidas</th>
+                        <th>Planos (Vendas e Conversão %)</th>
+                        <th>Conversão (%)</th>
+                        <th>Valor Médio por Compra (R$)</th>
+                    </tr>
+                </thead>
+                <tbody id="botDetailsBody">
+                    <!-- Preenchido dinamicamente, se/quando você implementar -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- jQuery (recomendado pelo Bootstrap) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Seu script de dashboard -->
+    <script src="/js/dashboard.js"></script>
+</body>
+
+</html>
