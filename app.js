@@ -73,6 +73,8 @@ app.get('/api/bots-stats', async (req, res) => {
         const totalPurchases = await User.count({
             where: {
                 hasPurchased: true,
+                // Se você controla a "data da compra" em outra coluna, use-a aqui.
+                // Se for lastInteraction, mantenha assim.
                 lastInteraction: {
                     [Op.between]: [startDate, endDate]
                 }
@@ -114,7 +116,6 @@ app.get('/api/bots-stats', async (req, res) => {
             totalPurchases,
             conversionRate,
             botRanking
-            // se quiser algo como "botDetails", você faz queries extras
         };
 
         return res.json(stats);
