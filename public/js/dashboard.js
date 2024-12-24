@@ -1,11 +1,10 @@
-// public/js/dashboard.js
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
-    let salesChart; // Gráfico principal (Usuários x Compras)
+    let salesChart; // gráfico principal da 1ª aba
 
-    // Gráficos da aba "Estatísticas do Dia Detalhado"
+    // Novos gráficos na aba "statsDayDetailSection"
     let chartLeads;
     let chartPagamentos;
     let chartTaxaConversao;
@@ -19,25 +18,22 @@ $(document).ready(function () {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
-            console.log('Dados recebidos:', data);
 
-            //-----------------------------------------
-            // SEÇÃO 1: Estatísticas do Dia (statsSection)
-            //-----------------------------------------
+            // -------------------------------
+            // SEÇÃO 1: Estatísticas do Dia
+            // -------------------------------
             $('#totalUsers').text(data.totalUsers);
             $('#totalPurchases').text(data.totalPurchases);
             $('#conversionRate').text(data.conversionRate.toFixed(2) + '%');
 
-            // Gráfico principal
+            // Gráfico principal (Usuários x Compras)
             const chartData = {
                 labels: ['Usuários', 'Compras'],
-                datasets: [
-                    {
-                        label: 'Quantidade',
-                        data: [data.totalUsers, data.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#4BC0C0']
-                    }
-                ]
+                datasets: [{
+                    label: 'Quantidade',
+                    data: [data.totalUsers, data.totalPurchases],
+                    backgroundColor: ['#36A2EB', '#4BC0C0'],
+                }],
             };
             const ctx = document.getElementById('salesChart').getContext('2d');
             if (salesChart) {
@@ -55,32 +51,31 @@ $(document).ready(function () {
                 });
             }
 
-            //-----------------------------------------
-            // RANKING SIMPLES (rankingSimplesSection)
-            //-----------------------------------------
+            // -------------------------------
+            // Ranking Simples
+            // -------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
-            // data.botRanking é do "ranking simples"
-            if (data.botRanking && data.botRanking.length) {
-                data.botRanking.forEach((rank) => {
+            if (data.botRanking && data.botRanking.length > 0) {
+                data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
                         <tr>
-                            <td>${rank.botName || 'N/A'}</td>
-                            <td>${rank.vendas}</td>
+                            <td>${bot.botName || 'N/A'}</td>
+                            <td>${bot.vendas}</td>
                         </tr>
                     `);
                 });
             }
 
-            //-----------------------------------------
-            // RANKING DETALHADO (rankingDetalhadoSection)
-            //-----------------------------------------
+            // -------------------------------
+            // Ranking Detalhado
+            // -------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
-            if (data.botDetails && data.botDetails.length) {
-                data.botDetails.forEach((bot) => {
+            if (data.botDetails && data.botDetails.length > 0) {
+                data.botDetails.forEach(bot => {
                     let plansHtml = '';
-                    bot.plans.forEach((plan) => {
+                    bot.plans.forEach(plan => {
                         plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
 
@@ -97,22 +92,22 @@ $(document).ready(function () {
                 });
             }
 
-            //-----------------------------------------
-            // ABA "Estatísticas do Dia Detalhado"
-            // Precisamos de:
-            //  data.totalLeads,
-            //  data.pagamentosConfirmados,
-            //  data.taxaConversao,
-            //  data.totalVendasGeradas,
-            //  data.totalVendasConvertidas
-            //-----------------------------------------
-            const totalLeads = data.totalLeads || 0;
-            const pagamentosConfirmados = data.pagamentosConfirmados || 0;
-            const taxaConversao = data.taxaConversao || 0;
-            const totalVendasGeradas = data.totalVendasGeradas || 0;
-            const totalVendasConvertidas = data.totalVendasConvertidas || 0;
+            // -------------------------------
+            // SEÇÃO "Estatísticas do Dia Detalhado"
+            // Precisamos de 5 métricas:
+            //   totalLeads, pagamentosConfirmados,
+            //   taxaConversao, totalVendasGeradas,
+            //   totalVendasConvertidas
+            // -------------------------------
+            const {
+                totalLeads,
+                pagamentosConfirmados,
+                taxaConversao,
+                totalVendasGeradas,
+                totalVendasConvertidas
+            } = data;
 
-            // chartLeads
+            // chartLeads (exemplo: doughnut)
             const leadsCtx = document.getElementById('chartLeads').getContext('2d');
             const leadsConfig = {
                 type: 'doughnut',
@@ -120,19 +115,19 @@ $(document).ready(function () {
                     labels: ['Leads'],
                     datasets: [
                         {
-                            data: [totalLeads],
-                            backgroundColor: ['#FF6384']
-                        }
-                    ]
+                            data: [totalLeads || 0],
+                            backgroundColor: ['#FF6384'],
+                        },
+                    ],
                 },
                 options: {
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Total de Leads'
-                        }
-                    }
-                }
+                            text: 'Total Leads',
+                        },
+                    },
+                },
             };
             if (chartLeads) {
                 chartLeads.data = leadsConfig.data;
@@ -149,19 +144,19 @@ $(document).ready(function () {
                     labels: ['Pagamentos'],
                     datasets: [
                         {
-                            data: [pagamentosConfirmados],
-                            backgroundColor: ['#36A2EB']
-                        }
-                    ]
+                            data: [pagamentosConfirmados || 0],
+                            backgroundColor: ['#36A2EB'],
+                        },
+                    ],
                 },
                 options: {
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Pagamentos Confirmados'
-                        }
-                    }
-                }
+                            text: 'Pagamentos Confirmados',
+                        },
+                    },
+                },
             };
             if (chartPagamentos) {
                 chartPagamentos.data = pgConfig.data;
@@ -178,19 +173,19 @@ $(document).ready(function () {
                     labels: ['Taxa %'],
                     datasets: [
                         {
-                            data: [taxaConversao],
-                            backgroundColor: ['#FFCE56']
-                        }
-                    ]
+                            data: [taxaConversao || 0],
+                            backgroundColor: ['#FFCE56'],
+                        },
+                    ],
                 },
                 options: {
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Taxa de Conversão (%)'
-                        }
-                    }
-                }
+                            text: 'Taxa Conversão (%)',
+                        },
+                    },
+                },
             };
             if (chartTaxaConversao) {
                 chartTaxaConversao.data = txConfig.data;
@@ -207,19 +202,19 @@ $(document).ready(function () {
                     labels: ['Vendas Geradas (R$)'],
                     datasets: [
                         {
-                            data: [totalVendasGeradas],
-                            backgroundColor: ['#4BC0C0']
-                        }
-                    ]
+                            data: [totalVendasGeradas || 0],
+                            backgroundColor: ['#4BC0C0'],
+                        },
+                    ],
                 },
                 options: {
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Total Vendas Geradas (R$)'
-                        }
-                    }
-                }
+                            text: 'Total Vendas Geradas (R$)',
+                        },
+                    },
+                },
             };
             if (chartVendasGeradas) {
                 chartVendasGeradas.data = vgConfig.data;
@@ -236,19 +231,19 @@ $(document).ready(function () {
                     labels: ['Vendas Convertidas (R$)'],
                     datasets: [
                         {
-                            data: [totalVendasConvertidas],
-                            backgroundColor: ['#9966FF']
-                        }
-                    ]
+                            data: [totalVendasConvertidas || 0],
+                            backgroundColor: ['#9966FF'],
+                        },
+                    ],
                 },
                 options: {
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Vendas Convertidas (R$)'
-                        }
-                    }
-                }
+                            text: 'Vendas Convertidas (R$)',
+                        },
+                    },
+                },
             };
             if (chartVendasConvertidas) {
                 chartVendasConvertidas.data = vcConfig.data;
@@ -262,19 +257,19 @@ $(document).ready(function () {
         }
     }
 
-    // Atualiza ao carregar
+    // 1) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Atualiza ao mudar data
+    // 2) Atualiza ao mudar a data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // Sidebar: troca as seções
+    // 3) Lógica de Sidebar para trocar seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
 
-        // remove active
+        // remove 'active' de todos
         $('#sidebarNav .nav-link').removeClass('active');
         $(this).addClass('active');
 
@@ -282,9 +277,8 @@ $(document).ready(function () {
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
-        $('#statsDayDetailSection').addClass('d-none'); // nova aba
+        $('#statsDayDetailSection').addClass('d-none'); // nova
 
-        // mostra a section alvo
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
