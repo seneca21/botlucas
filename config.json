@@ -1,422 +1,27 @@
 {
   "bots": [
     {
-      "name": "Cantincest_bot - ruivo",
-      "details": "Cantincest_bot",
-      "token": "7926238621:AAEwfvKiERkPD1Tbu4eZGCEPETaBJkEuq5I",
-      "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
-      "description": "💣 PLANO MENSAL BÁSICO <b>R$10</b> \n \n 🔥 PLANO VITALÍCIO BÁSICO <b>R$15</b> \n \n 💥 PLANO VITALÍCIO PREMIUM <b>R$20</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-      "video": "copy5.mp4",
-      "buttons": [
-        {
-          "name": "MENSAL BÁSICO",
-          "value": 10,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO BÁSICO",
-          "value": 15,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO PREMIUM",
-          "value": 20,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        }
-      ],
-      "mp_config": {
-        "accessToken": "APP_USR-...",
-        "options": {
-          "timeout": 5000
-        }
-      },
-      "pushin_config": {
-        "token": "4553|MeWIwdDfMXRMwGfDAUd2Z3XYEAJGQfeTxw3OxNUh04c82931",
-        "api_url": "https://api.pushinpay.com.br/api",
-        "pix_key": "+5511941111578",
-        "pix_key_type": "phone"
-      },
-      "remarketing": {
-        "messages": [
-          {
-            "condition": "not_purchased",
-            "text": "🚨URGENTE 🚨\n \n APENAS AGORA VOCÊ PODE GANHAR TODOS OS GRUPOS DO VITALICIO PREMIUM POR APENAS R$10,00 ⏳\n \n SUA ÚLTIMA CHANCE DE ENTRAR NO GRUPO COM AS MELHORES MIDIAS REAIS DO TELEGRAM🔥\n \n GANHA DE BRINDE PLANO VITALÍCIO PREMIUM <b>R$50% DE DESCONTO0</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-            "buttons": [
-              {
-                "name": "VITALÍCIO PREMIUM",
-                "value": 9.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          },
-          {
-            "condition": "purchased",
-            "text": "• N@v1nhas pagando boquete 👅👧 \n • N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
-            "buttons": [
-              {
-                "name": "MENSAL AVANÇADO",
-                "value": 19.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 24.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 29.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy-upsell-nov.mp4"
-          }
-        ],
-        "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
-        }
-      }
-    },
-    {
-      "name": "@PromoIPM_bot - ruivo",
-      "details": "@PromoIPM_bot",
-      "token": "7550954677:AAGK7sC-LYZjN30T1BJHrgHvMl4qtvsnAo4",
-      "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
-      "description": "PROCURANDO UM NOVO VIP SEU SAFADO? \n \n 🫦 Sabemos que sua fome pelo INCESTO não tem fim, então resolvemos te levar ao limite de sua saciedade e  busca por aquilo que você realmente AMA. \n \n 🎁 Como você clicou no link especial, você acaba de ganhar um mega desconto e muitos grupos de presente.\n \n 👄 Além disso tudo você ganha números para um sorteio das roupas íntimas de familiares a sua escolha: \n<b>Mensal Basico = 1 número</b> \n<b>Vitalício Basico = 10 números</b> \n<b>Vitalício Premium = 100 números</b> \n \n 💥 NO VITALÍCIO PREMIUM GANHE DE BRINDE: 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n ⬇️ LITERALMENTE TUDO O QUE VOCÊ PROCURA AQUI!!! ⬇️",
-      "video": "copy2.mp4",
-      "buttons": [
-        {
-          "name": "MENSAL BÁSICO R$10",
-          "value": 10,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO BÁSICO R$15",
-          "value": 15,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO PREMIUM R$20",
-          "value": 20,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        }
-      ],
-      "mp_config": {
-        "accessToken": "APP_USR-...",
-        "options": {
-          "timeout": 5000
-        }
-      },
-      "pushin_config": {
-        "token": "7767060748:AAH_JQauUfBhKw1cUsgDh9GruogDifl6Igw",
-        "api_url": "https://api.pushinpay.com.br/api",
-        "pix_key": "+5511941111578",
-        "pix_key_type": "phone"
-      },
-      "remarketing": {
-        "messages": [
-          {
-            "condition": "not_purchased",
-            "text": "🚨URGENTE 🚨\n \n APENAS AGORA VOCÊ PODE GANHAR TODOS OS GRUPOS DO VITALICIO PREMIUM POR APENAS R$10,00 ⏳\n \n SUA ÚLTIMA CHANCE DE ENTRAR NO GRUPO COM AS MELHORES MIDIAS REAIS DO TELEGRAM🔥\n \n GANHA DE BRINDE PLANO VITALÍCIO PREMIUM <b>R$50% DE DESCONTO0</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-            "buttons": [
-              {
-                "name": "VITALÍCIO PREMIUM",
-                "value": 9.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          },
-          {
-            "condition": "purchased",
-            "text": "• N@v1nhas pagando boquete 👅👧 \n • N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
-            "buttons": [
-              {
-                "name": "MENSAL AVANÇADO",
-                "value": 19.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 24.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 29.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy-upsell-nov.mp4"
-          }
-        ],
-        "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
-        }
-      }
-    },
-    {
-      "name": "Inceslg_bot - felipe",
-      "details": "Inceslg_bot",
-      "token": "7876759202:AAFfgfA6Dj2dsBwGMtEh8WkNli8sjcBv1sA",
-      "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
-      "description": "💣 PLANO MENSAL BÁSICO <b>R$10</b> \n \n 🔥 PLANO VITALÍCIO BÁSICO <b>R$15</b> \n \n 💥 PLANO VITALÍCIO PREMIUM <b>R$20</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-      "video": "previa.mp4",
-      "buttons": [
-        {
-          "name": "MENSAL BÁSICO",
-          "value": 9.90,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        },
-        {
-          "name": "VITALÍCIO BÁSICO",
-          "value": 14.90,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        },
-        {
-          "name": "VITALÍCIO PREMIUM",
-          "value": 19.97,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        }
-      ],
-      "mp_config": {
-        "accessToken": "APP_USR-...",
-        "options": {
-          "timeout": 5000
-        }
-      },
-      "pushin_config": {
-        "token": "7767060748:AAH_JQauUfBhKw1cUsgDh9GruogDifl6Igw",
-        "api_url": "https://api.pushinpay.com.br/api",
-        "pix_key": "+5511941111578",
-        "pix_key_type": "phone"
-      },
-      "remarketing": {
-        "messages": [
-          {
-            "condition": "not_purchased",
-            "text": "🚨URGENTE 🚨\n \n APENAS AGORA VOCÊ PODE GANHAR TODOS OS GRUPOS DO VITALICIO PREMIUM POR APENAS R$10,00 ⏳\n \n SUA ÚLTIMA CHANCE DE ENTRAR NO GRUPO COM AS MELHORES MIDIAS REAIS DO TELEGRAM🔥\n \n GANHA DE BRINDE PLANO VITALÍCIO PREMIUM <b>R$50% DE DESCONTO0</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-            "buttons": [
-              {
-                "name": "VITALÍCIO PREMIUM",
-                "value": 9.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          },
-          {
-            "condition": "purchased",
-            "text": "• N@v1nhas pagando boquete 👅👧 \n • N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
-            "buttons": [
-              {
-                "name": "MENSAL AVANÇADO",
-                "value": 19.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 24.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 29.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy-upsell-nov.mp4"
-          }
-        ],
-        "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
-        }
-      }
-    },
-    {
-      "name": "Familysacana_bot - felipe",
-      "details": "Familysacana_bot",
-      "token": "7367634260:AAGSPltdWjbyFJJCFFKl3VrKqFtjIPY46Ro",
-      "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
-      "description": "💣 PLANO MENSAL BÁSICO <b>R$10</b> \n \n 🔥 PLANO VITALÍCIO BÁSICO <b>R$15</b> \n \n 💥 PLANO VITALÍCIO PREMIUM <b>R$20</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-      "video": "copy1.mp4",
-      "buttons": [
-        {
-          "name": "MENSAL BÁSICO",
-          "value": 9.90,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        },
-        {
-          "name": "VITALÍCIO BÁSICO",
-          "value": 14.90,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        },
-        {
-          "name": "VITALÍCIO PREMIUM",
-          "value": 19.97,
-          "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
-        }
-      ],
-      "mp_config": {
-        "accessToken": "APP_USR-...",
-        "options": {
-          "timeout": 5000
-        }
-      },
-      "pushin_config": {
-        "token": "7767060748:AAH_JQauUfBhKw1cUsgDh9GruogDifl6Igw",
-        "api_url": "https://api.pushinpay.com.br/api",
-        "pix_key": "+5511941111578",
-        "pix_key_type": "phone"
-      },
-      "remarketing": {
-        "messages": [
-          {
-            "condition": "not_purchased",
-            "text": "🚨URGENTE 🚨\n \n APENAS AGORA VOCÊ PODE GANHAR TODOS OS GRUPOS DO VITALICIO PREMIUM POR APENAS R$10,00 ⏳\n \n SUA ÚLTIMA CHANCE DE ENTRAR NO GRUPO COM AS MELHORES MIDIAS REAIS DO TELEGRAM🔥\n \n GANHA DE BRINDE PLANO VITALÍCIO PREMIUM <b>R$50% DE DESCONTO0</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-            "buttons": [
-              {
-                "name": "VITALÍCIO PREMIUM",
-                "value": 9.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          },
-          {
-            "condition": "purchased",
-            "text": "• N@v1nhas pagando boquete 👅👧 \n • N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
-            "buttons": [
-              {
-                "name": "MENSAL AVANÇADO",
-                "value": 19.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 24.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 29.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy-upsell-nov.mp4"
-          }
-        ],
-        "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
-        }
-      }
-    },
-    {
-      "name": "@Nv9reais_bot - ruivo",
-      "details": "nvinha - upsell",
-      "token": "7712808148:AAEeyonui4r_QBhw4D7PJ4hie1__JnECPGw",
+      "name": "@Testexota_bot",
+      "details": "@Testexota_bot",
+      "token": "7042810577:AAGp3Se86bzHoSe856iNdzqA04cYvqY9Uqw",
       "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
       "description": "• N@v1nhas pagando boquete 👅👧 \n • N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
       "video": "copy-upsell-nov.mp4",
       "buttons": [
         {
           "name": "MENSAL",
-          "value": 19.90,
+          "value": 2,
           "link": "https://t.me/+WOjrmdhtJoI2MzA5"
         },
         {
           "name": "VITALÍCIO BÁSICO",
-          "value": 24.90,
+          "value": 3,
           "link": "https://t.me/+WOjrmdhtJoI2MzA5"
         },
         {
           "name": "VITALÍCIO PREMIUM",
-          "value": 29.90,
+          "value": 4,
           "link": "https://t.me/+WOjrmdhtJoI2MzA5"
-        }
-      ],
-      "mp_config": {
-        "accessToken": "APP_USR-...",
-        "options": {
-          "timeout": 5000
-        }
-      },
-      "pushin_config": {
-        "token": "7767060748:AAH_JQauUfBhKw1cUsgDh9GruogDifl6Igw",
-        "api_url": "https://api.pushinpay.com.br/api",
-        "pix_key": "+5511941111578",
-        "pix_key_type": "phone"
-      },
-      "remarketing": {
-        "messages": [
-          {
-            "condition": "not_purchased",
-            "text": "🚨URGENTE 🚨\n \n APENAS AGORA VOCÊ PODE GANHAR TODOS OS GRUPOS DO VITALICIO PREMIUM POR APENAS R$10,00 ⏳\n \n SUA ÚLTIMA CHANCE DE ENTRAR NO GRUPO COM AS MELHORES MIDIAS REAIS DO TELEGRAM🔥\n \n GANHA DE BRINDE PLANO VITALÍCIO PREMIUM <b>R$50% DE DESCONTO0</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-            "buttons": [
-              {
-                "name": "VITALÍCIO PREMIUM",
-                "value": 9.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          },
-          {
-            "condition": "purchased",
-            "text": "• N@v1nhas pagando boquete 👅👧 \n •N@v1nhas perdendo virgindade🎀 \n • N@v1nhas tendo orgasmos escorrendo molhadinha 💦 \n N@v1nhas engolindo porra🙇 \n • N@v1nhas dando o cuzinho pela primeira vez🔥🙊 \n • N@v1nhas masoquista🥵💀 \n \nTudo por <b>R$19,90</b> mensal ou <b>R$24,90</b> vitalício ou <b>R$29,90 no vitalício premium</b> que você ganha 5 grupos (Masoquismo, N@v1nhas Teen da dark web, Casadas Traindo o Corno, Incestos pesado Reais) \n \nConteúdos Reais e da Web, só Compre se Quiser Putaria de Verdade (Por isso o preço, conteúdos raríssimos) 🎁",
-            "buttons": [
-              {
-                "name": "MENSAL AVANÇADO",
-                "value": 19.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 24.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              },
-              {
-                "name": "VITALÍCIO AVANÇADO",
-                "value": 29.95,
-                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-              }
-            ],
-            "video": "copy2.mp4"
-          }
-        ],
-        "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
-        }
-      }
-    },
-    {
-      "name": "Famosas - meno",
-      "details": "Famosas - meno",
-      "token": "7698537463:AAFJmDl5ejV3lj7ejyGGjNKFjjfevA1V4n8",
-      "url": "https://botpushincomdb-fa83c890802f.herokuapp.com/",
-      "description": "💣 PLANO MENSAL BÁSICO <b>R$10</b> \n \n 🔥 PLANO VITALÍCIO BÁSICO <b>R$15</b> \n \n 💥 PLANO VITALÍCIO PREMIUM <b>R$20</b> E GANHE DE BRINDE: \n 5 grupos de bônus (incesto real, novinhas, famosas, vazadas amadores, traiçoẽs/cornos, omegle+18) com mais de 3 mil Mídias \n \n \n ⏳ Só HOJE COM GRANDE DESCONTO NO VITALÍCIO ⬅️ \n \n <i>🤫 TODAS AS NOSSAS MÍDIAS SÃO DAS NOVINHAS BRASILEIRAS MAIS SAFADAS 🤫</i>",
-      "video": "copy1.mp4",
-      "buttons": [
-        {
-          "name": "MENSAL BÁSICO",
-          "value": 9.87,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO BÁSICO",
-          "value": 14.87,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
-        },
-        {
-          "name": "VITALÍCIO PREMIUM",
-          "value": 19.87,
-          "link": "https://t.me/+EQB6UUVFLdJkMzdh"
         }
       ],
       "mp_config": {
@@ -439,7 +44,7 @@
             "buttons": [
               {
                 "name": "VITALÍCIO PREMIUM",
-                "value": 9.85,
+                "value": 1.50,
                 "link": "https://t.me/+EQB6UUVFLdJkMzdh"
               }
             ],
@@ -451,25 +56,25 @@
             "buttons": [
               {
                 "name": "MENSAL AVANÇADO",
-                "value": 19.85,
+                "value": 2.25,
                 "link": "https://t.me/+EQB6UUVFLdJkMzdh"
               },
               {
                 "name": "VITALÍCIO AVANÇADO",
-                "value": 24.85,
+                "value": 2.50,
                 "link": "https://t.me/+EQB6UUVFLdJkMzdh"
               },
               {
                 "name": "VITALÍCIO AVANÇADO",
-                "value": 29.85,
+                "value": 2.75,
                 "link": "https://t.me/+EQB6UUVFLdJkMzdh"
               }
             ],
-            "video": "copy-upsell-nov.mp4"
+            "video": "copy2.mp4"
           }
         ],
         "intervals": {
-          "not_purchased_minutes": 2,
+          "not_purchased_minutes": 1,
           "purchased_seconds": 30
         }
       }
