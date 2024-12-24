@@ -1,58 +1,39 @@
-// public/js/dashboard.js
-
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
     let salesChart;
 
+    // Função principal de atualização
     async function updateDashboard(date) {
         try {
-            // Faz request para a rota do backend: /api/bots-stats?date=YYYY-MM-DD
             const response = await fetch(`/api/bots-stats?date=${date}`);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
 
             const data = await response.json();
-            console.log('Dados recebidos da API:', data);
+            console.log('Dados recebidos:', data);
 
-            // Atualizar Estatísticas Básicas
+            // Estatísticas básicas
             $('#totalUsers').text(data.totalUsers);
             $('#totalPurchases').text(data.totalPurchases);
             $('#conversionRate').text(data.conversionRate.toFixed(2) + '%');
 
-            // 1) Montar ranking simples (botRanking)
-            const botRankingTbody = $('#botRanking');
-            botRankingTbody.empty();
-            if (data.botRanking && data.botRanking.length > 0) {
-                data.botRanking.forEach(bot => {
-                    botRankingTbody.append(`
-                        <tr>
-                            <td>${bot.botName || 'N/A'}</td>
-                            <td>${bot.vendas}</td>
-                        </tr>
-                    `);
-                });
-            }
-
-            // 2) Montar/atualizar gráfico (usuários X compras)
+            // Gráfico
             const chartData = {
-                labels: ['Usuários (Geraram Pix)', 'Compras'],
+                labels: ['Usuários', 'Compras'],
                 datasets: [{
                     label: 'Quantidade',
                     data: [data.totalUsers, data.totalPurchases],
                     backgroundColor: ['#36A2EB', '#4BC0C0']
                 }]
             };
-
             const ctx = document.getElementById('salesChart').getContext('2d');
             if (salesChart) {
-                // Atualiza se já existe
                 salesChart.data = chartData;
                 salesChart.update();
             } else {
-                // Cria novo se não existe
                 salesChart = new Chart(ctx, {
                     type: 'bar',
                     data: chartData,
@@ -64,39 +45,80 @@ $(document).ready(function () {
                 });
             }
 
-            // 3) Montar Ranking de Bots com Mais Vendas - Detalhado (botDetails)
-            const botDetailsBody = $('#botDetailsBody');
-            botDetailsBody.empty();
-            if (data.botDetails && data.botDetails.length > 0) {
-                data.botDetails.forEach(bot => {
-                    // Exemplo de colunas
-                    // "plans" => array com {planName, salesCount, conversionRate}
-                    const plansInfo = bot.plans.map(p => {
-                        return `<strong>${p.planName}</strong>: ${p.salesCount} vendas (${p.conversionRate.toFixed(2)}%)`;
-                    }).join('<br>');
+            // Ranking Simples (botRanking)
+            const botRankingTbody = $('#botRanking');
+            botRankingTbody.empty();
+            // Se quiser exibir um ranking simples,
+            // podemos criar um "botRanking" no backend (ARRAY) ou exibir parte do "botDetails".
+            // Exemplo hipotético: data.botRanking
+            // Mas no seu app, você não tinha "botRanking"? Então crie no backend ou aproveite data.botDetails.
 
-                    botDetailsBody.append(`
+            // Exemplo: se usarmos data.botDetails para exibir "botName" e "totalPurchases":
+            // Filtra para Ranking Simples
+            if (data.botDetails) {
+                data.botDetails.forEach(bot => {
+                    botRankingTbody.append(`
+                        <tr>
+                            <td>${bot.botName}</td>
+                            <td>${bot.totalPurchases}</td>
+                        </tr>
+                    `);
+                });
+            }
+
+            // Ranking Detalhado (botDetailsBody)
+            const detailsTbody = $('#botDetailsBody');
+            detailsTbody.empty();
+
+            if (data.botDetails) {
+                data.botDetails.forEach(bot => {
+                    // Monta a lista de planos
+                    let plansHtml = '';
+                    bot.plans.forEach(plan => {
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
+                    });
+
+                    detailsTbody.append(`
                         <tr>
                             <td>${bot.botName}</td>
                             <td>R$${bot.valorGerado.toFixed(2)}</td>
                             <td>${bot.totalPurchases}</td>
-                            <td>${plansInfo}</td>
+                            <td>${plansHtml}</td>
                             <td>${bot.conversionRate.toFixed(2)}%</td>
                             <td>R$${bot.averageValue.toFixed(2)}</td>
                         </tr>
                     `);
                 });
             }
-        } catch (err) {
-            console.error('Erro no updateDashboard:', err);
+
+        } catch (error) {
+            console.error('Erro ao atualizar o dashboard:', error);
         }
     }
 
-    // Atualiza o dashboard quando carrega
+    // 1) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Re-atualiza ao mudar a data
+    // 2) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
+    });
+
+    // 3) Lógica de Sidebar: troca visibilidade das sections
+    $('#sidebarNav .nav-link').on('click', function (e) {
+        e.preventDefault();
+
+        // Remove 'active' das links
+        $('#sidebarNav .nav-link').removeClass('active');
+        $(this).addClass('active');
+
+        // Esconde todas as sections
+        $('#statsSection').addClass('d-none');
+        $('#rankingSimplesSection').addClass('d-none');
+        $('#rankingDetalhadoSection').addClass('d-none');
+
+        // Mostra apenas a section clicada
+        const targetSection = $(this).data('section');
+        $(`#${targetSection}`).removeClass('d-none');
     });
 });

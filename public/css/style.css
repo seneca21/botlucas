@@ -1,16 +1,12 @@
-/* style.css - Exemplo simples */
-
-body {
-    background-color: #f9f9f9;
-    margin: 0;
-    padding: 0;
+/* A sidebar pode ter um estilo fixo, se quiser */
+#sidebar {
+    min-height: 100vh;
+    /* altura total da tela */
+    border-right: 1px solid #ddd;
 }
 
-h1 {
-    margin-top: 20px;
-}
-
-.table th,
-.table td {
-    vertical-align: middle;
+/* Deixa um highlight no link ativo */
+#sidebarNav .nav-link.active {
+    background-color: #007bff;
+    color: #fff;
 }
