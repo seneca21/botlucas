@@ -5,28 +5,23 @@ const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
 const fs = require('fs');
 const ConfigService = require('./config.service');
-const { Sequelize } = require('sequelize');
-const db = require('./index');  // <--- Aqui importamos todos os models
+const db = require('./index'); // importa index do Sequelize
 const User = db.User;
-const Purchase = db.Purchase;   // <--- Nosso novo model
+const Purchase = db.Purchase;
+
+const config = ConfigService.loadConfig();
+const dbConfig = ConfigService.getDbConfig();
+
+// Armazena as instâncias de bots e sessões em memória
+const bots = [];
+const userSessions = {};
+
 /**
  * Função auxiliar para converter boolean para texto (logs)
  */
 function booleanParaTexto(value, verdadeiro, falso) {
   return value ? verdadeiro : falso;
 }
-
-// Carrega config.json
-const config = ConfigService.loadConfig();
-// Carrega configs de banco
-const dbConfig = ConfigService.getDbConfig();
-
-// Inicializa Sequelize (usamos db.sequelize pronto, se preferir)
-const sequelize = db.sequelize;
-
-// Armazena as instâncias de bots e sessões em memória
-const bots = [];
-const userSessions = {};
 
 /**
  * Inicializa cada bot configurado em config.json
@@ -42,7 +37,7 @@ function initializeBot(botConfig) {
     try {
       const telegramId = ctx.from.id.toString();
 
-      // Tenta criar ou achar
+      // Tenta criar ou encontrar
       const [user, created] = await User.findOrCreate({
         where: { telegramId },
         defaults: {
@@ -58,7 +53,6 @@ function initializeBot(botConfig) {
         },
       });
 
-      // Se não foi criado, atualiza
       if (!created) {
         user.lastInteraction = new Date();
         user.botName = botConfig.name;
@@ -96,10 +90,17 @@ function initializeBot(botConfig) {
   }
 
   /**
-   * Envia mensagens de remarketing
+   * Envia mensagens de remarketing.
+   * - condition pode ser "not_purchased" ou "purchased"
    */
   async function sendRemarketingMessage(user, condition) {
     try {
+      if (!userSessions[user.telegramId]) {
+        userSessions[user.telegramId] = {};
+      }
+      // Guardamos no session para saber qual condition
+      userSessions[user.telegramId].remarketingCondition = condition;
+
       const messageConfig = botConfig.remarketing.messages.find(msg => msg.condition === condition);
       if (!messageConfig) {
         console.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
@@ -110,14 +111,6 @@ function initializeBot(botConfig) {
       if (!fs.existsSync(videoPath)) {
         console.error(`❌ Vídeo não encontrado: ${videoPath}`);
         return;
-      }
-
-      // Checa botões
-      for (const button of messageConfig.buttons) {
-        if (!button.name) {
-          console.error(`❌ Botão de remarketing sem 'name'.`);
-          return;
-        }
       }
 
       const remarketingButtons = messageConfig.buttons.map((btn) =>
@@ -146,12 +139,13 @@ function initializeBot(botConfig) {
 
   /**
    * Ação remarketing_select_plan_X
+   * - Aqui criamos uma cobrança, mas definimos originCondition com base no session
    */
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const planValue = parseFloat(ctx.match[1]);
 
-    // Tenta achar esse plano
+    // Descobre o plano clicado
     const mainPlan = botConfig.buttons.find(btn => btn.value === planValue);
     const remarketingPlan = botConfig.remarketing.messages
       .flatMap(msg => msg.buttons)
@@ -165,7 +159,7 @@ function initializeBot(botConfig) {
       return;
     }
 
-    // Registra planName/planValue na session (opcional)
+    // Se o user existe, atualiza lastInteraction
     const user = await User.findOne({ where: { telegramId: chatId.toString() } });
     if (user) {
       user.lastInteraction = new Date();
@@ -173,9 +167,12 @@ function initializeBot(botConfig) {
       await user.save();
     }
 
-    console.log(`✅ Plano remarketing ${plan.name} R$${plan.value} selecionado.`);
+    // Descobre se este remarketing era "not_purchased" ou "purchased"
+    const session = userSessions[chatId] || {};
+    const remarketingCond = session.remarketingCondition || 'not_purchased';
 
-    // Cria cobrança
+    console.log(`✅ Plano remarketing ${plan.name} R$${plan.value} selecionado. Condition = ${remarketingCond}`);
+
     try {
       const chargeData = {
         value: plan.value * 100,
@@ -185,9 +182,10 @@ function initializeBot(botConfig) {
       const chargeId = chargeResult.id;
       const emv = chargeResult.qr_code;
 
-      if (!userSessions[chatId]) userSessions[chatId] = {};
-      userSessions[chatId].chargeId = chargeId;
-      userSessions[chatId].selectedPlan = plan;
+      session.chargeId = chargeId;
+      session.selectedPlan = plan;
+      // define originCondition = 'purchased' ou 'not_purchased', etc.
+      session.originCondition = remarketingCond;
 
       await ctx.reply(
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
@@ -213,7 +211,7 @@ function initializeBot(botConfig) {
   });
 
   /**
-   * /start
+   * /start (plano principal) => originCondition = 'main'
    */
   bot.start(async (ctx) => {
     try {
@@ -227,7 +225,7 @@ function initializeBot(botConfig) {
         return;
       }
 
-      // Cria botões de compra (da config inicial)
+      // Botões da config principal
       const buttonMarkup = botConfig.buttons.map((btn, idx) =>
         Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
@@ -253,7 +251,7 @@ function initializeBot(botConfig) {
   });
 
   /**
-   * Ação "select_plan_X"
+   * Ação "select_plan_X" => plano principal -> originCondition = 'main'
    */
   bot.action(/^select_plan_(\d+)$/, async (ctx) => {
     const chatId = ctx.chat.id;
@@ -267,7 +265,7 @@ function initializeBot(botConfig) {
       return;
     }
 
-    // Atualiza user
+    // user
     const user = await User.findOne({ where: { telegramId: chatId.toString() } });
     if (user) {
       user.lastInteraction = new Date();
@@ -275,7 +273,12 @@ function initializeBot(botConfig) {
       await user.save();
     }
 
-    console.log(`✅ Plano ${buttonConfig.name} (R$${buttonConfig.value}) enviado.`);
+    // Sessão do user
+    if (!userSessions[chatId]) userSessions[chatId] = {};
+    userSessions[chatId].originCondition = 'main';
+    userSessions[chatId].selectedPlan = buttonConfig;
+
+    console.log(`✅ Plano ${buttonConfig.name} (R$${buttonConfig.value}) (main) enviado.`);
 
     try {
       const chargeData = {
@@ -286,9 +289,7 @@ function initializeBot(botConfig) {
       const chargeId = chargeResult.id;
       const emv = chargeResult.qr_code;
 
-      if (!userSessions[chatId]) userSessions[chatId] = {};
       userSessions[chatId].chargeId = chargeId;
-      userSessions[chatId].selectedPlan = buttonConfig;
 
       await ctx.reply(
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
@@ -333,22 +334,20 @@ function initializeBot(botConfig) {
         await ctx.reply('🎉 Pagamento confirmado!');
         const user = await User.findOne({ where: { telegramId: chatId.toString() } });
         if (user) {
-          // Marca user como "já comprou algo"
           user.hasPurchased = true;
           await user.save();
 
-          // Cria um registro de Purchase com base no plano selecionado
-          if (session.selectedPlan) {
-            await Purchase.create({
-              userId: user.id,
-              planName: session.selectedPlan.name,
-              planValue: session.selectedPlan.value,
-              botName: botConfig.name,
-              purchasedAt: new Date(),
-            });
-          }
+          // Cria Purchase
+          await Purchase.create({
+            userId: user.id,
+            planName: session.selectedPlan.name,
+            planValue: session.selectedPlan.value,
+            botName: botConfig.name,
+            purchasedAt: new Date(),
+            originCondition: session.originCondition || 'main',
+          });
 
-          console.log(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}`);
+          console.log(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value} [${session.originCondition}]`);
 
           // Envia upsell
           const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
@@ -356,6 +355,7 @@ function initializeBot(botConfig) {
             try {
               const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
               if (currentUser && currentUser.hasPurchased) {
+                // Envia remarketing de "purchased"
                 await sendRemarketingMessage(currentUser, 'purchased');
                 console.log(`✅ Upsell enviado -> ${chatId}`);
               }
@@ -365,7 +365,7 @@ function initializeBot(botConfig) {
           }, purchasedInterval * 1000);
 
           // Link do produto
-          if (session.selectedPlan && session.selectedPlan.link) {
+          if (session.selectedPlan.link) {
             await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
             await ctx.reply('⚠️ Link do produto não encontrado.');
@@ -412,22 +412,20 @@ function initializeBot(botConfig) {
         await ctx.reply('🎉 Pagamento confirmado!');
         const user = await User.findOne({ where: { telegramId: chatId.toString() } });
         if (user) {
-          // Marca user como "já comprou algo"
           user.hasPurchased = true;
           await user.save();
 
           // Cria Purchase
-          if (session.selectedPlan) {
-            await Purchase.create({
-              userId: user.id,
-              planName: session.selectedPlan.name,
-              planValue: session.selectedPlan.value,
-              botName: botConfig.name,
-              purchasedAt: new Date(),
-            });
-          }
+          await Purchase.create({
+            userId: user.id,
+            planName: session.selectedPlan.name,
+            planValue: session.selectedPlan.value,
+            botName: botConfig.name,
+            purchasedAt: new Date(),
+            originCondition: session.originCondition || 'main',
+          });
 
-          console.log(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}`);
+          console.log(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value} [${session.originCondition}]`);
 
           // Upsell
           const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
@@ -444,12 +442,11 @@ function initializeBot(botConfig) {
           }, purchasedInterval * 1000);
 
           // Link do produto
-          if (session.selectedPlan && session.selectedPlan.link) {
+          if (session.selectedPlan.link) {
             await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
             await ctx.reply('⚠️ Link do produto não encontrado.');
           }
-
           delete userSessions[chatId];
         }
       } else if (paymentStatus.status === 'expired') {
@@ -488,10 +485,9 @@ function initializeBot(botConfig) {
   bots.push(bot);
 }
 
-// Inicia cada bot do array config.bots
-for (const botConfig of config.bots) {
-  initializeBot(botConfig);
+// Inicia cada bot
+for (const botConf of config.bots) {
+  initializeBot(botConf);
 }
 
-// Exporta, se precisar
 module.exports = bots;

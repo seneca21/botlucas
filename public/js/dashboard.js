@@ -1,15 +1,9 @@
+// public/js/dashboard.js
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
-    let salesChart; // gráfico principal
-
-    // Se você quiser gráficos DOUGHNUT para a aba detalhada, declare aqui:
-    let chartLeads;
-    let chartPagamentos;
-    let chartTaxaConversao;
-    let chartVendasGeradas;
-    let chartVendasConvertidas;
+    let salesChart;
 
     async function updateDashboard(date) {
         try {
@@ -22,18 +16,21 @@ $(document).ready(function () {
             //-------------------------------------------
             // 1) Estatísticas do Dia (Aba statsSection)
             //-------------------------------------------
-            $('#totalUsers').text(data.totalUsers);
-            $('#totalPurchases').text(data.totalPurchases);
-            $('#conversionRate').text(data.conversionRate.toFixed(2) + '%');
+            // data.statsAll se refere aos dados gerais
+            $('#totalUsers').text(data.statsAll.totalUsers);
+            $('#totalPurchases').text(data.statsAll.totalPurchases);
+            $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
             // Gráfico Bar (usuários x compras)
             const chartData = {
                 labels: ['Usuários', 'Compras'],
-                datasets: [{
-                    label: 'Quantidade',
-                    data: [data.totalUsers, data.totalPurchases],
-                    backgroundColor: ['#36A2EB', '#4BC0C0'],
-                }],
+                datasets: [
+                    {
+                        label: 'Quantidade',
+                        data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
+                        backgroundColor: ['#36A2EB', '#4BC0C0'],
+                    },
+                ],
             };
             const ctx = document.getElementById('salesChart').getContext('2d');
             if (salesChart) {
@@ -45,9 +42,9 @@ $(document).ready(function () {
                     data: chartData,
                     options: {
                         scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
+                            y: { beginAtZero: true },
+                        },
+                    },
                 });
             }
 
@@ -57,13 +54,13 @@ $(document).ready(function () {
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
-                data.botRanking.forEach(bot => {
+                data.botRanking.forEach((bot) => {
                     botRankingTbody.append(`
-                        <tr>
-                            <td>${bot.botName || 'N/A'}</td>
-                            <td>${bot.vendas}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName || 'N/A'}</td>
+              <td>${bot.vendas}</td>
+            </tr>
+          `);
                 });
             }
 
@@ -73,130 +70,57 @@ $(document).ready(function () {
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
-                data.botDetails.forEach(bot => {
+                data.botDetails.forEach((bot) => {
                     let plansHtml = '';
-                    bot.plans.forEach(plan => {
+                    bot.plans.forEach((plan) => {
                         plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
 
                     detailsTbody.append(`
-                        <tr>
-                            <td>${bot.botName}</td>
-                            <td>R$${bot.valorGerado.toFixed(2)}</td>
-                            <td>${bot.totalPurchases}</td>
-                            <td>${plansHtml}</td>
-                            <td>${bot.conversionRate.toFixed(2)}%</td>
-                            <td>R$${bot.averageValue.toFixed(2)}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName}</td>
+              <td>R$${bot.valorGerado.toFixed(2)}</td>
+              <td>${bot.totalPurchases}</td>
+              <td>${plansHtml}</td>
+              <td>${bot.conversionRate.toFixed(2)}%</td>
+              <td>R$${bot.averageValue.toFixed(2)}</td>
+            </tr>
+          `);
                 });
             }
 
             //-------------------------------------------
-            // 4) Estatísticas do Dia (Detalhado) - Cards e Gráficos Doughnut
+            // 4) Estatísticas Detalhadas (4 colunas)
+            //    data.statsAll, data.statsMain, data.statsNotPurchased, data.statsPurchased
             //-------------------------------------------
-            // Preenche os cards
-            $('#cardTotalLeads').text(data.totalLeads || 0);
-            $('#cardPaymentsConfirmed').text(data.pagamentosConfirmados || 0);
-            $('#cardConversionRateDetailed').text((data.taxaConversao || 0).toFixed(2) + '%');
-            $('#cardTotalVolume').text('R$ ' + (data.totalVendasGeradas || 0).toFixed(2));
-            $('#cardTotalPaidVolume').text('R$ ' + (data.totalVendasConvertidas || 0).toFixed(2));
+            // (A) statsAll
+            $('#cardAllLeads').text(data.statsAll.totalUsers);
+            $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
+            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
+            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
 
-            // Se estiver usando doughnut nessa aba, atualize/crie os gráficos:
-            // 4.1) chartLeads
-            const leadsCtx = document.getElementById('chartLeads');
-            if (leadsCtx) {
-                const leadsData = [data.totalLeads || 0];
-                const leadsConfig = {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Leads'],
-                        datasets: [{ data: leadsData, backgroundColor: ['#FF6384'] }]
-                    }
-                };
-                if (chartLeads) {
-                    chartLeads.data.datasets[0].data = leadsData;
-                    chartLeads.update();
-                } else {
-                    chartLeads = new Chart(leadsCtx, leadsConfig);
-                }
-            }
+            // (B) statsMain
+            $('#cardMainLeads').text(data.statsMain.totalUsers);
+            $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
+            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
+            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
+            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
 
-            // 4.2) chartPagamentos
-            const pgCtx = document.getElementById('chartPagamentos');
-            if (pgCtx) {
-                const pgData = [data.pagamentosConfirmados || 0];
-                const pgConfig = {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Pagamentos'],
-                        datasets: [{ data: pgData, backgroundColor: ['#36A2EB'] }]
-                    }
-                };
-                if (chartPagamentos) {
-                    chartPagamentos.data.datasets[0].data = pgData;
-                    chartPagamentos.update();
-                } else {
-                    chartPagamentos = new Chart(pgCtx, pgConfig);
-                }
-            }
+            // (C) statsNotPurchased
+            $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
 
-            // 4.3) chartTaxaConversao
-            const txCtx = document.getElementById('chartTaxaConversao');
-            if (txCtx) {
-                const txData = [data.taxaConversao || 0];
-                const txConfig = {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Taxa Conversão'],
-                        datasets: [{ data: txData, backgroundColor: ['#FFCE56'] }]
-                    }
-                };
-                if (chartTaxaConversao) {
-                    chartTaxaConversao.data.datasets[0].data = txData;
-                    chartTaxaConversao.update();
-                } else {
-                    chartTaxaConversao = new Chart(txCtx, txConfig);
-                }
-            }
+            // (D) statsPurchased
+            $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
 
-            // 4.4) chartVendasGeradas
-            const vgCtx = document.getElementById('chartVendasGeradas');
-            if (vgCtx) {
-                const vgData = [data.totalVendasGeradas || 0];
-                const vgConfig = {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Vendas Geradas (R$)'],
-                        datasets: [{ data: vgData, backgroundColor: ['#4BC0C0'] }]
-                    }
-                };
-                if (chartVendasGeradas) {
-                    chartVendasGeradas.data.datasets[0].data = vgData;
-                    chartVendasGeradas.update();
-                } else {
-                    chartVendasGeradas = new Chart(vgCtx, vgConfig);
-                }
-            }
-
-            // 4.5) chartVendasConvertidas
-            const vcCtx = document.getElementById('chartVendasConvertidas');
-            if (vcCtx) {
-                const vcData = [data.totalVendasConvertidas || 0];
-                const vcConfig = {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Vendas Convertidas (R$)'],
-                        datasets: [{ data: vcData, backgroundColor: ['#9966FF'] }]
-                    }
-                };
-                if (chartVendasConvertidas) {
-                    chartVendasConvertidas.data.datasets[0].data = vcData;
-                    chartVendasConvertidas.update();
-                } else {
-                    chartVendasConvertidas = new Chart(vcCtx, vcConfig);
-                }
-            }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -213,12 +137,9 @@ $(document).ready(function () {
     // (C) Lógica de Sidebar para trocar seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
-
-        // remove 'active' de todos
         $('#sidebarNav .nav-link').removeClass('active');
         $(this).addClass('active');
 
-        // esconde as sections
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
