@@ -3,8 +3,8 @@ $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
-    let salesChart;          // Gráfico de barras (Usuários x Compras)
-    let lineComparisonChart; // Gráfico de linha (Ontem x Hoje)
+    let salesChart;          // Gráfico de barras
+    let lineComparisonChart; // Gráfico de linha
 
     async function updateDashboard(date) {
         try {
@@ -15,13 +15,13 @@ $(document).ready(function () {
             const data = await response.json();
 
             //-------------------------------------------
-            // 1) Estatísticas do Dia (Aba statsSection)
+            // 1) Estatísticas do Dia
             //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // ========== GRÁFICO DE BARRAS (Usuários x Compras) ==========
+            // ========== GRÁFICO DE BARRAS ==========
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -48,7 +48,7 @@ $(document).ready(function () {
                 });
             }
 
-            // ========== GRÁFICO DE LINHA (Ontem vs Hoje, Valor Convertido) ==========
+            // ========== GRÁFICO DE LINHA (Ontem vs Hoje) ==========
             const lineData = {
                 labels: ['Ontem', 'Hoje'],
                 datasets: [
@@ -56,13 +56,13 @@ $(document).ready(function () {
                         label: 'Valor Convertido (R$)',
                         data: [
                             data.statsYesterday.totalVendasConvertidas,
-                            data.statsAll.totalVendasConvertidas
+                            data.statsAll.totalVendasConvertidas,
                         ],
                         fill: false,
-                        borderColor: '#ff5c5c', // cor da linha
+                        borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 7,
-                        tension: 0.2, // curva suave da linha
+                        tension: 0.2,
                     },
                 ],
             };
@@ -80,7 +80,7 @@ $(document).ready(function () {
                         responsive: true,
                         scales: {
                             y: {
-                                beginAtZero: false, // se quiser ver "abaixo" caso ontem>hoje
+                                beginAtZero: false,
                             },
                         },
                         plugins: {
@@ -98,7 +98,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 2) Ranking Simples (Aba rankingSimplesSection)
+            // 2) Ranking Simples
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -114,7 +114,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado (Aba rankingDetalhadoSection)
+            // 3) Ranking Detalhado
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -203,15 +203,15 @@ $(document).ready(function () {
         }
     }
 
-    // (A) Atualiza ao carregar
+    // Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // (B) Atualiza ao mudar data
+    // Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // (C) Troca de seções do sidebar
+    // Troca de seções do sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -226,7 +226,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Botão hambúrguer -> recolhe/expande sidebar
+    // Botão hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });

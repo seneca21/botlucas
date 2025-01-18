@@ -48,13 +48,12 @@
     width: 230px;
 }
 
-/* Quando estiver recolhido (collapsed), some da tela */
 #sidebar.collapsed {
     margin-left: -230px;
     opacity: 0;
 }
 
-/* ========== LINKS DO MENU ========== */
+/* ========== MENU LINKS ========== */
 #sidebarNav .nav-link {
     color: #000 !important;
     transition: box-shadow 0.3s;
@@ -79,7 +78,7 @@
     }
 }
 
-/* ========== CARDS: Títulos pretos, números azuis ========== */
+/* ========== CARDS: TÍTULOS PRETOS, NÚMEROS AZUIS ========== */
 .card-title {
     color: #000 !important;
     font-weight: 600;
