@@ -176,7 +176,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Botão / Ícone de hambúrguer -> recolhe/expande sidebar
+    // (D) Ícone hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });

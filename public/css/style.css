@@ -1,6 +1,6 @@
 /* style.css */
 
-/* ========== HAMBURGER ICON ========== */
+/* ========== HAMBURGER ICON (mesmo da versão anterior) ========== */
 .hamburger-icon {
     width: 24px;
     height: 18px;
@@ -31,7 +31,7 @@
     top: 16px;
 }
 
-/* ========== BORDAS ARREDONDADAS ========== */
+/* ========== BORDAS ARREDONDADAS (mesmo) ========== */
 
 .card,
 .table,
@@ -41,7 +41,7 @@
     border-radius: 8px !important;
 }
 
-/* ========== SIDEBAR BASICS ========== */
+/* ========== SIDEBAR BASICS (mesmo) ========== */
 
 #sidebar {
     min-height: 100vh;
@@ -49,30 +49,41 @@
     border-right: 1px solid #ddd;
     transition: all 0.3s ease;
     /* animação suave ao abrir/fechar */
-    /* Largura normal do sidebar */
     width: 230px;
+    /* Largura normal do sidebar */
 }
 
-/* Quando estiver recolhido (collapsed), some da tela */
 #sidebar.collapsed {
     margin-left: -230px;
     /* empurra para a esquerda */
     opacity: 0;
 }
 
-/* Deixa um highlight no link ativo */
-#sidebarNav .nav-link.active {
-    background-color: #007bff;
-    color: #fff;
+/* ========== REMOVER DESTAQUE DA ABA SELECIONADA ========== */
+/* Antes tinha um background azul em .nav-link.active; agora removemos. */
+
+/* ========== DEIXAR LINKS DO MENU EM PRETO ========== */
+#sidebarNav .nav-link {
+    color: #000 !important;
 }
 
+/* Se quiser alterar efeito hover, adicione aqui:
+#sidebarNav .nav-link:hover {
+  background-color: #eee;
+}
+*/
+
+/* ========== CARDS: TÍTULOS E TEXTOS EM PRETO ========== */
 .card-title {
     font-weight: 600;
     font-size: 1.1rem;
+    color: #000 !important;
+    /* Agora em preto */
 }
 
 .card-text {
     font-size: 1.4rem;
     font-weight: bold;
-    color: #007bff;
+    color: #000 !important;
+    /* Agora em preto */
 }
