@@ -6,33 +6,92 @@ $(document).ready(function () {
     let salesChart;          // Gráfico de barras
     let lineComparisonChart; // Gráfico de linha
 
-    /* ================== TEMA (DARK MODE) ================== */
+    //------------------------------------------------------------
+    // 1) PLUGIN para pintar o background do gráfico igual ao card
+    //------------------------------------------------------------
+    const chartBackgroundPlugin = {
+        id: 'chartBackground',
+        beforeDraw(chart, args, options) {
+            const { ctx, chartArea } = chart;
+            ctx.save();
+            ctx.fillStyle = options.color || '#fff';
+            ctx.fillRect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+            ctx.restore();
+        }
+    };
+
+    // Registra globalmente
+    Chart.register(chartBackgroundPlugin);
+
+    //------------------------------------------------------------
+    // 2) DARK MODE: Checa localStorage + emoji lua/sol
+    //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
 
-    // Carrega preferência do localStorage
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
-        themeBtn.text('☀'); // quando estiver escuro, mostra sol
+        if (themeBtn.length) {
+            themeBtn.text('☀');
+        }
     }
 
-    // Ao clicar no emoji lua/sol
     themeBtn.on('click', function () {
         if (body.hasClass('dark-mode')) {
-            // Se está escuro, vamos pro claro
+            // Indo para claro
             body.removeClass('dark-mode');
             themeBtn.text('🌙');
             localStorage.setItem('theme', 'light');
         } else {
-            // Se está claro, vamos pro escuro
+            // Indo para escuro
             body.addClass('dark-mode');
             themeBtn.text('☀');
             localStorage.setItem('theme', 'dark');
         }
+
+        // Se já temos gráficos criados, forçamos update neles pra trocar cor
+        updateChartsIfExist();
     });
 
-    /* ================== ATUALIZA DASHBOARD ================== */
+    // Função para re-aplicar as cores de fundo quando troca dark/light
+    function updateChartsIfExist() {
+        if (salesChart) {
+            applyChartOptions(salesChart);
+            salesChart.update();
+        }
+        if (lineComparisonChart) {
+            applyChartOptions(lineComparisonChart);
+            lineComparisonChart.update();
+        }
+    }
+
+    // Retorna cor de fundo e configs de escalas dependendo do modo
+    function getChartConfigs() {
+        const isDark = $('body').hasClass('dark-mode');
+        return {
+            backgroundColor: isDark ? '#1e1e1e' : '#fff',
+            axisColor: isDark ? '#fff' : '#000',
+            gridColor: isDark ? '#555' : '#ccc',
+        };
+    }
+
+    // Aplica as opções (plugins e escalas) ao chart existente
+    function applyChartOptions(chartInstance) {
+        const cfg = getChartConfigs();
+        chartInstance.options.plugins.chartBackground = { color: cfg.backgroundColor };
+        // Ajusta cores de ticks e grids
+        if (chartInstance.options.scales) {
+            Object.values(chartInstance.options.scales).forEach(scale => {
+                if (scale.ticks) scale.ticks.color = cfg.axisColor;
+                if (scale.grid) scale.grid.color = cfg.gridColor;
+            });
+        }
+    }
+
+    //------------------------------------------------------------
+    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    //------------------------------------------------------------
     async function updateDashboard(date) {
         try {
             const response = await fetch(`/api/bots-stats?date=${date}`);
@@ -41,14 +100,14 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            //-------------------------------------------
             // Estatísticas do Dia
-            //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS (Usuários x Compras)
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -60,22 +119,32 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
-            if (salesChart) {
-                salesChart.data = barData;
-                salesChart.update();
-            } else {
+
+            if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
                     data: barData,
                     options: {
+                        responsive: true,
                         scales: {
                             y: { beginAtZero: true },
+                            x: {}
+                        },
+                        plugins: {
+                            chartBackground: {}, // plugin que pintará o fundo
                         },
                     },
                 });
+            } else {
+                salesChart.data = barData;
             }
+            // Aplica as cores no salesChart
+            applyChartOptions(salesChart);
+            salesChart.update();
 
+            //--------------------------------------------------
             // GRÁFICO DE LINHA (Ontem vs Hoje)
+            //--------------------------------------------------
             const lineData = {
                 labels: ['Ontem', 'Hoje'],
                 datasets: [
@@ -93,24 +162,20 @@ $(document).ready(function () {
                     },
                 ],
             };
-            const lineCtx = document
-                .getElementById('lineComparisonChart')
-                .getContext('2d');
-            if (lineComparisonChart) {
-                lineComparisonChart.data = lineData;
-                lineComparisonChart.update();
-            } else {
+            const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+
+            if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
                     data: lineData,
                     options: {
                         responsive: true,
                         scales: {
-                            y: {
-                                beginAtZero: false,
-                            },
+                            y: { beginAtZero: false },
+                            x: {}
                         },
                         plugins: {
+                            chartBackground: {}, // plugin do fundo
                             tooltip: {
                                 callbacks: {
                                     label: function (context) {
@@ -122,11 +187,16 @@ $(document).ready(function () {
                         },
                     },
                 });
+            } else {
+                lineComparisonChart.data = lineData;
             }
+            // Aplica as cores no lineComparisonChart
+            applyChartOptions(lineComparisonChart);
+            lineComparisonChart.update();
 
-            //-------------------------------------------
-            // Ranking Simples
-            //-------------------------------------------
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -140,9 +210,9 @@ $(document).ready(function () {
                 });
             }
 
-            //-------------------------------------------
-            // Ranking Detalhado
-            //-------------------------------------------
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -153,7 +223,6 @@ $(document).ready(function () {
                             2
                         )}%)<br>`;
                     });
-
                     detailsTbody.append(`
             <tr>
               <td>${bot.botName}</td>
@@ -167,10 +236,10 @@ $(document).ready(function () {
                 });
             }
 
-            //-------------------------------------------
-            // Estatísticas Detalhadas (4 colunas)
-            //-------------------------------------------
-            // (A) statsAll
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS (4 colunas)
+            //--------------------------------------------------
+            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -183,7 +252,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
             );
 
-            // (B) statsMain
+            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(
@@ -196,7 +265,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
             );
 
-            // (C) statsNotPurchased
+            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(
                 data.statsNotPurchased.totalPurchases
@@ -211,7 +280,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
             );
 
-            // (D) statsPurchased
+            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(
                 data.statsPurchased.totalPurchases
@@ -230,15 +299,15 @@ $(document).ready(function () {
         }
     }
 
-    // Atualiza ao carregar
+    // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Atualiza ao mudar data
+    // (B) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // Troca de seções do sidebar
+    // (C) Troca de seções do sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -253,7 +322,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hamburguer -> recolhe/expande sidebar
+    // (D) Botão hamburguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
