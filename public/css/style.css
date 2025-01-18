@@ -1,14 +1,6 @@
 /* style.css */
 
-/* 
-  A estrutura agora é:
-  #appContainer { display: flex; }
-    #sidebar
-      #sidebarContent
-    #mainContent
-*/
-
-/* ========== FLEX LAYOUT PRINCIPAL ========== */
+/* LAYOUT PRINCIPAL */
 #appContainer {
     display: flex;
     min-height: 100vh;
@@ -18,27 +10,21 @@
 /* SIDEBAR */
 #sidebar {
     width: 230px;
-    /* Largura normal */
     transition: width 0.4s ease;
-    /* animação suave */
     background-color: #f8f9fa;
     border-right: 1px solid #ddd;
     overflow: hidden;
-    /* oculta o que passar dos limites */
     position: relative;
-    /* se quisermos posicionar #sidebarContent */
 }
 
-/* CONTEÚDO DO SIDEBAR (texto, links etc.) */
 #sidebarContent {
-    /* Para evitar “compressão” do texto, forçamos no-wrap e sumimos via opacity */
-    white-space: nowrap;
+    /* Removemos white-space: nowrap para evitar truncar letras
+     Deixamos quebre linha se precisar */
     transition: opacity 0.3s ease;
     padding: 1rem;
 }
 
-/* Ao colapsar, a sidebar tem width=0. 
-   Então, também tiramos a opacidade do conteúdo para não ver compressão do texto. */
+/* Colapsando sidebar */
 #sidebar.collapsed {
     width: 0;
 }
@@ -46,13 +32,12 @@
 #sidebar.collapsed #sidebarContent {
     opacity: 0;
     pointer-events: none;
-    /* desabilita clique no texto oculto */
+    /* evita clique em texto oculto */
 }
 
 /* MAIN CONTENT */
 #mainContent {
     flex: 1;
-    /* cresce para ocupar espaço restante */
     padding: 0 1.5rem;
     transition: all 0.4s ease;
 }
@@ -97,17 +82,12 @@
     border-radius: 8px !important;
 }
 
-/* ========== MENU LINKS ========== */
+/* NAV LINKS no sidebar */
 #sidebarNav .nav-link {
     color: #000 !important;
     transition: box-shadow 0.3s;
     padding: 0.75rem 1rem;
     display: block;
-}
-
-#sidebarNav .nav-link.active {
-    background-color: transparent !important;
-    color: #000 !important;
 }
 
 /* Efeito de shadow momentâneo ao clicar */
@@ -123,6 +103,11 @@
     100% {
         box-shadow: none;
     }
+}
+
+#sidebarNav .nav-link.active {
+    background-color: transparent !important;
+    color: #000 !important;
 }
 
 /* ========== CARDS: TÍTULOS PRETOS, NÚMEROS AZUIS ========== */
@@ -144,7 +129,7 @@ body.dark-mode {
     color: #fff;
 }
 
-/* Sidebar no modo escuro */
+/* Sidebar no dark-mode */
 body.dark-mode #sidebar {
     background-color: #1e1e1e !important;
     border-right: 1px solid #444;
