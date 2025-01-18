@@ -18,8 +18,7 @@
 }
 
 #sidebarContent {
-    /* Removemos white-space: nowrap para evitar truncar letras
-     Deixamos quebre linha se precisar */
+    /* Deixamos texto com normal wrap */
     transition: opacity 0.3s ease;
     padding: 1rem;
 }
@@ -142,7 +141,6 @@ body.dark-mode #sidebarNav .nav-link {
 body.dark-mode .nav-link.active {
     color: #fff !important;
     background-color: transparent !important;
-    box-shadow: none !important;
 }
 
 /* Tabelas no modo escuro */
