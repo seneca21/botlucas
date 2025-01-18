@@ -39,8 +39,9 @@
 
             <!-- CONTEÚDO PRINCIPAL -->
             <main class="col-12 col-md-9 col-lg-10 ml-sm-auto px-4" role="main">
-                <!-- ÍCONE HAMBÚRGUER para recolher/fechar sidebar -->
-                <div class="pt-3 pb-3">
+                <!-- TOPO: Botão Hamburguer e Botão Modo Escuro -->
+                <div class="d-flex justify-content-between align-items-center pt-3 pb-3">
+                    <!-- Ícone Hamburguer -->
                     <button class="btn border-0" id="toggleSidebarBtn" style="background: none;"
                         aria-label="Toggle sidebar">
                         <div class="hamburger-icon">
@@ -49,6 +50,13 @@
                             <span></span>
                         </div>
                     </button>
+
+                    <!-- Emoji Lua/Sol -->
+                    <div>
+                        <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;" title="Alternar tema">
+                            🌙
+                        </span>
+                    </div>
                 </div>
 
                 <div class="py-3">
@@ -128,7 +136,7 @@
                     <section id="statsDetailedSection" class="d-none">
                         <h3>Estatísticas do Dia (Detalhado)</h3>
                         <div class="row">
-                            <!-- COLUNA 1 (ALL) -->
+                            <!-- COL 1: All -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[TODAS AS COMPRAS]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -163,7 +171,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 2 (MAIN) -->
+                            <!-- COL 2: Main -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[PLANO PRINCIPAL]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -198,7 +206,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 3 (NOT_PURCHASED) -->
+                            <!-- COL 3: Not_Purchased -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[REMARKETING - NOT_PURCHASED]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -233,7 +241,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 4 (PURCHASED) -->
+                            <!-- COL 4: Purchased -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[UPSELL - PURCHASED]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -274,7 +282,6 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

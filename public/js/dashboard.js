@@ -6,6 +6,33 @@ $(document).ready(function () {
     let salesChart;          // Gráfico de barras
     let lineComparisonChart; // Gráfico de linha
 
+    /* ================== TEMA (DARK MODE) ================== */
+    const body = $('body');
+    const themeBtn = $('#themeToggleBtn');
+
+    // Carrega preferência do localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        body.addClass('dark-mode');
+        themeBtn.text('☀'); // quando estiver escuro, mostra sol
+    }
+
+    // Ao clicar no emoji lua/sol
+    themeBtn.on('click', function () {
+        if (body.hasClass('dark-mode')) {
+            // Se está escuro, vamos pro claro
+            body.removeClass('dark-mode');
+            themeBtn.text('🌙');
+            localStorage.setItem('theme', 'light');
+        } else {
+            // Se está claro, vamos pro escuro
+            body.addClass('dark-mode');
+            themeBtn.text('☀');
+            localStorage.setItem('theme', 'dark');
+        }
+    });
+
+    /* ================== ATUALIZA DASHBOARD ================== */
     async function updateDashboard(date) {
         try {
             const response = await fetch(`/api/bots-stats?date=${date}`);
@@ -15,13 +42,13 @@ $(document).ready(function () {
             const data = await response.json();
 
             //-------------------------------------------
-            // 1) Estatísticas do Dia
+            // Estatísticas do Dia
             //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // ========== GRÁFICO DE BARRAS ==========
+            // GRÁFICO DE BARRAS
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -48,7 +75,7 @@ $(document).ready(function () {
                 });
             }
 
-            // ========== GRÁFICO DE LINHA (Ontem vs Hoje) ==========
+            // GRÁFICO DE LINHA (Ontem vs Hoje)
             const lineData = {
                 labels: ['Ontem', 'Hoje'],
                 datasets: [
@@ -98,7 +125,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 2) Ranking Simples
+            // Ranking Simples
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -114,7 +141,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado
+            // Ranking Detalhado
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -141,7 +168,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 4) Estatísticas Detalhadas (4 colunas)
+            // Estatísticas Detalhadas (4 colunas)
             //-------------------------------------------
             // (A) statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
@@ -226,7 +253,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hambúrguer -> recolhe/expande sidebar
+    // Botão hamburguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
