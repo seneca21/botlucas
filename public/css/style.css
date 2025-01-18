@@ -1,57 +1,78 @@
-/* public/css/style.css */
+/* style.css */
 
-/* Sidebar: altura total, border, etc. */
+/* ========== HAMBURGER ICON ========== */
+.hamburger-icon {
+    width: 24px;
+    height: 18px;
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.hamburger-icon span {
+    background-color: #000;
+    display: block;
+    height: 2px;
+    width: 100%;
+    position: absolute;
+    left: 0;
+    transition: all 0.3s;
+}
+
+.hamburger-icon span:nth-child(1) {
+    top: 0;
+}
+
+.hamburger-icon span:nth-child(2) {
+    top: 8px;
+}
+
+.hamburger-icon span:nth-child(3) {
+    top: 16px;
+}
+
+/* ========== BORDAS ARREDONDADAS ========== */
+
+.card,
+.table,
+.form-control,
+.btn,
+.nav-link {
+    border-radius: 8px !important;
+}
+
+/* ========== SIDEBAR BASICS ========== */
+
 #sidebar {
     min-height: 100vh;
     /* altura total da tela */
     border-right: 1px solid #ddd;
-    background-color: #f8f9fa;
     transition: all 0.3s ease;
-    /* Animação para o toggle */
+    /* animação suave ao abrir/fechar */
+    /* Largura normal do sidebar */
+    width: 230px;
 }
 
-/* Toggle button */
-#sidebarCollapseBtn {
-    cursor: pointer;
-    border: none;
-    background: none;
-    font-size: 1.4rem;
-    margin-right: 1rem;
+/* Quando estiver recolhido (collapsed), some da tela */
+#sidebar.collapsed {
+    margin-left: -230px;
+    /* empurra para a esquerda */
+    opacity: 0;
 }
 
-/* Esconde sidebar quando está colapsada */
-#sidebar.hidden {
-    margin-left: -200px;
-    /* ou -100%, mas depende da largura */
-}
-
-/* Link ativo do menu lateral */
+/* Deixa um highlight no link ativo */
 #sidebarNav .nav-link.active {
     background-color: #007bff;
     color: #fff;
 }
 
-/* Borda arredondada para os cards */
-.card {
-    border-radius: 8px;
-    /* adicione aqui */
-    margin-bottom: 20px;
-    /* um espacinho extra */
+.card-title {
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 
-/* Opcional: borda e sombra mais suaves */
-.card.shadow-sm {
-    border: 1px solid #eee;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.06);
-}
-
-/* Se quiser cantos arredondados em tabelas também */
-table.table {
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-table.table th,
-table.table td {
-    vertical-align: middle;
+.card-text {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #007bff;
 }

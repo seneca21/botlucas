@@ -48,7 +48,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 2) Ranking Simples
+            // 2) Ranking Simples (Aba rankingSimplesSection)
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -64,7 +64,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado
+            // 3) Ranking Detalhado (Aba rankingDetalhadoSection)
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -91,9 +91,9 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 4) Estatísticas Detalhadas (4 colunas)
+            // 4) Estatísticas do Dia (Detalhado) - 4 colunas
             //-------------------------------------------
-            // (A) statsAll (coluna 1)
+            // (A) statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -106,7 +106,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
             );
 
-            // (B) statsMain (coluna 2)
+            // (B) statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(
@@ -119,7 +119,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
             );
 
-            // (C) statsNotPurchased (coluna 3)
+            // (C) statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(
                 data.statsNotPurchased.totalPurchases
@@ -134,7 +134,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
             );
 
-            // (D) statsPurchased (coluna 4)
+            // (D) statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(
                 data.statsPurchased.totalPurchases
@@ -153,15 +153,15 @@ $(document).ready(function () {
         }
     }
 
-    // Atualiza ao carregar
+    // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Atualiza ao mudar data
+    // (B) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // Lógica de Sidebar para trocar seções
+    // (C) Lógica de Sidebar para trocar seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active');
@@ -176,7 +176,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // =========== NOVO: Botão para recolher/expandir sidebar ===========
+    // (D) Botão / Ícone de hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
