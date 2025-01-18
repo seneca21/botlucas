@@ -16,7 +16,6 @@ $(document).ready(function () {
             //-------------------------------------------
             // 1) Estatísticas do Dia (Aba statsSection)
             //-------------------------------------------
-            // data.statsAll se refere aos dados gerais
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
@@ -49,7 +48,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 2) Ranking Simples (Aba rankingSimplesSection)
+            // 2) Ranking Simples
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -65,7 +64,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado (Aba rankingDetalhadoSection)
+            // 3) Ranking Detalhado
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -73,7 +72,9 @@ $(document).ready(function () {
                 data.botDetails.forEach((bot) => {
                     let plansHtml = '';
                     bot.plans.forEach((plan) => {
-                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(
+                            2
+                        )}%)<br>`;
                     });
 
                     detailsTbody.append(`
@@ -91,50 +92,76 @@ $(document).ready(function () {
 
             //-------------------------------------------
             // 4) Estatísticas Detalhadas (4 colunas)
-            //    data.statsAll, data.statsMain, data.statsNotPurchased, data.statsPurchased
             //-------------------------------------------
-            // (A) statsAll
+            // (A) statsAll (coluna 1)
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
-            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
-            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
+            $('#cardAllConversionRateDetailed').text(
+                data.statsAll.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardAllTotalVolume').text(
+                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardAllTotalPaidVolume').text(
+                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
+            );
 
-            // (B) statsMain
+            // (B) statsMain (coluna 2)
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
-            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
-            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
+            $('#cardMainConversionRateDetailed').text(
+                data.statsMain.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardMainTotalVolume').text(
+                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardMainTotalPaidVolume').text(
+                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
+            );
 
-            // (C) statsNotPurchased
+            // (C) statsNotPurchased (coluna 3)
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
-            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
+            $('#cardNotPurchasedPaymentsConfirmed').text(
+                data.statsNotPurchased.totalPurchases
+            );
+            $('#cardNotPurchasedConversionRateDetailed').text(
+                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardNotPurchasedTotalVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardNotPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
+            );
 
-            // (D) statsPurchased
+            // (D) statsPurchased (coluna 4)
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
-            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
-
+            $('#cardPurchasedPaymentsConfirmed').text(
+                data.statsPurchased.totalPurchases
+            );
+            $('#cardPurchasedConversionRateDetailed').text(
+                data.statsPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardPurchasedTotalVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
+            );
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    // (A) Atualiza ao carregar
+    // Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // (B) Atualiza ao mudar a data
+    // Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // (C) Lógica de Sidebar para trocar seções
+    // Lógica de Sidebar para trocar seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active');
@@ -147,5 +174,10 @@ $(document).ready(function () {
 
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
+    });
+
+    // =========== NOVO: Botão para recolher/expandir sidebar ===========
+    $('#toggleSidebarBtn').on('click', function () {
+        $('#sidebar').toggleClass('collapsed');
     });
 });
