@@ -1,5 +1,41 @@
 /* style.css */
 
+/* ========== APP CONTAINER LAYOUT ========== */
+/* Usamos flex para permitir que #sidebar encolha com transição e #mainContent se expanda */
+#appContainer {
+    display: flex;
+    min-height: 100vh;
+    /* altura total da tela */
+    /* background do body fica por conta do body */
+}
+
+/* SIDEBAR */
+#sidebar {
+    width: 230px;
+    /* Largura normal */
+    transition: width 0.4s ease;
+    /* animação suave */
+    overflow: hidden;
+    /* oculta conteúdo ao encolher */
+    background-color: #f8f9fa;
+    /* cor clara no modo normal */
+    border-right: 1px solid #ddd;
+}
+
+/* Quando colapsa */
+#sidebar.collapsed {
+    width: 0;
+}
+
+/* MAIN CONTENT */
+#mainContent {
+    flex: 1;
+    /* cresce para ocupar todo espaço livre */
+    padding: 0 1.5rem;
+    /* espaçamento interno */
+    transition: all 0.4s ease;
+}
+
 /* ========== HAMBURGER ICON ========== */
 .hamburger-icon {
     width: 24px;
@@ -40,24 +76,14 @@
     border-radius: 8px !important;
 }
 
-/* ========== SIDEBAR BASICS ========== */
-/* Ajustamos o width fixo e o transition */
-#sidebar {
-    width: 230px;
-    /* largura padrão da sidebar */
-    border-right: 1px solid #ddd;
-    transition: margin-left 0.4s ease;
-}
-
-#sidebar.collapsed {
-    margin-left: -230px;
-    opacity: 0;
-}
-
 /* ========== MENU LINKS ========== */
 #sidebarNav .nav-link {
     color: #000 !important;
     transition: box-shadow 0.3s;
+    padding: 1rem;
+    /* para ficar mais amigável */
+    display: block;
+    /* link no sidebar mais estilo */
 }
 
 #sidebarNav .nav-link.active {
@@ -92,46 +118,13 @@
     color: #007bff !important;
 }
 
-/* 
-  ========== MAIN REFLUIR AO COLAPSAR SIDEBAR ==========
-  Precisamos sobrescrever o width do <main role="main"> 
-  para que ele se expanda quando sidebar for colapsada.
-*/
-main[role="main"] {
-    transition: width 0.4s ease;
-    width: calc(100% - 230px) !important;
-    /* Por padrão, subtrai a largura da sidebar */
-}
-
-main[role="main"].expanded {
-    width: 100% !important;
-    /* quando sidebar colapsar, main ocupa tudo */
-}
-
-/* 
-  ========== MODO ESCURO (dark-mode) ==========
-*/
+/* ========== MODO ESCURO (dark-mode) ========== */
 body.dark-mode {
     background-color: #121212;
     color: #fff;
 }
 
-/* Cards no modo escuro */
-body.dark-mode .card {
-    background-color: #1e1e1e !important;
-    color: #fff !important;
-    border-color: #444 !important;
-}
-
-body.dark-mode .card .card-title {
-    color: #fff !important;
-}
-
-body.dark-mode .card .card-text {
-    color: #40a8ff !important;
-}
-
-/* Sidebar no modo escuro */
+/* Sidebar no dark-mode */
 body.dark-mode #sidebar {
     background-color: #1e1e1e !important;
     border-right: 1px solid #444;
@@ -173,4 +166,19 @@ body.dark-mode .btn {
 /* Hamburguer no modo escuro */
 body.dark-mode .hamburger-icon span {
     background-color: #fff;
+}
+
+/* Cards no modo escuro */
+body.dark-mode .card {
+    background-color: #1e1e1e !important;
+    color: #fff !important;
+    border-color: #444 !important;
+}
+
+body.dark-mode .card .card-title {
+    color: #fff !important;
+}
+
+body.dark-mode .card .card-text {
+    color: #40a8ff !important;
 }
