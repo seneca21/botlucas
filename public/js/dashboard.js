@@ -14,13 +14,13 @@ $(document).ready(function () {
             const data = await response.json();
 
             //-------------------------------------------
-            // 1) Estatísticas do Dia (Aba statsSection)
+            // 1) Estatísticas do Dia
             //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // Gráfico Bar (usuários x compras)
+            // Gráfico Bar
             const chartData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -48,7 +48,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 2) Ranking Simples (Aba rankingSimplesSection)
+            // 2) Ranking Simples
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -64,7 +64,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado (Aba rankingDetalhadoSection)
+            // 3) Ranking Detalhado
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -91,9 +91,9 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 4) Estatísticas do Dia (Detalhado) - 4 colunas
+            // 4) Estatísticas Detalhadas (4 colunas)
             //-------------------------------------------
-            // (A) statsAll
+            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -106,7 +106,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
             );
 
-            // (B) statsMain
+            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(
@@ -119,7 +119,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
             );
 
-            // (C) statsNotPurchased
+            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(
                 data.statsNotPurchased.totalPurchases
@@ -134,7 +134,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
             );
 
-            // (D) statsPurchased
+            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(
                 data.statsPurchased.totalPurchases
@@ -153,30 +153,39 @@ $(document).ready(function () {
         }
     }
 
-    // (A) Atualiza ao carregar
+    // Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // (B) Atualiza ao mudar data
+    // Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // (C) Lógica de Sidebar para trocar seções
-    // REMOVEMOS a parte que deixava .active fixo, pois não queremos cor permanente
+    // Controla troca de seções
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
 
-        // Ao clicar, só muda a seção (mas não adicionamos classe 'active')
+        // Remove .active e .clicked de todos
+        $('#sidebarNav .nav-link').removeClass('active clicked');
+
+        // Adiciona .active ao link clicado
+        $(this).addClass('active');
+
+        // Dispara o efeito de sombra forte
+        $(this).addClass('clicked');
+
+        // Esconde as sections
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
 
+        // Mostra a section alvo
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Botão / Ícone de hambúrguer -> recolhe/expande sidebar
+    // Ícone hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });

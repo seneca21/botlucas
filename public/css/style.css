@@ -40,49 +40,61 @@
     border-radius: 8px !important;
 }
 
-/* As letras dos números do card em preto */
-.card-text {
-    font-size: 1.4rem;
-    font-weight: bold;
-    color: #000 !important;
-    /* preto */
-}
-
-.card-title {
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: #000 !important;
-    /* também garante título em preto */
-}
-
 /* ========== SIDEBAR BASICS ========== */
 #sidebar {
     min-height: 100vh;
     border-right: 1px solid #ddd;
     transition: all 0.3s ease;
     width: 230px;
+    /* largura do sidebar */
 }
 
-/* Sidebar recolhido (collapsed) */
+/* Quando estiver recolhido (collapsed), some da tela */
 #sidebar.collapsed {
     margin-left: -230px;
     opacity: 0;
 }
 
-/* REMOVIDO: Estilo de 'link ativo' - não queremos fundo azul fixo */
+/* ========== LINKS DO MENU ========== */
+/* Texto preto por padrão */
+#sidebarNav .nav-link {
+    color: #000 !important;
+}
+
+/* Remove cor de fundo ao 'selecionar' */
 #sidebarNav .nav-link.active {
     background-color: transparent !important;
-    color: inherit !important;
-    /* sem destaque */
+    color: #000 !important;
+    /* mantém texto em preto */
 }
 
-/* Em vez disso, só terá um shadow quando clicamos (efeito transitório) */
-#sidebarNav .nav-link {
-    transition: box-shadow 0.3s ease;
-    /* suave */
+/* Ao clicar, ativamos uma animação de sombra para destacar a aba momentaneamente */
+.nav-link.clicked {
+    animation: highlight 0.8s forwards;
 }
 
-/* Ao clicar (pressionado), exibe uma sombra e depois some */
-#sidebarNav .nav-link:active {
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+@keyframes highlight {
+    0% {
+        box-shadow: 0 0 12px 4px rgba(0, 123, 255, 0.7);
+    }
+
+    100% {
+        box-shadow: none;
+    }
+}
+
+/* ========== CARDS: Títulos pretos, números azuis ========== */
+
+/* Título dos cards (pretos) */
+.card-title {
+    color: #000 !important;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* Texto dos cards (números, etc.) em azul */
+.card-text {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #007bff !important;
 }

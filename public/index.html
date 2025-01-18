@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8" />
     <title>Dashboard de Vendas</title>
-    <!-- Bootstrap CSS (ex.: versão 4.6) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/style.css" />
 </head>
@@ -14,6 +13,7 @@
         <div class="row">
             <!-- SIDEBAR -->
             <nav id="sidebar" class="col-12 col-md-3 col-lg-2 bg-light sidebar p-3">
+                <!-- Removemos o "Menu" -->
                 <ul class="nav flex-column" id="sidebarNav">
                     <li class="nav-item">
                         <a class="nav-link active" href="#" data-section="statsSection">
@@ -77,7 +77,7 @@
                             <span id="conversionRate">0%</span>
                         </p>
 
-                        <!-- Gráfico (exemplo) -->
+                        <!-- Gráfico -->
                         <canvas id="salesChart" width="400" height="200"></canvas>
                     </section>
 
@@ -117,42 +117,33 @@
                     <section id="statsDetailedSection" class="d-none">
                         <h3>Estatísticas do Dia (Detalhado)</h3>
                         <div class="row">
-                            <!-- COLUNA 1 (GERAL = statsAll) -->
+                            <!-- COLUNA 1 (ALL) -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[TODAS AS COMPRAS]</h5>
-                                <!-- Card 1 -->
                                 <div class="card text-center shadow-sm mb-3">
                                     <div class="card-body">
                                         <h5 class="card-title">Total de Leads</h5>
                                         <p class="card-text" id="cardAllLeads">0</p>
                                     </div>
                                 </div>
-
-                                <!-- Card 2 -->
                                 <div class="card text-center shadow-sm mb-3">
                                     <div class="card-body">
                                         <h5 class="card-title">Pagamentos Confirmados</h5>
                                         <p class="card-text" id="cardAllPaymentsConfirmed">0</p>
                                     </div>
                                 </div>
-
-                                <!-- Card 3 -->
                                 <div class="card text-center shadow-sm mb-3">
                                     <div class="card-body">
                                         <h5 class="card-title">Taxa de Conversão</h5>
                                         <p class="card-text" id="cardAllConversionRateDetailed">0%</p>
                                     </div>
                                 </div>
-
-                                <!-- Card 4 -->
                                 <div class="card text-center shadow-sm mb-3">
                                     <div class="card-body">
                                         <h5 class="card-title">Volume Gerado (R$)</h5>
                                         <p class="card-text" id="cardAllTotalVolume">0</p>
                                     </div>
                                 </div>
-
-                                <!-- Card 5 -->
                                 <div class="card text-center shadow-sm mb-3">
                                     <div class="card-body">
                                         <h5 class="card-title">Vendas Convertidas (R$)</h5>
@@ -161,7 +152,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 2 (PLANO PRINCIPAL = statsMain) -->
+                            <!-- COLUNA 2 (MAIN) -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[PLANO PRINCIPAL]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -196,7 +187,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 3 (REMARKETING NOT_PURCHASED) -->
+                            <!-- COLUNA 3 (NOT_PURCHASED) -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[REMARKETING - NOT_PURCHASED]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -231,7 +222,7 @@
                                 </div>
                             </div>
 
-                            <!-- COLUNA 4 (UPSELL PURCHASED) -->
+                            <!-- COLUNA 4 (PURCHASED) -->
                             <div class="col-md-3 mb-3">
                                 <h5 class="text-center">[UPSELL - PURCHASED]</h5>
                                 <div class="card text-center shadow-sm mb-3">
@@ -272,7 +263,7 @@
         </div>
     </div>
 
-    <!-- Scripts Bootstrap + jQuery + Chart.js etc. -->
+    <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
