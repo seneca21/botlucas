@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const { Op, Sequelize } = require('sequelize');
-const db = require('./services/index'); // Importa index do Sequelize
+const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
@@ -31,10 +31,11 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Função para obter estatísticas detalhadas de um intervalo
- * Usada para "statsAll", "statsMain", etc.
+ * Função para obter estatísticas de um intervalo
  */
 async function getDetailedStats(startDate, endDate, originCondition) {
+    const { User, Purchase } = db;
+
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -42,8 +43,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
 
-    // Se não houver condition, totalUsers = todos que interagiram no dia
-    // Se houver condition, totalUsers = quem comprou nessa condition + interagiu
+    // leads
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -56,14 +56,14 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     let totalUsers;
     if (!originCondition) {
-        // "statsAll" => leads = user que lastInteraction no dia
+        // statsAll => leads = user que interagiu no dia
         totalUsers = await User.count({
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
             },
         });
     } else {
-        // "statsX" => leads = user que lastInteraction no dia E comprou nessa condition
+        // statsX => leads = user que comprou nessa condition + interagiu
         totalUsers = await User.count({
             where: {
                 id: { [Op.in]: userIdsWithCondition },
@@ -79,9 +79,10 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
     // totalVendasGeradas
-    const totalVendasGeradas = (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
+    const totalVendasGeradas =
+        (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
 
-    // totalVendasConvertidas (igual a geradas, pois se está em Purchase, está paga)
+    // totalVendasConvertidas (se está em Purchase, está pago)
     const totalVendasConvertidas = totalVendasGeradas;
 
     return {
@@ -94,7 +95,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 }
 
 /**
- * Helper para obter data de X sem horas
+ * Helper: retorna data "zerada" (00:00)
  */
 function makeDay(date) {
     const d = new Date(date);
@@ -102,45 +103,42 @@ function makeDay(date) {
     return d;
 }
 
-// Rota /api/bots-stats
+// ROTA /api/bots-stats
 app.get('/api/bots-stats', async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
 
-        // Intervalo do dia
+        // Dia atual
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // "statsAll" do dia selecionado
-        const statsAll = await getDetailedStats(startDate, endDate, null);
-
-        // statsYesterday => dia anterior
+        // Dia anterior
         const yesterday = new Date(startDate);
-        yesterday.setDate(yesterday.getDate() - 1); // subtrai 1 dia
+        yesterday.setDate(yesterday.getDate() - 1);
         const startYesterday = makeDay(yesterday);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
+
+        // statsAll (Hoje)
+        const statsAll = await getDetailedStats(startDate, endDate, null);
+        // statsYesterday (Ontem)
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
 
-        // statsMain
+        // statsMain, statsNotPurchased, statsPurchased
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
-        // statsNotPurchased
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
-        // statsPurchased
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
-        // RANKING SIMPLES (todos)
+        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
             ],
             where: {
-                purchasedAt: {
-                    [Op.between]: [startDate, endDate],
-                },
+                purchasedAt: { [Op.between]: [startDate, endDate] },
             },
             group: ['botName'],
             order: [[Sequelize.literal('"vendas"'), 'DESC']],
@@ -150,7 +148,7 @@ app.get('/api/bots-stats', async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // RANKING DETALHADO
+        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -158,29 +156,21 @@ app.get('/api/bots-stats', async (req, res) => {
                 [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
             ],
             where: {
-                purchasedAt: {
-                    [Op.between]: [startDate, endDate],
-                },
-                botName: {
-                    [Op.ne]: null,
-                },
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
             },
             group: ['botName'],
         });
 
-        // totalUsers por bot (User)
+        // totalUsers por bot
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
             ],
             where: {
-                lastInteraction: {
-                    [Op.between]: [startDate, endDate],
-                },
-                botName: {
-                    [Op.ne]: null,
-                },
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
             },
             group: ['botName'],
         });
@@ -191,7 +181,7 @@ app.get('/api/bots-stats', async (req, res) => {
             botUsersMap[bName] = uCount;
         });
 
-        // agrupar purchases por planName e botName
+        // planSalesByBot
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -200,9 +190,7 @@ app.get('/api/bots-stats', async (req, res) => {
                 [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue'],
             ],
             where: {
-                purchasedAt: {
-                    [Op.between]: [startDate, endDate],
-                },
+                purchasedAt: { [Op.between]: [startDate, endDate] },
                 planName: { [Op.ne]: null },
                 botName: { [Op.ne]: null },
             },
@@ -222,10 +210,11 @@ app.get('/api/bots-stats', async (req, res) => {
         const botDetails = [];
         botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
-            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
-            const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
+            const totalPurchasesBot =
+                parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalValueBot =
+                parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-
             const conversionRateBot =
                 totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
             const averageValueBot =
@@ -234,12 +223,12 @@ app.get('/api/bots-stats', async (req, res) => {
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
-                const planConversionRate =
+                const planConvRate =
                     totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
                 plansArray.push({
                     planName,
                     salesCount: info.salesCount,
-                    conversionRate: planConversionRate,
+                    conversionRate: planConvRate,
                 });
             }
 
@@ -255,10 +244,10 @@ app.get('/api/bots-stats', async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Responde ao front-end
+        // Responde
         res.json({
-            statsAll,          // Dia atual
-            statsYesterday,    // Dia anterior
+            statsAll,        // Dia atual
+            statsYesterday,  // Dia anterior
             statsMain,
             statsNotPurchased,
             statsPurchased,

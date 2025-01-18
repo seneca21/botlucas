@@ -3,7 +3,8 @@ $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
-    let salesChart;
+    let salesChart;          // Gráfico de barras (Usuários x Compras)
+    let lineComparisonChart; // Gráfico de linha (Ontem x Hoje)
 
     async function updateDashboard(date) {
         try {
@@ -14,14 +15,14 @@ $(document).ready(function () {
             const data = await response.json();
 
             //-------------------------------------------
-            // 1) Estatísticas do Dia (atual)
+            // 1) Estatísticas do Dia (Aba statsSection)
             //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // Gráfico Bar (usuários x compras)
-            const chartData = {
+            // ========== GRÁFICO DE BARRAS (Usuários x Compras) ==========
+            const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
                     {
@@ -31,14 +32,14 @@ $(document).ready(function () {
                     },
                 ],
             };
-            const ctx = document.getElementById('salesChart').getContext('2d');
+            const barCtx = document.getElementById('salesChart').getContext('2d');
             if (salesChart) {
-                salesChart.data = chartData;
+                salesChart.data = barData;
                 salesChart.update();
             } else {
-                salesChart = new Chart(ctx, {
+                salesChart = new Chart(barCtx, {
                     type: 'bar',
-                    data: chartData,
+                    data: barData,
                     options: {
                         scales: {
                             y: { beginAtZero: true },
@@ -47,12 +48,57 @@ $(document).ready(function () {
                 });
             }
 
-            // ========== Tabela comparativa: Hoje (statsAll) x Ontem (statsYesterday) ==========
-            $('#tdTodaySales').text(data.statsAll.totalPurchases);
-            $('#tdYesterdaySales').text(data.statsYesterday.totalPurchases);
+            // ========== GRÁFICO DE LINHA (Ontem vs Hoje, Valor Convertido) ==========
+            const lineData = {
+                labels: ['Ontem', 'Hoje'],
+                datasets: [
+                    {
+                        label: 'Valor Convertido (R$)',
+                        data: [
+                            data.statsYesterday.totalVendasConvertidas,
+                            data.statsAll.totalVendasConvertidas
+                        ],
+                        fill: false,
+                        borderColor: '#ff5c5c', // cor da linha
+                        pointBackgroundColor: '#ff5c5c',
+                        pointHoverRadius: 7,
+                        tension: 0.2, // curva suave da linha
+                    },
+                ],
+            };
+            const lineCtx = document
+                .getElementById('lineComparisonChart')
+                .getContext('2d');
+            if (lineComparisonChart) {
+                lineComparisonChart.data = lineData;
+                lineComparisonChart.update();
+            } else {
+                lineComparisonChart = new Chart(lineCtx, {
+                    type: 'line',
+                    data: lineData,
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false, // se quiser ver "abaixo" caso ontem>hoje
+                            },
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const value = context.parsed.y || 0;
+                                        return `R$ ${value.toFixed(2)}`;
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+            }
 
             //-------------------------------------------
-            // 2) Ranking Simples
+            // 2) Ranking Simples (Aba rankingSimplesSection)
             //-------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -68,7 +114,7 @@ $(document).ready(function () {
             }
 
             //-------------------------------------------
-            // 3) Ranking Detalhado
+            // 3) Ranking Detalhado (Aba rankingDetalhadoSection)
             //-------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
@@ -157,34 +203,30 @@ $(document).ready(function () {
         }
     }
 
-    // Atualiza ao carregar
+    // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Atualiza ao mudar data
+    // (B) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // Troca de seções no sidebar
+    // (C) Troca de seções do sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
-        // remove classes
         $('#sidebarNav .nav-link').removeClass('active clicked');
-        // marca este link como ativo
         $(this).addClass('active clicked');
 
-        // esconde seções
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
 
-        // mostra a section alvo
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hambúrguer -> recolhe/expande sidebar
+    // (D) Botão hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
