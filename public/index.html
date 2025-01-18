@@ -14,28 +14,31 @@
     <div id="appContainer">
         <!-- SIDEBAR -->
         <nav id="sidebar">
-            <ul class="nav flex-column" id="sidebarNav">
-                <li class="nav-item">
-                    <a class="nav-link active" href="#" data-section="statsSection">
-                        Estatísticas do Dia
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" data-section="rankingSimplesSection">
-                        Ranking de Bots (Simples)
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" data-section="rankingDetalhadoSection">
-                        Ranking de Bots Detalhado
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" data-section="statsDetailedSection">
-                        Estatísticas do Dia (Detalhado)
-                    </a>
-                </li>
-            </ul>
+            <!-- CONTAINER INTERNO para o conteúdo do sidebar -->
+            <div id="sidebarContent">
+                <ul class="nav flex-column" id="sidebarNav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-section="statsSection">
+                            Estatísticas do Dia
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="rankingSimplesSection">
+                            Ranking de Bots (Simples)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="rankingDetalhadoSection">
+                            Ranking de Bots Detalhado
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="statsDetailedSection">
+                            Estatísticas do Dia (Detalhado)
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </nav>
 
         <!-- CONTEÚDO PRINCIPAL -->
@@ -54,7 +57,6 @@
 
                 <!-- Emoji Lua/Sol -->
                 <div>
-                    <!-- Se seu Dark Mode estiver ativo, esse ID deve ser o mesmo do JS -->
                     <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;" title="Alternar tema">
                         🌙
                     </span>
@@ -158,9 +160,7 @@
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Taxa de Conversão</h5>
-                                    <p class="card-text" id="cardAllConversionRateDetailed">
-                                        0%
-                                    </p>
+                                    <p class="card-text" id="cardAllConversionRateDetailed">0%</p>
                                 </div>
                             </div>
                             <div class="card text-center shadow-sm mb-3">
@@ -172,9 +172,7 @@
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Vendas Convertidas (R$)</h5>
-                                    <p class="card-text" id="cardAllTotalPaidVolume">
-                                        0
-                                    </p>
+                                    <p class="card-text" id="cardAllTotalPaidVolume">0</p>
                                 </div>
                             </div>
                         </div>

@@ -1,12 +1,18 @@
 /* style.css */
 
-/* ========== APP CONTAINER LAYOUT ========== */
-/* Usamos flex para permitir que #sidebar encolha com transição e #mainContent se expanda */
+/* 
+  A estrutura agora é:
+  #appContainer { display: flex; }
+    #sidebar
+      #sidebarContent
+    #mainContent
+*/
+
+/* ========== FLEX LAYOUT PRINCIPAL ========== */
 #appContainer {
     display: flex;
     min-height: 100vh;
     /* altura total da tela */
-    /* background do body fica por conta do body */
 }
 
 /* SIDEBAR */
@@ -15,24 +21,39 @@
     /* Largura normal */
     transition: width 0.4s ease;
     /* animação suave */
-    overflow: hidden;
-    /* oculta conteúdo ao encolher */
     background-color: #f8f9fa;
-    /* cor clara no modo normal */
     border-right: 1px solid #ddd;
+    overflow: hidden;
+    /* oculta o que passar dos limites */
+    position: relative;
+    /* se quisermos posicionar #sidebarContent */
 }
 
-/* Quando colapsa */
+/* CONTEÚDO DO SIDEBAR (texto, links etc.) */
+#sidebarContent {
+    /* Para evitar “compressão” do texto, forçamos no-wrap e sumimos via opacity */
+    white-space: nowrap;
+    transition: opacity 0.3s ease;
+    padding: 1rem;
+}
+
+/* Ao colapsar, a sidebar tem width=0. 
+   Então, também tiramos a opacidade do conteúdo para não ver compressão do texto. */
 #sidebar.collapsed {
     width: 0;
+}
+
+#sidebar.collapsed #sidebarContent {
+    opacity: 0;
+    pointer-events: none;
+    /* desabilita clique no texto oculto */
 }
 
 /* MAIN CONTENT */
 #mainContent {
     flex: 1;
-    /* cresce para ocupar todo espaço livre */
+    /* cresce para ocupar espaço restante */
     padding: 0 1.5rem;
-    /* espaçamento interno */
     transition: all 0.4s ease;
 }
 
@@ -80,10 +101,8 @@
 #sidebarNav .nav-link {
     color: #000 !important;
     transition: box-shadow 0.3s;
-    padding: 1rem;
-    /* para ficar mais amigável */
+    padding: 0.75rem 1rem;
     display: block;
-    /* link no sidebar mais estilo */
 }
 
 #sidebarNav .nav-link.active {
@@ -91,6 +110,7 @@
     color: #000 !important;
 }
 
+/* Efeito de shadow momentâneo ao clicar */
 .nav-link.clicked {
     animation: highlight 0.8s forwards;
 }
@@ -124,7 +144,7 @@ body.dark-mode {
     color: #fff;
 }
 
-/* Sidebar no dark-mode */
+/* Sidebar no modo escuro */
 body.dark-mode #sidebar {
     background-color: #1e1e1e !important;
     border-right: 1px solid #444;
