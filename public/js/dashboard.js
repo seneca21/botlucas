@@ -162,11 +162,11 @@ $(document).ready(function () {
     });
 
     // (C) Lógica de Sidebar para trocar seções
+    // REMOVEMOS a parte que deixava .active fixo, pois não queremos cor permanente
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
-        $('#sidebarNav .nav-link').removeClass('active');
-        $(this).addClass('active');
 
+        // Ao clicar, só muda a seção (mas não adicionamos classe 'active')
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
@@ -176,7 +176,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Ícone hambúrguer -> recolhe/expande sidebar
+    // (D) Botão / Ícone de hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
