@@ -43,10 +43,11 @@
 /* ========== SIDEBAR BASICS ========== */
 #sidebar {
     min-height: 100vh;
+    /* altura total da tela */
     border-right: 1px solid #ddd;
     transition: all 0.3s ease;
     width: 230px;
-    /* largura do sidebar */
+    /* Largura do sidebar */
 }
 
 /* Quando estiver recolhido (collapsed), some da tela */
@@ -56,19 +57,18 @@
 }
 
 /* ========== LINKS DO MENU ========== */
-/* Texto preto por padrão */
 #sidebarNav .nav-link {
     color: #000 !important;
+    transition: box-shadow 0.3s;
 }
 
 /* Remove cor de fundo ao 'selecionar' */
 #sidebarNav .nav-link.active {
     background-color: transparent !important;
     color: #000 !important;
-    /* mantém texto em preto */
 }
 
-/* Ao clicar, ativamos uma animação de sombra para destacar a aba momentaneamente */
+/* Animação de sombra ao clicar (vai sumindo) */
 .nav-link.clicked {
     animation: highlight 0.8s forwards;
 }
@@ -84,17 +84,25 @@
 }
 
 /* ========== CARDS: Títulos pretos, números azuis ========== */
-
-/* Título dos cards (pretos) */
 .card-title {
     color: #000 !important;
     font-weight: 600;
     font-size: 1.1rem;
 }
 
-/* Texto dos cards (números, etc.) em azul */
 .card-text {
     font-size: 1.4rem;
     font-weight: bold;
     color: #007bff !important;
+}
+
+/* ========== TABELA COMPARATIVA DE VENDAS (DIA E ONTEM) ========== */
+.row-today {
+    background-color: #c8e6c9 !important;
+    /* Verde claro */
+}
+
+.row-yesterday {
+    background-color: #ffcdd2 !important;
+    /* Vermelho claro */
 }

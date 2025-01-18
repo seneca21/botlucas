@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const { Op, Sequelize } = require('sequelize');
-const db = require('./services/index');
+const db = require('./services/index'); // Importa index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
@@ -31,13 +31,10 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Retorna um objeto de estatísticas do dia, filtrando por originCondition se quiser.
- * @param {Date} startDate
- * @param {Date} endDate
- * @param {String} [originCondition] pode ser "main", "not_purchased", "purchased" ou null p/ tudo
+ * Função para obter estatísticas detalhadas de um intervalo
+ * Usada para "statsAll", "statsMain", etc.
  */
 async function getDetailedStats(startDate, endDate, originCondition) {
-    // Filtra purchases se originCondition != null
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -45,19 +42,8 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
 
-    // totalUsers = contagem de users que interagiram
-    //  se originCondition está definido, precisamos filtrar somente
-    //  usuários que compraram nessa condition? ou que?
-    // A pedido, "Leads" é sempre quem interagiu no dia. Mas se quisermos
-    //  filtrar só leads que COMPRARAM nesse originCondition, é outra lógica.
-    // Aqui, assumiremos que "Leads" = Users com lastInteraction no dia
-    // e se originCondition != null, pegamos quem fez Purchase nessa condition.
-    // => Ajustando ao pedido: "segunda, terceira e quarta colunas" só para
-    //    quem de fato comprou nesse originCondition?
-    // Se for para refletir "Leads" do main, "Leads" do upsell, etc. — não está
-    //  muito claro. Vamos supor que a "coluna" signifique "só as compras".
-    // para ficar coerente, vamos filtrar leads => user com lastInteraction E
-    //  fez purchase com originCondition. Assim fica 100% "coluna" coerente.
+    // Se não houver condition, totalUsers = todos que interagiram no dia
+    // Se houver condition, totalUsers = quem comprou nessa condition + interagiu
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -70,14 +56,14 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     let totalUsers;
     if (!originCondition) {
-        // statsAll => leads = todo user que lastInteraction no dia
+        // "statsAll" => leads = user que lastInteraction no dia
         totalUsers = await User.count({
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
             },
         });
     } else {
-        // statsX => leads = user que lastInteraction no dia E comprou nessa condition
+        // "statsX" => leads = user que lastInteraction no dia E comprou nessa condition
         totalUsers = await User.count({
             where: {
                 id: { [Op.in]: userIdsWithCondition },
@@ -89,13 +75,13 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     // totalPurchases
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
 
-    // conversionRate = totalPurchases / totalUsers * 100
+    // conversionRate
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
-    // totalVendasGeradas = soma planValue
-    const totalVendasGeradas = await Purchase.sum('planValue', { where: purchaseWhere }) || 0;
+    // totalVendasGeradas
+    const totalVendasGeradas = (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
 
-    // totalVendasConvertidas = aqui é igual totalVendasGeradas (pois se está em Purchase, tá pago)
+    // totalVendasConvertidas (igual a geradas, pois se está em Purchase, está paga)
     const totalVendasConvertidas = totalVendasGeradas;
 
     return {
@@ -107,26 +93,42 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     };
 }
 
-// ROTA /api/bots-stats
+/**
+ * Helper para obter data de X sem horas
+ */
+function makeDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+// Rota /api/bots-stats
 app.get('/api/bots-stats', async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
 
         // Intervalo do dia
-        const startDate = new Date(selectedDate);
-        startDate.setHours(0, 0, 0, 0);
-
-        const endDate = new Date(selectedDate);
+        const startDate = makeDay(selectedDate);
+        const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // ---- statsAll (tudo)
+        // "statsAll" do dia selecionado
         const statsAll = await getDetailedStats(startDate, endDate, null);
-        // ---- statsMain
+
+        // statsYesterday => dia anterior
+        const yesterday = new Date(startDate);
+        yesterday.setDate(yesterday.getDate() - 1); // subtrai 1 dia
+        const startYesterday = makeDay(yesterday);
+        const endYesterday = new Date(startYesterday);
+        endYesterday.setHours(23, 59, 59, 999);
+        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
+
+        // statsMain
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
-        // ---- statsNotPurchased
+        // statsNotPurchased
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
-        // ---- statsPurchased
+        // statsPurchased
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
         // RANKING SIMPLES (todos)
@@ -148,8 +150,7 @@ app.get('/api/bots-stats', async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // RANKING DETALHADO (todos)
-        // (mesma lógica anterior que você já tinha)
+        // RANKING DETALHADO
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -167,7 +168,7 @@ app.get('/api/bots-stats', async (req, res) => {
             group: ['botName'],
         });
 
-        // totalUsers por bot
+        // totalUsers por bot (User)
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -183,7 +184,6 @@ app.get('/api/bots-stats', async (req, res) => {
             },
             group: ['botName'],
         });
-
         const botUsersMap = {};
         botsWithInteractions.forEach((item) => {
             const bName = item.botName;
@@ -209,7 +209,6 @@ app.get('/api/bots-stats', async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
-
         const botPlansMap = {};
         planSalesByBot.forEach((row) => {
             const bName = row.botName;
@@ -223,8 +222,7 @@ app.get('/api/bots-stats', async (req, res) => {
         const botDetails = [];
         botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
-            const totalPurchasesBot =
-                parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
 
@@ -255,18 +253,15 @@ app.get('/api/bots-stats', async (req, res) => {
                 plans: plansArray,
             });
         });
-
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Responde:
+        // Responde ao front-end
         res.json({
-            // estatísticas do dia (quatro blocos)
-            statsAll,
+            statsAll,          // Dia atual
+            statsYesterday,    // Dia anterior
             statsMain,
             statsNotPurchased,
             statsPurchased,
-
-            // ranking
             botRanking,
             botDetails,
         });

@@ -14,13 +14,13 @@ $(document).ready(function () {
             const data = await response.json();
 
             //-------------------------------------------
-            // 1) Estatísticas do Dia
+            // 1) Estatísticas do Dia (atual)
             //-------------------------------------------
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // Gráfico Bar
+            // Gráfico Bar (usuários x compras)
             const chartData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -46,6 +46,10 @@ $(document).ready(function () {
                     },
                 });
             }
+
+            // ========== Tabela comparativa: Hoje (statsAll) x Ontem (statsYesterday) ==========
+            $('#tdTodaySales').text(data.statsAll.totalPurchases);
+            $('#tdYesterdaySales').text(data.statsYesterday.totalPurchases);
 
             //-------------------------------------------
             // 2) Ranking Simples
@@ -93,7 +97,7 @@ $(document).ready(function () {
             //-------------------------------------------
             // 4) Estatísticas Detalhadas (4 colunas)
             //-------------------------------------------
-            // statsAll
+            // (A) statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -106,7 +110,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
             );
 
-            // statsMain
+            // (B) statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(
@@ -119,7 +123,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
             );
 
-            // statsNotPurchased
+            // (C) statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(
                 data.statsNotPurchased.totalPurchases
@@ -134,7 +138,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
             );
 
-            // statsPurchased
+            // (D) statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(
                 data.statsPurchased.totalPurchases
@@ -161,31 +165,26 @@ $(document).ready(function () {
         updateDashboard($(this).val());
     });
 
-    // Controla troca de seções
+    // Troca de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
-
-        // Remove .active e .clicked de todos
+        // remove classes
         $('#sidebarNav .nav-link').removeClass('active clicked');
+        // marca este link como ativo
+        $(this).addClass('active clicked');
 
-        // Adiciona .active ao link clicado
-        $(this).addClass('active');
-
-        // Dispara o efeito de sombra forte
-        $(this).addClass('clicked');
-
-        // Esconde as sections
+        // esconde seções
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
 
-        // Mostra a section alvo
+        // mostra a section alvo
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Ícone hambúrguer -> recolhe/expande sidebar
+    // Botão hambúrguer -> recolhe/expande sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
     });
