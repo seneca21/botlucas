@@ -41,11 +41,12 @@
 }
 
 /* ========== SIDEBAR BASICS ========== */
+/* Ajustamos o width fixo e o transition */
 #sidebar {
-    min-height: 100vh;
-    border-right: 1px solid #ddd;
-    transition: all 0.3s ease;
     width: 230px;
+    /* largura padrão da sidebar */
+    border-right: 1px solid #ddd;
+    transition: margin-left 0.4s ease;
 }
 
 #sidebar.collapsed {
@@ -91,10 +92,25 @@
     color: #007bff !important;
 }
 
-/* =========================================================
-   =========== MODO ESCURO (dark-mode) ===========
-   Basta adicionar .dark-mode no body
-   ========================================================= */
+/* 
+  ========== MAIN REFLUIR AO COLAPSAR SIDEBAR ==========
+  Precisamos sobrescrever o width do <main role="main"> 
+  para que ele se expanda quando sidebar for colapsada.
+*/
+main[role="main"] {
+    transition: width 0.4s ease;
+    width: calc(100% - 230px) !important;
+    /* Por padrão, subtrai a largura da sidebar */
+}
+
+main[role="main"].expanded {
+    width: 100% !important;
+    /* quando sidebar colapsar, main ocupa tudo */
+}
+
+/* 
+  ========== MODO ESCURO (dark-mode) ==========
+*/
 body.dark-mode {
     background-color: #121212;
     color: #fff;
@@ -104,19 +120,15 @@ body.dark-mode {
 body.dark-mode .card {
     background-color: #1e1e1e !important;
     color: #fff !important;
-    /* texto base do card */
     border-color: #444 !important;
 }
 
-/* Título do card no modo escuro */
 body.dark-mode .card .card-title {
     color: #fff !important;
 }
 
-/* Texto principal do card (estatísticas/ números) no modo escuro */
 body.dark-mode .card .card-text {
     color: #40a8ff !important;
-    /* azul claro */
 }
 
 /* Sidebar no modo escuro */

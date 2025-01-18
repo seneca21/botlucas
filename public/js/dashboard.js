@@ -1,5 +1,4 @@
 // public/js/dashboard.js
-
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
@@ -7,13 +6,33 @@ $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
 
-    // ======== TEMA (DARK MODE) ========
+    //------------------------------------------------------------
+    // 1) PLUGIN para pintar o background do gráfico
+    //------------------------------------------------------------
+    const chartBackgroundPlugin = {
+        id: 'chartBackground',
+        beforeDraw(chart, args, options) {
+            const { ctx, chartArea } = chart;
+            ctx.save();
+            ctx.fillStyle = options.color || '#fff';
+            ctx.fillRect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+            ctx.restore();
+        }
+    };
+    Chart.register(chartBackgroundPlugin);
+
+    //------------------------------------------------------------
+    // 2) DARK MODE
+    //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
+
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
-        themeBtn.text('☀');
+        if (themeBtn.length) {
+            themeBtn.text('☀');
+        }
     }
 
     themeBtn.on('click', function () {
@@ -26,43 +45,44 @@ $(document).ready(function () {
             themeBtn.text('☀');
             localStorage.setItem('theme', 'dark');
         }
+        // Atualiza se já existirem gráficos
+        updateChartsIfExist();
     });
 
-    // ======== TROCA DE SEÇÕES DO SIDEBAR ========
-    $('#sidebarNav .nav-link').on('click', function (e) {
-        e.preventDefault();
-        $('#sidebarNav .nav-link').removeClass('active clicked');
-        $(this).addClass('active clicked');
-
-        $('#statsSection').addClass('d-none');
-        $('#rankingSimplesSection').addClass('d-none');
-        $('#rankingDetalhadoSection').addClass('d-none');
-        $('#statsDetailedSection').addClass('d-none');
-
-        const targetSection = $(this).data('section');
-        $(`#${targetSection}`).removeClass('d-none');
-    });
-
-    // ======== TOGGLE SIDEBAR => SE EXPANDE O MAIN ========
-    $('#toggleSidebarBtn').on('click', function () {
-        // 1) Oculta/mostra o sidebar com d-none
-        $('#sidebar').toggleClass('d-none');
-
-        // 2) Se o sidebar está oculto, o main vira col-md-12 col-lg-12
-        if ($('#sidebar').hasClass('d-none')) {
-            // Expand main
-            $('#mainContent')
-                .removeClass('col-md-9 col-lg-10')
-                .addClass('col-md-12 col-lg-12');
-        } else {
-            // Retorna ao normal
-            $('#mainContent')
-                .removeClass('col-md-12 col-lg-12')
-                .addClass('col-md-9 col-lg-10');
+    function updateChartsIfExist() {
+        if (salesChart) {
+            applyChartOptions(salesChart);
+            salesChart.update();
         }
-    });
+        if (lineComparisonChart) {
+            applyChartOptions(lineComparisonChart);
+            lineComparisonChart.update();
+        }
+    }
 
-    // ======== ATUALIZA DASHBOARD COM DADOS DA API ========
+    function getChartConfigs() {
+        const isDark = $('body').hasClass('dark-mode');
+        return {
+            backgroundColor: isDark ? '#1e1e1e' : '#fff',
+            axisColor: isDark ? '#fff' : '#000',
+            gridColor: isDark ? '#555' : '#ccc',
+        };
+    }
+
+    function applyChartOptions(chartInstance) {
+        const cfg = getChartConfigs();
+        chartInstance.options.plugins.chartBackground = { color: cfg.backgroundColor };
+        if (chartInstance.options.scales) {
+            Object.values(chartInstance.options.scales).forEach(scale => {
+                if (scale.ticks) scale.ticks.color = cfg.axisColor;
+                if (scale.grid) scale.grid.color = cfg.gridColor;
+            });
+        }
+    }
+
+    //------------------------------------------------------------
+    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    //------------------------------------------------------------
     async function updateDashboard(date) {
         try {
             const response = await fetch(`/api/bots-stats?date=${date}`);
@@ -71,12 +91,14 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // (A) Estatísticas do Dia
+            // Estatísticas do Dia
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // (B) Gráfico de Barras
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -88,22 +110,31 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
+
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
                     data: barData,
                     options: {
+                        responsive: true,
                         scales: {
                             y: { beginAtZero: true },
+                            x: {}
+                        },
+                        plugins: {
+                            chartBackground: {},
                         },
                     },
                 });
             } else {
                 salesChart.data = barData;
-                salesChart.update();
             }
+            applyChartOptions(salesChart);
+            salesChart.update();
 
-            // (C) Gráfico de Linha (Ontem vs Hoje)
+            //--------------------------------------------------
+            // GRÁFICO DE LINHA (Ontem vs Hoje)
+            //--------------------------------------------------
             const lineData = {
                 labels: ['Ontem', 'Hoje'],
                 datasets: [
@@ -122,6 +153,7 @@ $(document).ready(function () {
                 ],
             };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
@@ -130,15 +162,30 @@ $(document).ready(function () {
                         responsive: true,
                         scales: {
                             y: { beginAtZero: false },
+                            x: {}
+                        },
+                        plugins: {
+                            chartBackground: {},
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const value = context.parsed.y || 0;
+                                        return `R$ ${value.toFixed(2)}`;
+                                    },
+                                },
+                            },
                         },
                     },
                 });
             } else {
                 lineComparisonChart.data = lineData;
-                lineComparisonChart.update();
             }
+            applyChartOptions(lineComparisonChart);
+            lineComparisonChart.update();
 
-            // (D) Ranking Simples
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -152,7 +199,9 @@ $(document).ready(function () {
                 });
             }
 
-            // (E) Ranking Detalhado
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -163,7 +212,6 @@ $(document).ready(function () {
                             2
                         )}%)<br>`;
                     });
-
                     detailsTbody.append(`
             <tr>
               <td>${bot.botName}</td>
@@ -177,7 +225,10 @@ $(document).ready(function () {
                 });
             }
 
-            // (F) Estatísticas Detalhadas (4 colunas)
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS (4 colunas)
+            //--------------------------------------------------
+            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -190,6 +241,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
             );
 
+            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(
@@ -202,6 +254,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
             );
 
+            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(
                 data.statsNotPurchased.totalPurchases
@@ -216,6 +269,7 @@ $(document).ready(function () {
                 'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
             );
 
+            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(
                 data.statsPurchased.totalPurchases
@@ -234,11 +288,33 @@ $(document).ready(function () {
         }
     }
 
-    // Ao carregar
+    // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Ao mudar data
+    // (B) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
+    });
+
+    // (C) Troca de seções no sidebar
+    $('#sidebarNav .nav-link').on('click', function (e) {
+        e.preventDefault();
+        $('#sidebarNav .nav-link').removeClass('active clicked');
+        $(this).addClass('active clicked');
+
+        $('#statsSection').addClass('d-none');
+        $('#rankingSimplesSection').addClass('d-none');
+        $('#rankingDetalhadoSection').addClass('d-none');
+        $('#statsDetailedSection').addClass('d-none');
+
+        const targetSection = $(this).data('section');
+        $(`#${targetSection}`).removeClass('d-none');
+    });
+
+    // (D) Botão hamburguer -> recolhe/expande sidebar + main
+    $('#toggleSidebarBtn').on('click', function () {
+        $('#sidebar').toggleClass('collapsed');
+        // Ao mesmo tempo, main expande para 100%
+        $('main[role="main"]').toggleClass('expanded');
     });
 });
