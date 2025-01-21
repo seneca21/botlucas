@@ -390,8 +390,8 @@
           }
         ],
         "intervals": {
-          "not_purchased_minutes": 2,
-          "purchased_seconds": 30
+          "not_purchased_minutes": 3,
+          "purchased_seconds": 15
         }
       }
     },
