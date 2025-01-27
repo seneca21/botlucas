@@ -30,11 +30,12 @@ const userSessions = {};
 const verificationLimits = new Map();
 
 // Definições de rate limiting
-const MAX_ATTEMPTS = 2;
-const WINDOW_MS = 60 * 1000; // 1 minuto
-const BLOCK_TIME_FIRST = 120 * 1000; // 2 minutos
-const BLOCK_TIME_SECOND = 10 * 60 * 1000; // 10 minutos
-const BLOCK_TIME_THIRD = 24 * 60 * 60 * 1000; // 24 horas
+const MAX_VERIFICATION_ATTEMPTS = 2;
+const VERIFICATION_WINDOW_MS = 60 * 1000; // 1 minuto
+const VERIFICATION_BLOCK_TIME_FIRST = 120 * 1000; // 2 minutos
+const VERIFICATION_BLOCK_TIME_SECOND = 10 * 60 * 1000; // 10 minutos
+const VERIFICATION_BLOCK_TIME_THIRD = 24 * 60 * 60 * 1000; // 24 horas
+const VERIFICATION_CYCLE_RESET = 48 * 60 * 60 * 1000; // 48 horas
 
 /**
  * Função para verificar se o usuário pode realizar uma nova tentativa de verificação
@@ -50,7 +51,8 @@ function canAttemptVerification(telegramId) {
       attempts: 0,
       firstAttempt: now,
       blockUntil: 0,
-      violations: 0
+      violations: 0,
+      lastViolationTime: 0
     };
     verificationLimits.set(telegramId, userData);
   }
@@ -60,41 +62,47 @@ function canAttemptVerification(telegramId) {
     const remaining = Math.ceil((userData.blockUntil - now) / 1000);
     return {
       allowed: false,
-      message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${remaining} segundos.`
+      message: `⏰ Você excedeu o número de verificações permitidas. Tente novamente em ${remaining} segundos.`
     };
   }
 
   // Reseta a janela de tentativas se necessário
-  if (now - userData.firstAttempt > WINDOW_MS) {
+  if (now - userData.firstAttempt > VERIFICATION_WINDOW_MS) {
     userData.attempts = 0;
     userData.firstAttempt = now;
   }
 
-  if (userData.attempts < MAX_ATTEMPTS) {
+  if (userData.attempts < MAX_VERIFICATION_ATTEMPTS) {
     userData.attempts += 1;
     return { allowed: true };
   } else {
     // Excede as tentativas permitidas
     userData.violations += 1;
+    userData.lastViolationTime = now;
 
     // Define o tempo de bloqueio com base no número de violações
     if (userData.violations === 1) {
-      userData.blockUntil = now + BLOCK_TIME_FIRST;
+      userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       return {
         allowed: false,
-        message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente em 2 minutos.`
+        message: `🚫 Você excedeu o número de verificações permitidas. Tente novamente em 2 minutos.`
       };
     } else if (userData.violations === 2) {
-      userData.blockUntil = now + BLOCK_TIME_SECOND;
+      userData.blockUntil = now + VERIFICATION_BLOCK_TIME_SECOND;
       return {
         allowed: false,
-        message: `🚫 Você excedeu o número de tentativas permitidas novamente. Tente novamente em 10 minutos.`
+        message: `🚫 Você excedeu o número de verificações permitidas novamente. Tente novamente em 10 minutos.`
       };
     } else if (userData.violations >= 3) {
-      userData.blockUntil = now + BLOCK_TIME_THIRD;
+      userData.blockUntil = now + VERIFICATION_BLOCK_TIME_THIRD;
+      // Reset ciclo após 48 horas
+      setTimeout(() => {
+        verificationLimits.delete(telegramId);
+        logger.info(`🔄 Ciclo de verificações resetado para o usuário ${telegramId}.`);
+      }, VERIFICATION_CYCLE_RESET);
       return {
         allowed: false,
-        message: `🚫 Você excedeu o número de tentativas permitidas múltiplas vezes. Tente novamente em 24 horas.`
+        message: `🚫 Você excedeu o número de verificações permitidas múltiplas vezes. Tente novamente em 24 horas.`
       };
     }
 
@@ -103,8 +111,119 @@ function canAttemptVerification(telegramId) {
     userData.firstAttempt = now;
     return {
       allowed: false,
-      message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.`
+      message: `🚫 Você excedeu o número de verificações permitidas. Tente novamente mais tarde.`
     };
+  }
+}
+
+// =====================================
+// Rate Limiting para Comando /start
+// =====================================
+
+// Mapa para rastrear as tentativas do comando /start por usuário
+const startLimits = new Map();
+
+// Definições de rate limiting para /start
+const MAX_STARTS = 3;
+const START_BLOCK_TIME_FIRST = 5 * 60 * 1000; // 5 minutos
+const START_BLOCK_TIME_SECOND = 24 * 60 * 60 * 1000; // 24 horas
+
+/**
+ * Função para verificar se o usuário pode enviar o comando /start
+ * @param {string} telegramId - ID do Telegram do usuário
+ * @returns {object} - { allowed: boolean, message: string }
+ */
+function canAttemptStart(telegramId) {
+  const now = Date.now();
+  let userData = startLimits.get(telegramId);
+
+  if (!userData) {
+    userData = {
+      starts: 0,
+      lastStart: 0
+    };
+    startLimits.set(telegramId, userData);
+  }
+
+  if (userData.starts === 0) {
+    // Primeiro /start sempre permitido
+    userData.starts = 1;
+    userData.lastStart = now;
+    return { allowed: true };
+  } else if (userData.starts === 1) {
+    // Segundo /start permitido após 5 minutos
+    if (now - userData.lastStart >= START_BLOCK_TIME_FIRST) {
+      userData.starts = 2;
+      userData.lastStart = now;
+      return { allowed: true };
+    } else {
+      const remaining = Math.ceil((START_BLOCK_TIME_FIRST - (now - userData.lastStart)) / 1000);
+      return {
+        allowed: false,
+        message: `⏰ Você pode usar o comando /start novamente em ${remaining} segundos.`
+      };
+    }
+  } else if (userData.starts === 2) {
+    // Terceiro /start permitido após 24 horas
+    if (now - userData.lastStart >= START_BLOCK_TIME_SECOND) {
+      userData.starts = 3;
+      userData.lastStart = now;
+      return { allowed: true };
+    } else {
+      const remaining = Math.ceil((START_BLOCK_TIME_SECOND - (now - userData.lastStart)) / 1000);
+      return {
+        allowed: false,
+        message: `⏰ Você pode usar o comando /start novamente em ${remaining} segundos.`
+      };
+    }
+  } else {
+    // Ciclo reinicia após o terceiro /start
+    userData.starts = 0;
+    userData.lastStart = 0;
+    return { allowed: true };
+  }
+}
+
+// =====================================
+// Rate Limiting para Seleção de Planos
+// =====================================
+
+// Mapa para rastrear as tentativas de seleção de plano por usuário
+const planSelectionLimits = new Map();
+
+// Definições de rate limiting para seleção de planos
+const MAX_PLAN_SELECTIONS = 2;
+const PLAN_SELECTION_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+/**
+ * Função para verificar se o usuário pode selecionar um plano
+ * @param {string} telegramId - ID do Telegram do usuário
+ * @returns {boolean} - true se permitido, false caso contrário
+ */
+function canSelectPlan(telegramId) {
+  const now = Date.now();
+  let userData = planSelectionLimits.get(telegramId);
+
+  if (!userData) {
+    userData = {
+      selections: 0,
+      firstSelection: now
+    };
+    planSelectionLimits.set(telegramId, userData);
+  }
+
+  if (now - userData.firstSelection > PLAN_SELECTION_WINDOW_MS) {
+    // Reseta o contador após 24 horas
+    userData.selections = 0;
+    userData.firstSelection = now;
+  }
+
+  if (userData.selections < MAX_PLAN_SELECTIONS) {
+    userData.selections += 1;
+    return true;
+  } else {
+    // Excede as tentativas permitidas, ignora silenciosamente
+    return false;
   }
 }
 
@@ -126,7 +245,7 @@ function initializeBot(botConfig) {
   // Limite de 2 interações a cada 50seg. Se exceder, IGNORA.
   const limitConfig = {
     window: 50000, // 50 segundos
-    limit: 3,      // max 2 msgs nesse intervalo
+    limit: 2,      // max 2 msgs nesse intervalo
     onLimitExceeded: (ctx, next) => {
       // Aqui não respondemos nada, simplesmente ignoramos.
       logger.warn(`⚠️ [RateLimit] Ignorando mensagem do user ${ctx.from?.id} (excedeu limite)`);
@@ -272,7 +391,7 @@ function initializeBot(botConfig) {
       await user.save();
     }
 
-    // Implementação do Rate Limiting
+    // Implementação do Rate Limiting para Verificações
     const telegramId = chatId.toString();
     const rateLimitResult = canAttemptVerification(telegramId);
 
@@ -326,10 +445,19 @@ function initializeBot(botConfig) {
   });
 
   /**
-   * /start (plano principal) => originCondition = 'main'
+   * Comando /start
    */
   bot.start(async (ctx) => {
     try {
+      const telegramId = ctx.from.id.toString();
+      const rateLimitStart = canAttemptStart(telegramId);
+
+      if (!rateLimitStart.allowed) {
+        // Não enviar mensagem, apenas ignorar
+        logger.warn(`🚫 Usuário ${telegramId} bloqueado para usar /start.`);
+        return;
+      }
+
       logger.info('📩 /start recebido');
       await registerUser(ctx);
 
@@ -388,6 +516,17 @@ function initializeBot(botConfig) {
       await user.save();
     }
 
+    // Implementação do Rate Limiting para Seleção de Planos
+    const telegramId = chatId.toString();
+    const canSelect = canSelectPlan(telegramId);
+
+    if (!canSelect) {
+      // Ignora silenciosamente
+      logger.warn(`🚫 Usuário ${telegramId} excedeu o número de seleções de plano permitidas.`);
+      await ctx.answerCbQuery();
+      return;
+    }
+
     // Sessão do user
     if (!userSessions[chatId]) userSessions[chatId] = {};
     userSessions[chatId].originCondition = 'main';
@@ -430,7 +569,7 @@ function initializeBot(botConfig) {
   });
 
   /**
-   * /status_pagamento
+   * Comando /status_pagamento
    */
   bot.command('status_pagamento', async (ctx) => {
     const chatId = ctx.chat.id;
