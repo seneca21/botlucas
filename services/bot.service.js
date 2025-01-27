@@ -555,6 +555,9 @@ function initializeBot(botConfig) {
       session.chargeId = chargeId;
       session.selectedPlan = plan;
       session.originCondition = remarketingCond;
+      session.paymentCheckCount = 0; // Inicializa o contador de verificações
+
+      userSessions[chatId] = session; // Atualiza a sessão
 
       await ctx.reply(
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
@@ -682,6 +685,7 @@ function initializeBot(botConfig) {
     if (!userSessions[chatId]) userSessions[chatId] = {};
     userSessions[chatId].originCondition = 'main';
     userSessions[chatId].selectedPlan = buttonConfig;
+    userSessions[chatId].paymentCheckCount = 0; // Inicializa o contador de verificações
 
     logger.info(`✅ Plano ${buttonConfig.name} (R$${buttonConfig.value}) (main) enviado.`);
 
@@ -798,7 +802,16 @@ function initializeBot(botConfig) {
         await ctx.reply('❌ Cobrança expirou.');
         delete userSessions[chatId];
       } else {
-        await ctx.reply('⏳ Pagamento pendente.');
+        // Pagamento pendente: Atualizar contador de verificações
+        userSessions[chatId].paymentCheckCount = (userSessions[chatId].paymentCheckCount || 0) + 1;
+        const count = userSessions[chatId].paymentCheckCount;
+
+        if (count === 1) {
+          await ctx.reply('⏳ Pagamento pendente');
+        } else if (count === 2) {
+          await ctx.reply('⏳ Pagamento pendente, conclua o pagamento para liberar o acesso ao melhor grupo vip do brasil');
+        }
+        // No terceiro clique e além, não enviar nenhuma mensagem
       }
     } catch (error) {
       logger.error('❌ Erro ao verificar pagamento:', error);
@@ -894,7 +907,16 @@ function initializeBot(botConfig) {
         await ctx.reply('❌ Cobrança expirou.');
         delete userSessions[chatId];
       } else {
-        await ctx.reply('⏳ Pagamento pendente.');
+        // Pagamento pendente: Atualizar contador de verificações
+        userSessions[chatId].paymentCheckCount = (userSessions[chatId].paymentCheckCount || 0) + 1;
+        const count = userSessions[chatId].paymentCheckCount;
+
+        if (count === 1) {
+          await ctx.reply('⏳ Pagamento pendente');
+        } else if (count === 2) {
+          await ctx.reply('⏳ Pagamento pendente, conclua o pagamento para liberar o acesso ao melhor grupo vip do brasil');
+        }
+        // No terceiro clique e além, não enviar nenhuma mensagem
       }
     } catch (error) {
       logger.error('❌ Erro ao verificar pagamento:', error);
@@ -986,9 +1008,9 @@ function initializeBot(botConfig) {
     }
   }, 60 * 60 * 1000); // Executa a cada hora
 
-  /**
-   * Lançamento do Bot
-   */
+  // =====================================
+  // Lançamento do Bot
+  // =====================================
   bot.launch()
     .then(() => {
       logger.info(`🚀 Bot ${botConfig.name} iniciado com sucesso.`);
@@ -1005,7 +1027,9 @@ function initializeBot(botConfig) {
   bots.push(bot);
 }
 
+// =====================================
 // Inicia cada bot
+// =====================================
 for (const botConf of config.bots) {
   initializeBot(botConf);
 }
