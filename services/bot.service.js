@@ -305,8 +305,81 @@ function checkStartFlood(botName) {
 }
 
 // =====================================
-// Função auxiliar para converter boolean -> texto (logs)
+// Proteção contra Bloqueios Múltiplos
 // =====================================
+
+// Mapa para rastrear o status de bloqueio e banimento de cada lead
+const userBlockStatus = new Map();
+
+// Definições de bloqueio e banimento
+const BLOCK_COUNT_THRESHOLD = 2; // Bloquear após 2 bloqueios em mapas diferentes
+const BAN_COUNT_THRESHOLD = 3; // Banir após 3 bloqueios
+const IGNORE_DURATION_MS = 72 * 60 * 60 * 1000; // 72 horas
+const BAN_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 semana
+const PAUSE_BEFORE_IGNORE_MS = 6 * 60 * 1000; // 6 minutos
+
+/**
+ * Função para gerenciar bloqueios e banimentos de leads
+ * @param {string} telegramId - ID do Telegram do usuário
+ */
+function handleUserBlock(telegramId) {
+  const now = Date.now();
+  let blockData = userBlockStatus.get(telegramId) || {
+    blockCount: 0,
+    isBlocked: false,
+    blockExpiresAt: 0,
+    isBanned: false,
+    banExpiresAt: 0
+  };
+
+  if (blockData.isBanned) {
+    // Já está banido, nenhuma ação necessária
+    return;
+  }
+
+  blockData.blockCount += 1;
+
+  if (blockData.blockCount === BLOCK_COUNT_THRESHOLD) {
+    // Inicia a pausa após 6 minutos
+    setTimeout(() => {
+      blockData.isBlocked = true;
+      blockData.blockExpiresAt = now + IGNORE_DURATION_MS;
+      userBlockStatus.set(telegramId, blockData);
+      logger.warn(`Lead ${telegramId} bloqueado por 72 horas devido a múltiplos bloqueios em diferentes mapas.`);
+
+      // Agendar desbloqueio após 72 horas
+      setTimeout(() => {
+        blockData.isBlocked = false;
+        blockData.blockExpiresAt = 0;
+        blockData.blockCount = 0; // Resetar contagem
+        userBlockStatus.set(telegramId, blockData);
+        logger.info(`Lead ${telegramId} desbloqueado após 72 horas.`);
+      }, IGNORE_DURATION_MS);
+    }, PAUSE_BEFORE_IGNORE_MS); // 6 minutos
+  } else if (blockData.blockCount >= BAN_COUNT_THRESHOLD) {
+    // Banir o lead por 1 semana
+    blockData.isBanned = true;
+    blockData.banExpiresAt = now + BAN_DURATION_MS;
+    userBlockStatus.set(telegramId, blockData);
+    logger.error(`Lead ${telegramId} banido por 1 semana devido a múltiplos bloqueios em diferentes mapas.`);
+
+    // Agendar desbanimento após 1 semana
+    setTimeout(() => {
+      blockData.isBanned = false;
+      blockData.banExpiresAt = 0;
+      blockData.blockCount = 0; // Resetar contagem
+      userBlockStatus.set(telegramId, blockData);
+      logger.info(`Lead ${telegramId} desbanido após 1 semana.`);
+    }, BAN_DURATION_MS);
+  } else {
+    // Atualiza os dados no mapa
+    userBlockStatus.set(telegramId, blockData);
+  }
+}
+
+/**
+ * Função auxiliar para converter boolean -> texto (logs)
+ */
 function booleanParaTexto(value, verdadeiro, falso) {
   return value ? verdadeiro : falso;
 }
@@ -459,6 +532,8 @@ function initializeBot(botConfig) {
     if (!rateLimitResult.allowed) {
       // Ignora silenciosamente sem enviar mensagem
       await ctx.answerCbQuery();
+      // Gerenciar bloqueio adicional
+      handleUserBlock(telegramId);
       return;
     }
 
@@ -519,10 +594,18 @@ function initializeBot(botConfig) {
         return;
       }
 
+      // Verifica se o usuário está bloqueado ou banido
+      const blockData = userBlockStatus.get(telegramId);
+      if (blockData && (blockData.isBlocked || blockData.isBanned)) {
+        // Ignora silenciosamente
+        return;
+      }
+
       const canStart = canAttemptStart(telegramId);
 
       if (!canStart) {
-        // Ignora silenciosamente
+        // Ignora silenciosamente e gerencia bloqueio
+        handleUserBlock(telegramId);
         return;
       }
 
@@ -589,8 +672,9 @@ function initializeBot(botConfig) {
     const canSelectPlan = canAttemptSelectPlan(telegramId, planId);
 
     if (!canSelectPlan) {
-      // Ignora silenciosamente
+      // Ignora silenciosamente e gerencia bloqueio
       await ctx.answerCbQuery();
+      handleUserBlock(telegramId);
       return;
     }
 
@@ -648,11 +732,19 @@ function initializeBot(botConfig) {
       return;
     }
 
+    // Verifica se o usuário está bloqueado ou banido
+    const blockData = userBlockStatus.get(telegramId);
+    if (blockData && (blockData.isBlocked || blockData.isBanned)) {
+      // Ignora silenciosamente
+      return;
+    }
+
     // Aplicar Rate Limiting para Verificação
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Ignora silenciosamente sem enviar mensagem
+      // Ignora silenciosamente e gerencia bloqueio
+      handleUserBlock(telegramId);
       return;
     }
 
@@ -734,12 +826,21 @@ function initializeBot(botConfig) {
       return;
     }
 
+    // Verifica se o usuário está bloqueado ou banido
+    const blockData = userBlockStatus.get(telegramId);
+    if (blockData && (blockData.isBlocked || blockData.isBanned)) {
+      // Ignora silenciosamente
+      await ctx.answerCbQuery();
+      return;
+    }
+
     // Aplicar Rate Limiting para Verificação
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Ignora silenciosamente sem enviar mensagem
+      // Ignora silenciosamente e gerencia bloqueio
       await ctx.answerCbQuery();
+      handleUserBlock(telegramId);
       return;
     }
 
@@ -855,9 +956,39 @@ function initializeBot(botConfig) {
     }
   }, 60 * 1000); // Executa a cada minuto
 
-  // =====================================
-  // Lançamento do Bot
-  // =====================================
+  // Rotina de limpeza para userBlockStatus
+  setInterval(() => {
+    const now = Date.now();
+    for (const [telegramId, blockData] of userBlockStatus) {
+      if (blockData.isBlocked && now >= blockData.blockExpiresAt) {
+        // Bloqueio expirou
+        blockData.isBlocked = false;
+        blockData.blockExpiresAt = 0;
+        blockData.blockCount = 0; // Resetar contagem
+        userBlockStatus.set(telegramId, blockData);
+        logger.info(`Lead ${telegramId} desbloqueado após 72 horas.`);
+      }
+
+      if (blockData.isBanned && now >= blockData.banExpiresAt) {
+        // Ban expirou
+        blockData.isBanned = false;
+        blockData.banExpiresAt = 0;
+        blockData.blockCount = 0; // Resetar contagem
+        userBlockStatus.set(telegramId, blockData);
+        logger.info(`Lead ${telegramId} desbanido após 1 semana.`);
+      }
+
+      // Remove usuários que não estão mais bloqueados ou banidos
+      if (!blockData.isBlocked && !blockData.isBanned && blockData.blockCount === 0) {
+        userBlockStatus.delete(telegramId);
+        logger.info(`Limpeza: Removido ${telegramId} de userBlockStatus.`);
+      }
+    }
+  }, 60 * 60 * 1000); // Executa a cada hora
+
+  /**
+   * Lançamento do Bot
+   */
   bot.launch()
     .then(() => {
       logger.info(`🚀 Bot ${botConfig.name} iniciado com sucesso.`);
@@ -874,9 +1005,7 @@ function initializeBot(botConfig) {
   bots.push(bot);
 }
 
-// =====================================
 // Inicia cada bot
-// =====================================
 for (const botConf of config.bots) {
   initializeBot(botConf);
 }
