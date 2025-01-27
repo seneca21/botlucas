@@ -394,7 +394,8 @@ function initializeBot(botConfig) {
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Ignora silenciosamente
+      // Envia a mensagem de bloqueio
+      await ctx.reply(rateLimitResult.message);
       await ctx.answerCbQuery();
       return;
     }
@@ -568,10 +569,20 @@ function initializeBot(botConfig) {
    */
   bot.command('status_pagamento', async (ctx) => {
     const chatId = ctx.chat.id;
+    const telegramId = chatId.toString();
     const session = userSessions[chatId];
 
     if (!session || !session.chargeId) {
       await ctx.reply('⚠️ Não há cobrança em andamento.');
+      return;
+    }
+
+    // Aplicar Rate Limiting para Verificação
+    const rateLimitResult = canAttemptVerification(telegramId);
+
+    if (!rateLimitResult.allowed) {
+      // Envia a mensagem de bloqueio
+      await ctx.reply(rateLimitResult.message);
       return;
     }
 
@@ -643,11 +654,22 @@ function initializeBot(botConfig) {
    */
   bot.action(/check_payment_(.+)/, async (ctx) => {
     const chatId = ctx.chat.id;
+    const telegramId = chatId.toString();
     const chargeId = ctx.match[1];
     const session = userSessions[chatId];
 
     if (!session || session.chargeId !== chargeId) {
       await ctx.reply('⚠️ Cobrança não corresponde.');
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    // Aplicar Rate Limiting para Verificação
+    const rateLimitResult = canAttemptVerification(telegramId);
+
+    if (!rateLimitResult.allowed) {
+      // Envia a mensagem de bloqueio
+      await ctx.reply(rateLimitResult.message);
       await ctx.answerCbQuery();
       return;
     }
@@ -696,6 +718,7 @@ function initializeBot(botConfig) {
             await ctx.reply('⚠️ Link do produto não encontrado.');
           }
         }
+
         delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
         await ctx.reply('❌ Cobrança expirou.');
@@ -716,7 +739,39 @@ function initializeBot(botConfig) {
     await ctx.answerCbQuery();
   });
 
-  // Lança o bot
+  // =====================================
+  // Rotinas de Limpeza para os Mapas de Rate Limiting
+  // =====================================
+
+  // Função para limpar entradas expiradas em um mapa
+  function cleanRateLimitMap(rateLimitMap, expirationFunction, mapName) {
+    const now = Date.now();
+    for (const [telegramId, userData] of rateLimitMap) {
+      if (expirationFunction(userData, now)) {
+        rateLimitMap.delete(telegramId);
+        logger.info(`Limpeza: Removido ${telegramId} de ${mapName}.`);
+      }
+    }
+  }
+
+  // Rotina de limpeza para startLimits
+  setInterval(() => {
+    cleanRateLimitMap(startLimits, (userData, now) => now > userData.nextAllowedStartTime + START_WAIT_SECOND_MS, 'startLimits');
+  }, 60 * 60 * 1000); // Executa a cada hora
+
+  // Rotina de limpeza para selectPlanLimits
+  setInterval(() => {
+    cleanRateLimitMap(selectPlanLimits, (userData, now) => now > userData.blockUntil, 'selectPlanLimits');
+  }, 60 * 60 * 1000); // Executa a cada hora
+
+  // Rotina de limpeza para verificationLimits
+  setInterval(() => {
+    cleanRateLimitMap(verificationLimits, (userData, now) => now > userData.blockUntil + VERIFICATION_CYCLE_RESET_MS, 'verificationLimits');
+  }, 60 * 60 * 1000); // Executa a cada hora
+
+  // =====================================
+  // Lançamento do Bot
+  // =====================================
   bot.launch()
     .then(() => {
       logger.info(`🚀 Bot ${botConfig.name} iniciado com sucesso.`);
@@ -733,7 +788,9 @@ function initializeBot(botConfig) {
   bots.push(bot);
 }
 
+// =====================================
 // Inicia cada bot
+// =====================================
 for (const botConf of config.bots) {
   initializeBot(botConf);
 }
