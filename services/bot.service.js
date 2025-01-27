@@ -9,6 +9,9 @@ const db = require('./index'); // importa index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
+// ===> ADICIONE ESTA LINHA:
+const rateLimit = require('telegraf-ratelimit'); // <-- Pacote anti-spam
+
 const config = ConfigService.loadConfig();
 const dbConfig = ConfigService.getDbConfig();
 
@@ -29,6 +32,23 @@ function booleanParaTexto(value, verdadeiro, falso) {
 function initializeBot(botConfig) {
   const bot = new Telegraf(botConfig.token);
   console.log(`🚀 Bot ${botConfig.name} em execução.`);
+
+  // ===> ADICIONE ESTE BLOCO:
+  // ------------------------------------------------
+  // Configura o rate-limit para cada mensagem/comando
+  // Se quiser limitar só o /start, pode adaptar
+  // Exemplo: 3 msgs por 15 segundos
+  const limitConfig = {
+    window: 30_000, // 30 segundos
+    limit: 2,       // máximo de 2 interações nesse período
+    onLimitExceeded: (ctx, next) => {
+      // Se o usuário ultrapassar esse limite, cai aqui
+      console.warn(`⚠️ [RateLimit] Usuario ${ctx.from.id} excedeu spam-limit do bot ${botConfig.name}.`);
+      ctx.reply('Você está enviando muitas mensagens em pouco tempo. Aguarde um pouco e tente novamente.');
+    }
+  };
+  bot.use(rateLimit(limitConfig));
+  // ------------------------------------------------
 
   /**
    * Registra ou atualiza o usuário
