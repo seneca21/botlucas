@@ -9,8 +9,8 @@ const db = require('./index'); // importa index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// ===> ADICIONE ESTA LINHA:
-const rateLimit = require('telegraf-ratelimit'); // <-- Pacote anti-spam
+// IMPORTANTE: Pacote de rate-limit
+const rateLimit = require('telegraf-ratelimit');
 
 const config = ConfigService.loadConfig();
 const dbConfig = ConfigService.getDbConfig();
@@ -20,7 +20,7 @@ const bots = [];
 const userSessions = {};
 
 /**
- * Função auxiliar para converter boolean para texto (logs)
+ * Função auxiliar para converter boolean -> texto (logs)
  */
 function booleanParaTexto(value, verdadeiro, falso) {
   return value ? verdadeiro : falso;
@@ -33,25 +33,22 @@ function initializeBot(botConfig) {
   const bot = new Telegraf(botConfig.token);
   console.log(`🚀 Bot ${botConfig.name} em execução.`);
 
-  // ===> ADICIONE ESTE BLOCO:
-  // ------------------------------------------------
-  // Configura o rate-limit para cada mensagem/comando
-  // Se quiser limitar só o /start, pode adaptar
-  // Exemplo: 3 msgs por 15 segundos
+  // ===============[ RATE-LIMIT CONFIG ]================
+  // Limite de 3 interações a cada 15 segundos. Se exceder, IGNORA.
   const limitConfig = {
-    window: 30_000, // 30 segundos
-    limit: 2,       // máximo de 2 interações nesse período
+    window: 15_000, // janela de 15 segundos
+    limit: 2,       // max de 3 msgs nesse intervalo
     onLimitExceeded: (ctx, next) => {
-      // Se o usuário ultrapassar esse limite, cai aqui
-      console.warn(`⚠️ [RateLimit] Usuario ${ctx.from.id} excedeu spam-limit do bot ${botConfig.name}.`);
-      ctx.reply('Você está enviando muitas mensagens em pouco tempo. Aguarde um pouco e tente novamente.');
+      // Aqui não respondemos nada, simplesmente ignoramos.
+      console.warn(`⚠️ [RateLimit] Ignorando mensagem do user ${ctx.from?.id} (excedeu limite)`);
+      // Não chamamos next(), então paramos aqui e não respondemos nada.
     }
   };
   bot.use(rateLimit(limitConfig));
-  // ------------------------------------------------
+  // ======================================================
 
   /**
-   * Registra ou atualiza o usuário
+   * Registra ou atualiza o usuário no banco
    */
   async function registerUser(ctx) {
     try {
@@ -159,7 +156,6 @@ function initializeBot(botConfig) {
 
   /**
    * Ação remarketing_select_plan_X
-   * - Aqui criamos uma cobrança, mas definimos originCondition com base no session
    */
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
@@ -204,7 +200,6 @@ function initializeBot(botConfig) {
 
       session.chargeId = chargeId;
       session.selectedPlan = plan;
-      // define originCondition = 'purchased' ou 'not_purchased', etc.
       session.originCondition = remarketingCond;
 
       await ctx.reply(
@@ -375,7 +370,6 @@ function initializeBot(botConfig) {
             try {
               const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
               if (currentUser && currentUser.hasPurchased) {
-                // Envia remarketing de "purchased"
                 await sendRemarketingMessage(currentUser, 'purchased');
                 console.log(`✅ Upsell enviado -> ${chatId}`);
               }
