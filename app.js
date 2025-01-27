@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js - Versão simples com login fixo
+// app.js - Versão com Login Fixo e Dashboard Protegido
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -10,19 +10,22 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// Configurações básicas do express
+// Configurações básicas
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Configura sessão
 app.use(session({
-    secret: 'chave-super-secreta', // Troque para algo mais seguro
+    secret: 'chave-super-secreta', // Troque isto p/ algo difícil
     resave: false,
     saveUninitialized: false
 }));
 
-// Função para verificar login
+/**
+ * Middleware que checa se o usuário está logado.
+ * Se não estiver, redireciona pra /login.
+ */
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) {
         return next();
@@ -45,61 +48,49 @@ db.sequelize
     .catch((err) => console.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// Rota raiz ("/") - Redireciona para dashboard ou login
-//------------------------------------------------------
-app.get('/', (req, res) => {
-    if (req.session.loggedIn) {
-        return res.redirect('/dashboard');
-    } else {
-        return res.redirect('/login');
-    }
-});
-
-//------------------------------------------------------
-// Rotas de LOGIN
+// ROTAS DE LOGIN/LOGOUT
 //------------------------------------------------------
 
-// GET /login (formulário simples)
+// GET /login -> Exibe form de login
 app.get('/login', (req, res) => {
     if (req.session.loggedIn) {
-        return res.redirect('/dashboard');
+        return res.redirect('/');
     }
-    // Exibe um formulário HTML simples
     const html = `
-  <html>
-    <head><title>Login</title></head>
-    <body>
-      <h1>Login</h1>
-      <form method="POST" action="/login">
-        <label>Usuário:</label>
-        <input type="text" name="username" /><br/><br/>
-        <label>Senha:</label>
-        <input type="password" name="password" /><br/><br/>
-        <button type="submit">Entrar</button>
-      </form>
-    </body>
-  </html>
+    <html>
+      <head><title>Login</title></head>
+      <body>
+        <h1>Login</h1>
+        <form method="POST" action="/login">
+          <label>Usuário:</label>
+          <input type="text" name="username" /><br/><br/>
+          <label>Senha:</label>
+          <input type="password" name="password" /><br/><br/>
+          <button type="submit">Entrar</button>
+        </form>
+      </body>
+    </html>
   `;
     res.send(html);
 });
 
-// POST /login (valida credenciais fixas)
+// POST /login -> Valida credenciais fixas
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    // Credenciais fixas de exemplo
+    // Ajuste estes valores conforme preferir
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = '1234';
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         req.session.loggedIn = true;
-        return res.redirect('/dashboard');
+        return res.redirect('/'); // se logar, vai pra rota /
     } else {
-        return res.send('Credenciais inválidas. <a href="/login">Tentar novamente</a>');
+        return res.send('Credenciais inválidas. <a href="/login">Tentar de novo</a>');
     }
 });
 
-// GET /logout
+// GET /logout -> Sai da sessão
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.send('Você saiu! <a href="/login">Fazer login novamente</a>');
@@ -107,19 +98,22 @@ app.get('/logout', (req, res) => {
 });
 
 //------------------------------------------------------
-// Rota da Dashboard
+// ROTA PRINCIPAL ("/")
+// Se logado, envia Dashboard (index.html). Se não, /login
 //------------------------------------------------------
-// Quando logado, serve o index.html dentro de /public
-app.get('/dashboard', checkAuth, (req, res) => {
+app.get('/', checkAuth, (req, res) => {
+    // Envia o index.html do dashboard
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Caso queira servir também CSS/JS da pasta public
-// somente para usuários logados:
+//------------------------------------------------------
+// Servindo arquivos estáticos da pasta 'public'
+// (css, js, imagens) somente se logado
+//------------------------------------------------------
 app.use('/public', checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS
+// FUNÇÕES DE ESTATÍSTICAS (mesmo que seu código original)
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const { User, Purchase } = db;
@@ -179,7 +173,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     };
 }
 
-// Helper para data zerada
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -187,7 +180,7 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// ROTA /api/bots-stats (protegida também)
+// ROTA /api/bots-stats -> Protegida tb
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
@@ -329,7 +322,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Responde com JSON
+        // Resposta final
         res.json({
             statsAll,
             statsYesterday,
@@ -346,7 +339,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Importa o bot e inicia o servidor
+// Importa o bot (services/bot.service.js) e inicia o server
 //------------------------------------------------------
 require('./services/bot.service.js');
 
