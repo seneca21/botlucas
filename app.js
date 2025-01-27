@@ -112,8 +112,8 @@ app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
     // Altere se quiser
-    const ADMIN_USER = 'admin';
-    const ADMIN_PASS = '1234';
+    const ADMIN_USER = 'pfjru';
+    const ADMIN_PASS = 'oppushin1234';
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         // se ok, define que está logado
