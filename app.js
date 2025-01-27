@@ -15,8 +15,8 @@ function checkIP(req, res, next) {
     // Lista de IPs permitidos
     const allowedIPs = [
         "189.29.145.193",   // Seu IP pessoal
-        "54.175.230.252",   // IP fixo do Heroku 1
-        "54.173.229.200"    // IP fixo do Heroku 2
+        "",   // IP fixo do Heroku 1
+        ""    // IP fixo do Heroku 2
     ];
 
     // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)

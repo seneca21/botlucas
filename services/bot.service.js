@@ -36,7 +36,7 @@ function initializeBot(botConfig) {
   // ===============[ RATE-LIMIT CONFIG ]================
   // Limite de 3 interações a cada 15 segundos. Se exceder, IGNORA.
   const limitConfig = {
-    window: 15_000, // janela de 15 segundos
+    window: 50_000, // janela de 15 segundos
     limit: 2,       // max de 3 msgs nesse intervalo
     onLimitExceeded: (ctx, next) => {
       // Aqui não respondemos nada, simplesmente ignoramos.
