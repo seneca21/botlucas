@@ -1,6 +1,5 @@
 // services/logger.js
-// Lógica de throttling de logs console.*
-// Ao ultrapassar 15 logs em 15s, pausa logs por 5 min
+// Logger customizado que limita a quantidade de logs e pausa o log quando excede o limite
 
 const Logger = (() => {
     // Configurações de throttling
@@ -8,12 +7,23 @@ const Logger = (() => {
     const WINDOW_MS = 15 * 1000;     // 15 segundos
     const PAUSE_MS = 5 * 60 * 1000;  // 5 minutos
 
-    // Variáveis internas
+    // Preserva os métodos originais do console
+    const originalConsole = {
+        log: console.log.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console),
+    };
+
+    // Variáveis internas para controle de logs
     let logCount = 0;
     let windowStart = Date.now();
     let pauseUntil = 0;
 
-    // Função interna que faz a checagem e decide se loga ou pausa
+    /**
+     * Função interna para gerenciar o throttling de logs
+     * @param {Function} nativeMethod - Método original do console (log, warn, error)
+     * @param  {...any} args - Argumentos para o método de log
+     */
     function baseLog(nativeMethod, ...args) {
         const now = Date.now();
 
@@ -22,8 +32,8 @@ const Logger = (() => {
             return;
         }
 
-        // Verifica se passou a janela de 15s, se sim, reseta contadores
-        if ((now - windowStart) > WINDOW_MS) {
+        // Verifica se passou a janela de tempo, se sim, reseta contadores
+        if (now - windowStart > WINDOW_MS) {
             logCount = 0;
             windowStart = now;
         }
@@ -33,18 +43,19 @@ const Logger = (() => {
         // Se ainda não bateu o limite, loga normalmente
         if (logCount <= MAX_LOGS) {
             nativeMethod(...args);
-        } else {
-            // Se bateu o limite, faz 1 log de aviso e entra em pausa
+        } else if (logCount === MAX_LOGS + 1) {
+            // Apenas no primeiro excesso, envia uma mensagem de aviso
             nativeMethod(`⚠️ [LOGGER] Excesso de logs detectado. Pausando logs por 5 minutos.`);
             pauseUntil = now + PAUSE_MS;
         }
+        // Logs além do limite +1 não são emitidos
     }
 
     // Retorna as funções de log substitutas
     return {
-        log: (...args) => baseLog(console.log, ...args),
-        warn: (...args) => baseLog(console.warn, ...args),
-        error: (...args) => baseLog(console.error, ...args),
+        log: (...args) => baseLog(originalConsole.log, ...args),
+        warn: (...args) => baseLog(originalConsole.warn, ...args),
+        error: (...args) => baseLog(originalConsole.error, ...args),
     };
 })();
 

@@ -10,19 +10,19 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// 1) IMPORTA O LOGGER E SOBRESCREVE O CONSOLE
+// 1) IMPORTA O LOGGER E SOBRESCREVE OS MÉTODOS DO CONSOLE
 const logger = require('./services/logger');
 console.log = logger.log;
-console.error = logger.error;
 console.warn = logger.warn;
+console.error = logger.error;
 
 // === MIDDLEWARE DE IP (CHECK IP) ===
 function checkIP(req, res, next) {
     // Lista de IPs permitidos
     const allowedIPs = [
-        "189.29.145.193", // Seu IP pessoal
-        "",               // IP fixo do Heroku 1
-        ""               // IP fixo do Heroku 2
+        "189.29.145.193",   // Seu IP pessoal
+        "54.175.230.252",   // IP fixo do Heroku 1
+        "54.173.229.200"    // IP fixo do Heroku 2
     ];
 
     // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)
