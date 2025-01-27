@@ -126,7 +126,7 @@ function initializeBot(botConfig) {
   // Limite de 2 interações a cada 50seg. Se exceder, IGNORA.
   const limitConfig = {
     window: 50000, // 50 segundos
-    limit: 2,      // max 2 msgs nesse intervalo
+    limit: 3,      // max 2 msgs nesse intervalo
     onLimitExceeded: (ctx, next) => {
       // Aqui não respondemos nada, simplesmente ignoramos.
       logger.warn(`⚠️ [RateLimit] Ignorando mensagem do user ${ctx.from?.id} (excedeu limite)`);
