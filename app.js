@@ -10,11 +10,8 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// 1) IMPORTA O LOGGER E SOBRESCREVE OS MÉTODOS DO CONSOLE
+// 1) IMPORTA O LOGGER
 const logger = require('./services/logger');
-console.log = logger.log;
-console.warn = logger.warn;
-console.error = logger.error;
 
 // === MIDDLEWARE DE IP (CHECK IP) ===
 function checkIP(req, res, next) {
@@ -38,7 +35,7 @@ function checkIP(req, res, next) {
     if (allowedIPs.includes(clientIp)) {
         next();
     } else {
-        console.warn(`IP Bloqueado: ${clientIp}`);
+        logger.warn(`IP Bloqueado: ${clientIp}`);
         return res.status(403).send("Acesso negado. Seu IP não está na whitelist.");
     }
 }
@@ -74,13 +71,13 @@ function checkAuth(req, res, next) {
 //------------------------------------------------------
 db.sequelize
     .authenticate()
-    .then(() => console.log('✅ Conexão com DB estabelecida.'))
-    .catch((err) => console.error('❌ Erro ao conectar DB:', err));
+    .then(() => logger.info('✅ Conexão com DB estabelecida.'))
+    .catch((err) => logger.error('❌ Erro ao conectar DB:', err));
 
 db.sequelize
     .sync({ alter: true })
-    .then(() => console.log('✅ Modelos sincronizados (alter).'))
-    .catch((err) => console.error('❌ Erro ao sincronizar modelos:', err));
+    .then(() => logger.info('✅ Modelos sincronizados (alter).'))
+    .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
 // Rotas de LOGIN / LOGOUT
@@ -123,15 +120,19 @@ app.post('/login', (req, res) => {
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         // se ok, define que está logado
         req.session.loggedIn = true;
+        logger.info(`✅ Usuário ${username} logou com sucesso.`);
         return res.redirect('/');
     } else {
+        logger.warn(`❌ Tentativa de login inválida com usuário: ${username}`);
         return res.send('Credenciais inválidas. <a href="/login">Tentar novamente</a>');
     }
 });
 
 // GET /logout -> sai e destrói a sessão
 app.get('/logout', (req, res) => {
+    const username = req.session.loggedIn ? 'Admin' : 'Desconhecido';
     req.session.destroy(() => {
+        logger.info(`✅ Usuário ${username} deslogou.`);
         res.send('Você saiu! <a href="/login">Fazer login novamente</a>');
     });
 });
@@ -376,7 +377,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botDetails,
         });
     } catch (error) {
-        console.error('❌ Erro ao obter estatísticas:', error);
+        logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
@@ -388,5 +389,5 @@ require('./services/bot.service.js');
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🌐 Servidor web iniciado na porta ${PORT}`);
+    logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
 });

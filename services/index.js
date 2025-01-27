@@ -1,54 +1,65 @@
 // services/index.js
-// Equivalente ao models/index.js do Sequelize
 
-const fs = require('fs');
-const path = require('path');
-const Sequelize = require('sequelize');
-const basename = path.basename(__filename);
-const env = process.env.NODE_ENV || 'development';
-const configFile = require('../config/config.json')[env]; // config DB do config.json
-const db = {};
+const { Sequelize, DataTypes } = require('sequelize');
+const logger = require('./logger'); // Importa o logger, se necessário
 
-// Cria instância do Sequelize
-let sequelize;
-if (configFile.use_env_variable) {
-  sequelize = new Sequelize(process.env[configFile.use_env_variable], configFile);
-} else {
-  sequelize = new Sequelize(
-    configFile.database,
-    configFile.username,
-    configFile.password,
-    configFile
-  );
-}
+const sequelize = new Sequelize('d79nkunl7qtudq', 'u28b183g4sl1bp', 'pe5c008c522cdf34fdd17659a53e7887844b6225c5e04ea408745e8941de9be7a', {
+  host: 'c6sfjnr30ch74e.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
+  port: '5432',
+  dialect: 'postgres',
+  logging: false, // Desativa logs do Sequelize
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
+  }
+});
 
-// Lê todos os arquivos de model .js (exceto este index.js)
-fs
-  .readdirSync(path.join(__dirname, '../models'))
-  .filter(file => {
-    return (
-      file.indexOf('.') !== 0 &&
-      file !== basename &&
-      (file.slice(-3) === '.js' || file.slice(-3) === '.ts')
-    );
-  })
-  .forEach(file => {
-    const model = require(path.join(__dirname, '../models', file))(
-      sequelize,
-      Sequelize.DataTypes
-    );
-    db[model.name] = model;
-  });
+// Definição dos modelos
+const User = sequelize.define('User', {
+  // Definição dos atributos
+  telegramId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  username: DataTypes.STRING,
+  firstName: DataTypes.STRING,
+  lastName: DataTypes.STRING,
+  languageCode: DataTypes.STRING,
+  isBot: DataTypes.BOOLEAN,
+  lastInteraction: DataTypes.DATE,
+  remarketingSent: DataTypes.BOOLEAN,
+  hasPurchased: DataTypes.BOOLEAN,
+  botName: DataTypes.STRING,
+  planName: DataTypes.STRING,
+  planValue: DataTypes.FLOAT
+}, {
+  // Outras opções do modelo
+});
 
-// ---- ASSOCIAÇÕES -----
-// Precisamos associar Purchase -> User
-// Se seus models se chamam "User" e "Purchase", segue:
-if (db.User && db.Purchase) {
-  db.User.hasMany(db.Purchase, { foreignKey: 'userId' });
-  db.Purchase.belongsTo(db.User, { foreignKey: 'userId' });
-}
+const Purchase = sequelize.define('Purchase', {
+  // Definição dos atributos
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  planName: DataTypes.STRING,
+  planValue: DataTypes.FLOAT,
+  botName: DataTypes.STRING,
+  purchasedAt: DataTypes.DATE,
+  originCondition: DataTypes.STRING
+}, {
+  // Outras opções do modelo
+});
 
-db.sequelize = sequelize;
-db.Sequelize = Sequelize;
+// Associações, se houver
+User.hasMany(Purchase, { foreignKey: 'userId' });
+Purchase.belongsTo(User, { foreignKey: 'userId' });
 
-module.exports = db;
+module.exports = {
+  sequelize,
+  User,
+  Purchase
+};

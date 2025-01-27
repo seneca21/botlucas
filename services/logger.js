@@ -53,7 +53,7 @@ const Logger = (() => {
 
     // Retorna as funções de log substitutas
     return {
-        log: (...args) => baseLog(originalConsole.log, ...args),
+        info: (...args) => baseLog(originalConsole.log, ...args),
         warn: (...args) => baseLog(originalConsole.warn, ...args),
         error: (...args) => baseLog(originalConsole.error, ...args),
     };
