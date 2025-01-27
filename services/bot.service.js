@@ -57,9 +57,8 @@ function canAttemptVerification(telegramId) {
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
-    const remainingSeconds = Math.ceil((userData.blockUntil - now) / 1000);
-    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()} (faltam ${remainingSeconds} segundos).`);
-    return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${remainingSeconds} segundos.` };
+    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
+    return { allowed: false, message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
   }
 
   // Reseta as tentativas se passou o ciclo de reset
@@ -142,8 +141,7 @@ function canAttemptStart(telegramId) {
 
   if (now < userData.nextAllowedStartTime) {
     // Ainda está no período de espera
-    const remainingSeconds = Math.ceil((userData.nextAllowedStartTime - now) / 1000);
-    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()} (faltam ${remainingSeconds} segundos).`);
+    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
     return false;
   }
 
@@ -211,8 +209,7 @@ function canAttemptSelectPlan(telegramId, planId) {
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
-    const remainingSeconds = Math.ceil((userData.blockUntil - now) / 1000);
-    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()} (faltam ${remainingSeconds} segundos).`);
+    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return false;
   }
 
@@ -394,8 +391,7 @@ function initializeBot(botConfig) {
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Envia a mensagem de bloqueio
-      await ctx.reply(rateLimitResult.message);
+      // Ignora silenciosamente sem enviar mensagem
       await ctx.answerCbQuery();
       return;
     }
@@ -581,8 +577,7 @@ function initializeBot(botConfig) {
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Envia a mensagem de bloqueio
-      await ctx.reply(rateLimitResult.message);
+      // Ignora silenciosamente sem enviar mensagem
       return;
     }
 
@@ -668,8 +663,7 @@ function initializeBot(botConfig) {
     const rateLimitResult = canAttemptVerification(telegramId);
 
     if (!rateLimitResult.allowed) {
-      // Envia a mensagem de bloqueio
-      await ctx.reply(rateLimitResult.message);
+      // Ignora silenciosamente sem enviar mensagem
       await ctx.answerCbQuery();
       return;
     }
