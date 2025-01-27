@@ -9,9 +9,6 @@ const db = require('./index'); // importa index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// IMPORTANTE: Pacote de rate-limit
-const rateLimit = require('telegraf-ratelimit');
-
 // Importa o logger
 const logger = require('./logger');
 
@@ -60,8 +57,9 @@ function canAttemptVerification(telegramId) {
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
-    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
-    return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${Math.ceil((userData.blockUntil - now) / 1000)} segundos.` };
+    const remainingSeconds = Math.ceil((userData.blockUntil - now) / 1000);
+    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()} (faltam ${remainingSeconds} segundos).`);
+    return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${remainingSeconds} segundos.` };
   }
 
   // Reseta as tentativas se passou o ciclo de reset
@@ -144,7 +142,8 @@ function canAttemptStart(telegramId) {
 
   if (now < userData.nextAllowedStartTime) {
     // Ainda está no período de espera
-    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
+    const remainingSeconds = Math.ceil((userData.nextAllowedStartTime - now) / 1000);
+    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()} (faltam ${remainingSeconds} segundos).`);
     return false;
   }
 
@@ -212,7 +211,8 @@ function canAttemptSelectPlan(telegramId, planId) {
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
-    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
+    const remainingSeconds = Math.ceil((userData.blockUntil - now) / 1000);
+    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()} (faltam ${remainingSeconds} segundos).`);
     return false;
   }
 
@@ -254,20 +254,6 @@ function booleanParaTexto(value, verdadeiro, falso) {
 function initializeBot(botConfig) {
   const bot = new Telegraf(botConfig.token);
   logger.info(`🚀 Bot ${botConfig.name} em execução.`);
-
-  // ===============[ RATE-LIMIT CONFIG ]================
-  // Limite de 2 interações a cada 50seg. Se exceder, IGNORA.
-  const limitConfig = {
-    window: 50000, // 50 segundos
-    limit: 2,      // max 2 msgs nesse intervalo
-    onLimitExceeded: (ctx, next) => {
-      // Aqui não respondemos nada, simplesmente ignoramos.
-      logger.warn(`⚠️ [RateLimit] Ignorando mensagem do user ${ctx.from?.id} (excedeu limite)`);
-      // Não chamamos next(), paramos a cadeia.
-    }
-  };
-  bot.use(rateLimit(limitConfig));
-  // ======================================================
 
   /**
    * Registra ou atualiza o usuário no banco
