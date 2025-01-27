@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js - Versão com Login Fixo e Dashboard Protegido
+// app.js
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -10,32 +10,34 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// Configurações básicas
+// Inicia a aplicação Express
 const app = express();
+
+// BodyParser para formulários e JSON
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Configura sessão
+// Configurações de sessão (para login)
 app.use(session({
-    secret: 'chave-super-secreta', // Troque isto p/ algo difícil
+    secret: 'chave-super-secreta', // troque para algo mais seguro
     resave: false,
     saveUninitialized: false
 }));
 
 /**
- * Middleware que checa se o usuário está logado.
- * Se não estiver, redireciona pra /login.
+ * Função que checa se o usuário está logado.
+ * Caso não esteja, redireciona para /login.
  */
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) {
-        return next();
+        next();
     } else {
-        return res.redirect('/login');
+        res.redirect('/login');
     }
 }
 
 //------------------------------------------------------
-// Testa conexão com DB e sincroniza
+// Conexão e sync com o DB
 //------------------------------------------------------
 db.sequelize
     .authenticate()
@@ -48,14 +50,17 @@ db.sequelize
     .catch((err) => console.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// ROTAS DE LOGIN/LOGOUT
+// Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 
-// GET /login -> Exibe form de login
+// GET /login -> exibe form
 app.get('/login', (req, res) => {
     if (req.session.loggedIn) {
+        // se já logado, vai direto p/ dashboard
         return res.redirect('/');
     }
+
+    // form simples de login
     const html = `
     <html>
       <head><title>Login</title></head>
@@ -74,23 +79,24 @@ app.get('/login', (req, res) => {
     res.send(html);
 });
 
-// POST /login -> Valida credenciais fixas
+// POST /login -> valida usuário/senha fixos
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    // Ajuste estes valores conforme preferir
+    // Altere se quiser
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = '1234';
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
+        // se ok, define que está logado
         req.session.loggedIn = true;
-        return res.redirect('/'); // se logar, vai pra rota /
+        return res.redirect('/');
     } else {
-        return res.send('Credenciais inválidas. <a href="/login">Tentar de novo</a>');
+        return res.send('Credenciais inválidas. <a href="/login">Tentar novamente</a>');
     }
 });
 
-// GET /logout -> Sai da sessão
+// GET /logout -> sai e destrói a sessão
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.send('Você saiu! <a href="/login">Fazer login novamente</a>');
@@ -98,22 +104,20 @@ app.get('/logout', (req, res) => {
 });
 
 //------------------------------------------------------
-// ROTA PRINCIPAL ("/")
-// Se logado, envia Dashboard (index.html). Se não, /login
+// ROTA PRINCIPAL ("/") -> carrega index.html (dashboard)
 //------------------------------------------------------
 app.get('/', checkAuth, (req, res) => {
-    // Envia o index.html do dashboard
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 //------------------------------------------------------
-// Servindo arquivos estáticos da pasta 'public'
-// (css, js, imagens) somente se logado
+// Servindo a pasta 'public' somente se logado
+// Assim, /css/style.css, /js/dashboard.js, etc. funcionam
 //------------------------------------------------------
-app.use('/public', checkAuth, express.static(path.join(__dirname, 'public')));
+app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS (mesmo que seu código original)
+// Funções de estatísticas
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const { User, Purchase } = db;
@@ -138,7 +142,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     let totalUsers;
     if (!originCondition) {
-        // statsAll => leads = user que interagiu no dia
+        // statsAll => leads = users c/ lastInteraction no dia
         totalUsers = await User.count({
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
@@ -156,11 +160,14 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     // totalPurchases
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
+
     // conversionRate
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
+
     // totalVendasGeradas
     const totalVendasGeradas =
         (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
+
     // totalVendasConvertidas (se está em Purchase, está pago)
     const totalVendasConvertidas = totalVendasGeradas;
 
@@ -173,6 +180,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     };
 }
 
+// helper: normaliza data para 00:00
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -180,7 +188,7 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// ROTA /api/bots-stats -> Protegida tb
+// /api/bots-stats -> rota para JSON (protegida por login)
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
@@ -199,14 +207,15 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
 
-        // statsAll (Hoje)
+        // statsAll
         const statsAll = await getDetailedStats(startDate, endDate, null);
-        // statsYesterday (Ontem)
+        // statsYesterday
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
-
-        // statsMain, statsNotPurchased, statsPurchased
+        // statsMain
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
+        // statsNotPurchased
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
+        // statsPurchased
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
         // Ranking simples
@@ -285,6 +294,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
+        // Monta array final
         const botDetails = [];
         botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
@@ -320,9 +330,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 plans: plansArray,
             });
         });
+        // Aqui foi onde faltava o parêntese:
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Resposta final
+        // Retorna JSON final
         res.json({
             statsAll,
             statsYesterday,
@@ -339,7 +350,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Importa o bot (services/bot.service.js) e inicia o server
+// Importa o bot e inicia o servidor
 //------------------------------------------------------
 require('./services/bot.service.js');
 
