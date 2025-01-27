@@ -1,0 +1,83 @@
+{
+  "bots": [
+    {
+      "name": "@Testexota_bot",
+      "details": "@Testexota_bot",
+      "token": "7042810577:AAGp3Se86bzHoSe856iNdzqA04cYvqY9Uqw",
+      "url": "https://bottesteeeeeeee-88f46ee8c620.herokuapp.com/",
+      "description": "compre aqui",
+      "video": "copy-upsell-nov.mp4",
+      "buttons": [
+        {
+          "name": "MENSAL",
+          "value": 2,
+          "link": "https://t.me/+WOjrmdhtJoI2MzA5"
+        },
+        {
+          "name": "VITALÍCIO BÁSICO",
+          "value": 3,
+          "link": "https://t.me/+WOjrmdhtJoI2MzA5"
+        },
+        {
+          "name": "VITALÍCIO PREMIUM",
+          "value": 4,
+          "link": "https://t.me/+WOjrmdhtJoI2MzA5"
+        }
+      ],
+      "mp_config": {
+        "accessToken": "APP_USR-...",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "pushin_config": {
+        "token": "9659|k7Sq3JqXnT92kcTJr3tuHpaLD897hijpYeFu6gms30522383",
+        "api_url": "https://api.pushinpay.com.br/api",
+        "pix_key": "+5511941111578",
+        "pix_key_type": "phone"
+      },
+      "remarketing": {
+        "messages": [
+          {
+            "condition": "not_purchased",
+            "text": "compre aqui",
+            "buttons": [
+              {
+                "name": "VITALÍCIO PREMIUM",
+                "value": 1.50,
+                "link": "https://t.me/+EQB6UUVFLdJkMzdh"
+              }
+            ],
+            "video": "copy2.mp4"
+          },
+          {
+            "condition": "purchased",
+            "text": "•compre aqui",
+            "buttons": [
+              {
+                "name": "MENSAL AVANÇADO",
+                "value": 19.95,
+                "link": "https://t.me/+CPJ0Hqo30NUwNjUx"
+              },
+              {
+                "name": "VITALÍCIO AVANÇADO",
+                "value": 24.95,
+                "link": "https://t.me/+CPJ0Hqo30NUwNjUx"
+              },
+              {
+                "name": "VITALÍCIO AVANÇADO",
+                "value": 29.95,
+                "link": "https://t.me/+CPJ0Hqo30NUwNjUx"
+              }
+            ],
+            "video": "copy-upsell-nov.mp4"
+          }
+        ],
+        "intervals": {
+          "not_purchased_minutes": 2,
+          "purchased_seconds": 30
+        }
+      }
+    }
+  ]
+}
