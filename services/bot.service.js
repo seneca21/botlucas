@@ -58,7 +58,7 @@ function canAttemptVerification(telegramId) {
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
     logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
-    return { allowed: false, message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
+    return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
   }
 
   // Reseta as tentativas se passou o ciclo de reset
@@ -236,6 +236,72 @@ function canAttemptSelectPlan(telegramId, planId) {
     logger.info(`Seleção de Plano: ${telegramId} - Excedeu o número de seleções permitidas. Bloqueado por 24 horas.`);
     return false;
   }
+}
+
+// =====================================
+// Proteção contra Ataques em Massa no Comando /start
+// =====================================
+
+// Mapa para rastrear as tentativas globais de /start por bot
+const startFloodProtection = new Map();
+
+// Definições de proteção contra ataques em massa
+const START_FLOOD_LIMIT = 20;
+const START_FLOOD_WINDOW_MS = 3 * 60 * 1000; // 3 minutos
+const START_FLOOD_PAUSE_MS = 8 * 60 * 1000; // 8 minutos
+
+/**
+ * Função para verificar e atualizar a proteção contra ataques em massa
+ * @param {string} botName - Nome do bot
+ * @returns {boolean} - true se o bot está pausado, false caso contrário
+ */
+function checkStartFlood(botName) {
+  const now = Date.now();
+  let floodData = startFloodProtection.get(botName);
+
+  if (!floodData) {
+    // Inicializa os dados de flood para o bot
+    startFloodProtection.set(botName, {
+      startTimestamps: [now],
+      isPaused: false,
+      pauseUntil: 0
+    });
+    return false;
+  }
+
+  // Verifica se o bot está atualmente pausado
+  if (floodData.isPaused) {
+    if (now >= floodData.pauseUntil) {
+      // Pausa expirou, reinicia os dados
+      floodData.isPaused = false;
+      floodData.startTimestamps = [];
+      startFloodProtection.set(botName, floodData);
+      logger.info(`Proteção Flood: ${botName} - Pausa de 8 minutos encerrada.`);
+    } else {
+      // Ainda está pausado
+      return true;
+    }
+  }
+
+  // Remove timestamps que estão fora da janela de 3 minutos
+  floodData.startTimestamps = floodData.startTimestamps.filter(timestamp => now - timestamp <= START_FLOOD_WINDOW_MS);
+
+  // Adiciona o novo timestamp
+  floodData.startTimestamps.push(now);
+
+  // Verifica se o limite foi excedido
+  if (floodData.startTimestamps.length >= START_FLOOD_LIMIT) {
+    // Inicia a pausa
+    floodData.isPaused = true;
+    floodData.pauseUntil = now + START_FLOOD_PAUSE_MS;
+    startFloodProtection.set(botName, floodData);
+    logger.warn(`Proteção Flood: ${botName} - Pausando respostas ao comando /start por 8 minutos devido a ${floodData.startTimestamps.length} starts em 3 minutos.`);
+    return true;
+  }
+
+  // Atualiza os dados de flood
+  startFloodProtection.set(botName, floodData);
+  return false;
 }
 
 // =====================================
@@ -444,6 +510,15 @@ function initializeBot(botConfig) {
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
+      const botName = botConfig.name;
+
+      // Verifica se o bot está pausado devido a ataque em massa
+      const isBotPaused = checkStartFlood(botName);
+      if (isBotPaused) {
+        // Ignora silenciosamente sem enviar mensagem
+        return;
+      }
+
       const canStart = canAttemptStart(telegramId);
 
       if (!canStart) {
@@ -734,7 +809,7 @@ function initializeBot(botConfig) {
   });
 
   // =====================================
-  // Rotinas de Limpeza para os Mapas de Rate Limiting
+  // Rotinas de Limpeza para os Mapas de Rate Limiting e Proteção Flood
   // =====================================
 
   // Função para limpar entradas expiradas em um mapa
@@ -762,6 +837,23 @@ function initializeBot(botConfig) {
   setInterval(() => {
     cleanRateLimitMap(verificationLimits, (userData, now) => now > userData.blockUntil + VERIFICATION_CYCLE_RESET_MS, 'verificationLimits');
   }, 60 * 60 * 1000); // Executa a cada hora
+
+  // Rotina de limpeza para startFloodProtection
+  setInterval(() => {
+    const now = Date.now();
+    for (const [botName, floodData] of startFloodProtection) {
+      if (floodData.isPaused && now >= floodData.pauseUntil) {
+        // Pausa expirou, reinicia os dados
+        floodData.isPaused = false;
+        floodData.startTimestamps = [];
+        startFloodProtection.set(botName, floodData);
+        logger.info(`Proteção Flood: ${botName} - Pausa de 8 minutos encerrada.`);
+      }
+      // Remove timestamps antigos fora da janela de 3 minutos
+      floodData.startTimestamps = floodData.startTimestamps.filter(timestamp => now - timestamp <= START_FLOOD_WINDOW_MS);
+      startFloodProtection.set(botName, floodData);
+    }
+  }, 60 * 1000); // Executa a cada minuto
 
   // =====================================
   // Lançamento do Bot
