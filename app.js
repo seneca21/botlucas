@@ -10,13 +10,19 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
+// 1) IMPORTA O LOGGER E SOBRESCREVE O CONSOLE
+const logger = require('./services/logger');
+console.log = logger.log;
+console.error = logger.error;
+console.warn = logger.warn;
+
 // === MIDDLEWARE DE IP (CHECK IP) ===
 function checkIP(req, res, next) {
     // Lista de IPs permitidos
     const allowedIPs = [
-        "189.29.145.193",   // Seu IP pessoal
-        "",   // IP fixo do Heroku 1
-        ""    // IP fixo do Heroku 2
+        "189.29.145.193", // Seu IP pessoal
+        "",               // IP fixo do Heroku 1
+        ""               // IP fixo do Heroku 2
     ];
 
     // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)
@@ -32,7 +38,6 @@ function checkIP(req, res, next) {
     if (allowedIPs.includes(clientIp)) {
         next();
     } else {
-        // Caso contrário, bloqueia
         console.warn(`IP Bloqueado: ${clientIp}`);
         return res.status(403).send("Acesso negado. Seu IP não está na whitelist.");
     }

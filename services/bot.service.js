@@ -34,14 +34,14 @@ function initializeBot(botConfig) {
   console.log(`🚀 Bot ${botConfig.name} em execução.`);
 
   // ===============[ RATE-LIMIT CONFIG ]================
-  // Limite de 3 interações a cada 15 segundos. Se exceder, IGNORA.
+  // Limite de 2 interações a cada 50seg. Se exceder, IGNORA.
   const limitConfig = {
-    window: 50_000, // janela de 15 segundos
-    limit: 2,       // max de 3 msgs nesse intervalo
+    window: 50000, // 50 segundos
+    limit: 2,      // max 2 msgs nesse intervalo
     onLimitExceeded: (ctx, next) => {
       // Aqui não respondemos nada, simplesmente ignoramos.
       console.warn(`⚠️ [RateLimit] Ignorando mensagem do user ${ctx.from?.id} (excedeu limite)`);
-      // Não chamamos next(), então paramos aqui e não respondemos nada.
+      // Não chamamos next(), paramos a cadeia.
     }
   };
   bot.use(rateLimit(limitConfig));
