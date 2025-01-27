@@ -54,11 +54,13 @@ function canAttemptVerification(telegramId) {
       violations: 0,
       lastAttempt: now
     });
+    logger.info(`Verificação: ${telegramId} - Primeira tentativa permitida.`);
     return { allowed: true };
   }
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
+    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${Math.ceil((userData.blockUntil - now) / 1000)} segundos.` };
   }
 
@@ -70,6 +72,7 @@ function canAttemptVerification(telegramId) {
       violations: 0,
       lastAttempt: now
     });
+    logger.info(`Verificação: ${telegramId} - Ciclo resetado. Primeira tentativa permitida.`);
     return { allowed: true };
   }
 
@@ -78,6 +81,7 @@ function canAttemptVerification(telegramId) {
     userData.attempts += 1;
     userData.lastAttempt = now;
     verificationLimits.set(telegramId, userData);
+    logger.info(`Verificação: ${telegramId} - Tentativa ${userData.attempts} permitida.`);
     return { allowed: true };
   } else {
     // Excede as tentativas permitidas
@@ -87,18 +91,22 @@ function canAttemptVerification(telegramId) {
     if (userData.violations === 1) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       verificationLimits.set(telegramId, userData);
+      logger.info(`Verificação: ${telegramId} - Bloqueado por 2 minutos devido a múltiplas tentativas.`);
       return { allowed: false, message: `🚫 Bloqueado por 2 minutos devido a múltiplas tentativas.` };
     } else if (userData.violations === 2) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_SECOND;
       verificationLimits.set(telegramId, userData);
+      logger.info(`Verificação: ${telegramId} - Bloqueado por 10 minutos devido a múltiplas tentativas.`);
       return { allowed: false, message: `🚫 Bloqueado por 10 minutos devido a múltiplas tentativas.` };
     } else if (userData.violations >= 3) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_THIRD;
       verificationLimits.set(telegramId, userData);
+      logger.info(`Verificação: ${telegramId} - Bloqueado por 24 horas devido a múltiplas tentativas.`);
       return { allowed: false, message: `🚫 Bloqueado por 24 horas devido a múltiplas tentativas.` };
     }
 
     verificationLimits.set(telegramId, userData);
+    logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
     return { allowed: false, message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
   }
 }
@@ -130,11 +138,13 @@ function canAttemptStart(telegramId) {
       startCount: 1,
       nextAllowedStartTime: now + START_WAIT_FIRST_MS
     });
+    logger.info(`/start: ${telegramId} - Primeiro start permitido.`);
     return true;
   }
 
   if (now < userData.nextAllowedStartTime) {
     // Ainda está no período de espera
+    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
     return false;
   }
 
@@ -143,6 +153,7 @@ function canAttemptStart(telegramId) {
     userData.startCount = 2;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS;
     startLimits.set(telegramId, userData);
+    logger.info(`/start: ${telegramId} - Segundo start permitido. Próximo start permitido em 24 horas.`);
     return true;
   }
 
@@ -151,6 +162,7 @@ function canAttemptStart(telegramId) {
     userData.startCount = 3;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS; // Mantém 24h para reiniciar
     startLimits.set(telegramId, userData);
+    logger.info(`/start: ${telegramId} - Terceiro start permitido. Próximo start permitido em 5 minutos após 24 horas.`);
     return true;
   }
 
@@ -159,6 +171,7 @@ function canAttemptStart(telegramId) {
     userData.startCount = 1;
     userData.nextAllowedStartTime = now + START_WAIT_FIRST_MS;
     startLimits.set(telegramId, userData);
+    logger.info(`/start: ${telegramId} - Ciclo reiniciado. Primeiro start permitido novamente.`);
     return true;
   }
 
@@ -193,11 +206,13 @@ function canAttemptSelectPlan(telegramId, planId) {
       blockUntil: 0,
       lastAttempt: now
     });
+    logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) selecionado.`);
     return true;
   }
 
   if (now < userData.blockUntil) {
     // Usuário está bloqueado
+    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return false;
   }
 
@@ -206,6 +221,7 @@ function canAttemptSelectPlan(telegramId, planId) {
     // Bloqueia por 24 horas
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
+    logger.info(`Seleção de Plano: ${telegramId} - Seleção repetida do plano (${planId}). Bloqueado por 24 horas.`);
     return false;
   }
 
@@ -214,11 +230,13 @@ function canAttemptSelectPlan(telegramId, planId) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
     selectPlanLimits.set(telegramId, userData);
+    logger.info(`Seleção de Plano: ${telegramId} - Plano (${planId}) selecionado. Total de seleções: ${userData.selectedPlans.size}.`);
     return true;
   } else {
     // Usuário já selecionou 2 diferentes planos, bloqueia
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
+    logger.info(`Seleção de Plano: ${telegramId} - Excedeu o número de seleções permitidas. Bloqueado por 24 horas.`);
     return false;
   }
 }
@@ -499,7 +517,7 @@ function initializeBot(botConfig) {
       return;
     }
 
-    // user
+    // Atualiza lastInteraction
     const user = await User.findOne({ where: { telegramId: chatId.toString() } });
     if (user) {
       user.lastInteraction = new Date();
