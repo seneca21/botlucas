@@ -23,7 +23,7 @@ const bots = [];
 const userSessions = {};
 
 // =====================================
-// Rate Limiting para Verificações
+// Rate Limiting para Verificações de Pagamento
 // =====================================
 
 // Mapa para rastrear as tentativas de verificação por usuário
@@ -179,39 +179,48 @@ const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000; // 24 horas
 /**
  * Função para verificar se o usuário pode realizar uma nova seleção de plano
  * @param {string} telegramId - ID do Telegram do usuário
+ * @param {string} planId - ID ou nome único do plano selecionado
  * @returns {boolean} - true se permitido, false se bloqueado
  */
-function canAttemptSelectPlan(telegramId) {
+function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
   let userData = selectPlanLimits.get(telegramId);
 
   if (!userData) {
     // Primeira seleção
     selectPlanLimits.set(telegramId, {
-      selectCount: 1,
-      blockUntil: now + SELECT_PLAN_BLOCK_TIME_MS
+      selectedPlans: new Set([planId]),
+      blockUntil: 0,
+      lastAttempt: now
     });
     return true;
   }
 
   if (now < userData.blockUntil) {
-    if (userData.selectCount < MAX_SELECT_PLAN_ATTEMPTS) {
-      // Permite até 2 cliques dentro do período
-      userData.selectCount += 1;
-      selectPlanLimits.set(telegramId, userData);
-      return true;
-    } else {
-      // Excede as tentativas permitidas
-      return false;
-    }
+    // Usuário está bloqueado
+    return false;
   }
 
-  // Reseta o ciclo após 24 horas
-  selectPlanLimits.set(telegramId, {
-    selectCount: 1,
-    blockUntil: now + SELECT_PLAN_BLOCK_TIME_MS
-  });
-  return true;
+  if (userData.selectedPlans.has(planId)) {
+    // Usuário está tentando selecionar o mesmo plano novamente
+    // Bloqueia por 24 horas
+    userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
+    selectPlanLimits.set(telegramId, userData);
+    return false;
+  }
+
+  if (userData.selectedPlans.size < MAX_SELECT_PLAN_ATTEMPTS) {
+    // Permite seleção e adiciona ao conjunto
+    userData.selectedPlans.add(planId);
+    userData.lastAttempt = now;
+    selectPlanLimits.set(telegramId, userData);
+    return true;
+  } else {
+    // Usuário já selecionou 2 diferentes planos, bloqueia
+    userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
+    selectPlanLimits.set(telegramId, userData);
+    return false;
+  }
 }
 
 // =====================================
@@ -500,7 +509,8 @@ function initializeBot(botConfig) {
 
     // Implementação do Rate Limiting para Seleção de Plano
     const telegramId = chatId.toString();
-    const canSelectPlan = canAttemptSelectPlan(telegramId);
+    const planId = buttonConfig.name; // Utilize um identificador único para o plano
+    const canSelectPlan = canAttemptSelectPlan(telegramId, planId);
 
     if (!canSelectPlan) {
       // Ignora silenciosamente
@@ -661,7 +671,7 @@ function initializeBot(botConfig) {
 
           logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value} [${session.originCondition}]`);
 
-          // Upsell
+          // Envia upsell
           const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
           setTimeout(async () => {
             try {
@@ -684,7 +694,7 @@ function initializeBot(botConfig) {
         }
         delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
-        await ctx.reply('❌ Cobrança expirada.');
+        await ctx.reply('❌ Cobrança expirou.');
         delete userSessions[chatId];
       } else {
         await ctx.reply('⏳ Pagamento pendente.');
