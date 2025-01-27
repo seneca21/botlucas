@@ -52,7 +52,7 @@
           },
           {
             "condition": "purchased",
-            "text": "•compre aqui",
+            "text": "•compre aqui ",
             "buttons": [
               {
                 "name": "MENSAL AVANÇADO",
