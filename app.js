@@ -10,6 +10,34 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
+// === MIDDLEWARE DE IP (CHECK IP) ===
+function checkIP(req, res, next) {
+    // Lista de IPs permitidos
+    const allowedIPs = [
+        "189.29.145.193",   // Seu IP pessoal
+        "54.175.230.252",   // IP fixo do Heroku 1
+        "54.173.229.200"    // IP fixo do Heroku 2
+    ];
+
+    // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)
+    const forwarded = req.headers['x-forwarded-for'];
+    let clientIp = forwarded
+        ? forwarded.split(',')[0].trim()
+        : req.ip;
+
+    // Remove prefixo "::ffff:" se houver
+    clientIp = clientIp.replace('::ffff:', '');
+
+    // Se estiver na lista allowedIPs, segue
+    if (allowedIPs.includes(clientIp)) {
+        next();
+    } else {
+        // Caso contrário, bloqueia
+        console.warn(`IP Bloqueado: ${clientIp}`);
+        return res.status(403).send("Acesso negado. Seu IP não está na whitelist.");
+    }
+}
+
 // Inicia a aplicação Express
 const app = express();
 
@@ -105,16 +133,16 @@ app.get('/logout', (req, res) => {
 
 //------------------------------------------------------
 // ROTA PRINCIPAL ("/") -> carrega index.html (dashboard)
+// Agora requer checkAuth + checkIP
 //------------------------------------------------------
-app.get('/', checkAuth, (req, res) => {
+app.get('/', checkAuth, checkIP, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 //------------------------------------------------------
-// Servindo a pasta 'public' somente se logado
-// Assim, /css/style.css, /js/dashboard.js, etc. funcionam
+// Servindo a pasta 'public' (CSS, JS) - também com IP e Auth
 //------------------------------------------------------
-app.use(checkAuth, express.static(path.join(__dirname, 'public')));
+app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
 // Funções de estatísticas
@@ -188,9 +216,9 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// /api/bots-stats -> rota para JSON (protegida por login)
+// /api/bots-stats -> rota JSON (precisa Auth e IP)
 //------------------------------------------------------
-app.get('/api/bots-stats', checkAuth, async (req, res) => {
+app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
@@ -330,7 +358,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 plans: plansArray,
             });
         });
-        // Aqui foi onde faltava o parêntese:
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
         // Retorna JSON final
