@@ -4,31 +4,119 @@
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
+const session = require('express-session'); // <-- para gerenciar login
 const { Op, Sequelize } = require('sequelize');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
+// Configuração básica do Express
 const app = express();
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Testa conexão
+// Permite ler corpo de formulários (login) e JSON
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
+// Configura a sessão
+app.use(session({
+    secret: 'chave-super-secreta', // troque para algo seguro, ou use variável de ambiente
+    resave: false,
+    saveUninitialized: false
+}));
+
+/**
+ * Middleware para proteger rotas. Se não estiver logado na sessão,
+ * redireciona para /login
+ */
+function checkAuth(req, res, next) {
+    if (req.session.loggedIn) {
+        return next();
+    } else {
+        return res.redirect('/login');
+    }
+}
+
+//------------------------------------------------------
+// Testa conexão com DB e sincroniza
+//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => console.log('✅ Conexão com DB estabelecida.'))
     .catch((err) => console.error('❌ Erro ao conectar DB:', err));
 
-// Sync
 db.sequelize
     .sync({ alter: true })
     .then(() => console.log('✅ Modelos sincronizados (alter).'))
     .catch((err) => console.error('❌ Erro ao sincronizar modelos:', err));
 
-// Rota principal
-app.get('/', (req, res) => {
+//------------------------------------------------------
+// ROTAS DE LOGIN
+//------------------------------------------------------
+
+// GET /login - mostra formulário se não estiver logado
+app.get('/login', (req, res) => {
+    if (req.session.loggedIn) {
+        return res.redirect('/dashboard');
+    }
+
+    const html = `
+  <html>
+    <head><title>Login</title></head>
+    <body>
+      <h1>Login</h1>
+      <form method="POST" action="/login">
+        <label>Usuário:</label>
+        <input type="text" name="username" /><br/><br/>
+        <label>Senha:</label>
+        <input type="password" name="password" /><br/><br/>
+        <button type="submit">Entrar</button>
+      </form>
+    </body>
+  </html>`;
+    res.send(html);
+});
+
+// POST /login - valida username e password
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Você pode usar variáveis de ambiente (process.env.DASHBOARD_USER)
+    // ou apenas fixar aqui. Exemplo simples:
+    const ADMIN_USER = 'rpfoppushin';
+    const ADMIN_PASS = 'oppushin2020';
+
+    if (username === ADMIN_USER && password === ADMIN_PASS) {
+        // Se der match, armazena sessão "loggedIn"
+        req.session.loggedIn = true;
+        return res.redirect('/dashboard');
+    } else {
+        // Se login inválido, volta msg
+        return res.send('Credenciais inválidas. <a href="/login">Tentar novamente</a>');
+    }
+});
+
+// GET /logout (opcional, se quiser logout)
+app.get('/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.send('Você saiu. <a href="/login">Login</a>');
+    });
+});
+
+//------------------------------------------------------
+// ROTA DA DASHBOARD (index.html) - protegida por checkAuth
+//------------------------------------------------------
+// Aqui servimos nosso "index.html" que fica em /public
+app.get('/dashboard', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Opcionalmente, se quiser servir TAMBÉM os arquivos estáticos (CSS, JS)
+// somente após login, podemos usar:
+app.use('/public', checkAuth, express.static(path.join(__dirname, 'public')));
+
+//------------------------------------------------------
+// FUNÇÕES DE STATS
+//------------------------------------------------------
 
 /**
  * Função para obter estatísticas de um intervalo
@@ -103,8 +191,10 @@ function makeDay(date) {
     return d;
 }
 
-// ROTA /api/bots-stats
-app.get('/api/bots-stats', async (req, res) => {
+//------------------------------------------------------
+// ROTA /api/bots-stats (protegida)
+//------------------------------------------------------
+app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
@@ -244,7 +334,7 @@ app.get('/api/bots-stats', async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Responde
+        // Responde JSON com as estatísticas
         res.json({
             statsAll,        // Dia atual
             statsYesterday,  // Dia anterior
@@ -260,7 +350,9 @@ app.get('/api/bots-stats', async (req, res) => {
     }
 });
 
-// Importa o bot
+//------------------------------------------------------
+// Inicializa servidor e importa bot
+//------------------------------------------------------
 require('./services/bot.service.js');
 
 const PORT = process.env.PORT || 3000;
