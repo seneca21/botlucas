@@ -22,6 +22,92 @@ const dbConfig = ConfigService.getDbConfig();
 const bots = [];
 const userSessions = {};
 
+// =====================================
+// Rate Limiting para Verificações
+// =====================================
+
+// Mapa para rastrear as tentativas de verificação por usuário
+const verificationLimits = new Map();
+
+// Definições de rate limiting
+const MAX_ATTEMPTS = 2;
+const WINDOW_MS = 60 * 1000; // 1 minuto
+const BLOCK_TIME_FIRST = 120 * 1000; // 2 minutos
+const BLOCK_TIME_SECOND = 10 * 60 * 1000; // 10 minutos
+const BLOCK_TIME_THIRD = 24 * 60 * 60 * 1000; // 24 horas
+
+/**
+ * Função para verificar se o usuário pode realizar uma nova tentativa de verificação
+ * @param {string} telegramId - ID do Telegram do usuário
+ * @returns {object} - { allowed: boolean, message: string }
+ */
+function canAttemptVerification(telegramId) {
+  const now = Date.now();
+  let userData = verificationLimits.get(telegramId);
+
+  if (!userData) {
+    userData = {
+      attempts: 0,
+      firstAttempt: now,
+      blockUntil: 0,
+      violations: 0
+    };
+    verificationLimits.set(telegramId, userData);
+  }
+
+  // Verifica se o usuário está bloqueado
+  if (now < userData.blockUntil) {
+    const remaining = Math.ceil((userData.blockUntil - now) / 1000);
+    return {
+      allowed: false,
+      message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente em ${remaining} segundos.`
+    };
+  }
+
+  // Reseta a janela de tentativas se necessário
+  if (now - userData.firstAttempt > WINDOW_MS) {
+    userData.attempts = 0;
+    userData.firstAttempt = now;
+  }
+
+  if (userData.attempts < MAX_ATTEMPTS) {
+    userData.attempts += 1;
+    return { allowed: true };
+  } else {
+    // Excede as tentativas permitidas
+    userData.violations += 1;
+
+    // Define o tempo de bloqueio com base no número de violações
+    if (userData.violations === 1) {
+      userData.blockUntil = now + BLOCK_TIME_FIRST;
+      return {
+        allowed: false,
+        message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente em 2 minutos.`
+      };
+    } else if (userData.violations === 2) {
+      userData.blockUntil = now + BLOCK_TIME_SECOND;
+      return {
+        allowed: false,
+        message: `🚫 Você excedeu o número de tentativas permitidas novamente. Tente novamente em 10 minutos.`
+      };
+    } else if (userData.violations >= 3) {
+      userData.blockUntil = now + BLOCK_TIME_THIRD;
+      return {
+        allowed: false,
+        message: `🚫 Você excedeu o número de tentativas permitidas múltiplas vezes. Tente novamente em 24 horas.`
+      };
+    }
+
+    // Reseta tentativas após bloqueio
+    userData.attempts = 0;
+    userData.firstAttempt = now;
+    return {
+      allowed: false,
+      message: `🚫 Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.`
+    };
+  }
+}
+
 /**
  * Função auxiliar para converter boolean -> texto (logs)
  */
@@ -184,6 +270,17 @@ function initializeBot(botConfig) {
       user.lastInteraction = new Date();
       user.botName = botConfig.name;
       await user.save();
+    }
+
+    // Implementação do Rate Limiting
+    const telegramId = chatId.toString();
+    const rateLimitResult = canAttemptVerification(telegramId);
+
+    if (!rateLimitResult.allowed) {
+      await ctx.reply(rateLimitResult.message);
+      logger.warn(`🚫 Usuário ${telegramId} bloqueado para nova tentativa de verificação.`);
+      await ctx.answerCbQuery();
+      return;
     }
 
     // Descobre se este remarketing era "not_purchased" ou "purchased"
@@ -394,7 +491,7 @@ function initializeBot(botConfig) {
         await ctx.reply('❌ Cobrança expirou.');
         delete userSessions[chatId];
       } else {
-        await ctx.reply('⏳ Ainda aguardando pagamento...');
+        await ctx.reply('⏳ Pagamento pendente.');
       }
     } catch (error) {
       logger.error('❌ Erro ao verificar pagamento:', error);
