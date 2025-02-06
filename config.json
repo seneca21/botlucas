@@ -405,17 +405,17 @@
       "buttons": [
         {
           "name": "MENSAL BÁSICO",
-          "value": 10.00,
+          "value": 10,
           "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
         },
         {
           "name": "VITALÍCIO BÁSICO",
-          "value": 15.00,
+          "value": 15,
           "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
         },
         {
           "name": "VITALÍCIO PREMIUM",
-          "value": 20.00,
+          "value": 20,
           "link": "https://t.me/+4NCF9_-7L0pjMjQ5"
         }
       ],
