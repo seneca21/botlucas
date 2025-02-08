@@ -97,7 +97,7 @@ $(document).ready(function () {
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
             //--------------------------------------------------
-            // GRÁFICO DE BARRAS (Usuários x Compras)
+            // GRÁFICO DE BARRAS (Usuários e Compras)
             //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
@@ -133,22 +133,16 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Últimos 7 dias)
-            //   Agora com 2 linhas: Valor Convertido e Valor Gerado
-            //   E no eixo X: DIA/ANO (ex: "08/2025")
+            // GRÁFICO DE LINHA (Vendas Pagas e Geradas)
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
-                // item.date -> "YYYY-MM-DD"
                 const parts = item.date.split('-');
-                // Mostra DIa/ANO => ex: "07/2025"
                 const day = parts[2];
                 const year = parts[0];
                 return day + '/' + year;
             });
 
-            // Vetor p/ valor convertido
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
-            // Vetor p/ valor gerado
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
 
             const lineData = {
@@ -305,6 +299,33 @@ $(document).ready(function () {
             $('#cardPurchasedTotalPaidVolume').text(
                 'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
             );
+
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES (NOVO)
+            //--------------------------------------------------
+            const movementsTbody = $('#lastMovementsBody');
+            movementsTbody.empty();
+            if (data.lastMovements && data.lastMovements.length > 0) {
+                data.lastMovements.forEach((mov) => {
+                    const dt = mov.pixGeneratedAt
+                        ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
+                        : '';
+                    movementsTbody.append(`
+                        <tr>
+                            <td>${mov.id}</td>
+                            <td>R$ ${mov.planValue.toFixed(2)}</td>
+                            <td>${dt}</td>
+                            <td>${mov.status}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                movementsTbody.append(`
+                    <tr>
+                        <td colspan="4">Nenhuma movimentação encontrada</td>
+                    </tr>
+                `);
+            }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -336,7 +357,6 @@ $(document).ready(function () {
     // (D) Botão hamburguer -> recolhe/expande sidebar + main
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
-        // Ao mesmo tempo, main expande para 100%
         $('main[role="main"]').toggleClass('expanded');
     });
 });

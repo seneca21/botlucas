@@ -55,6 +55,9 @@ function checkAuth(req, res, next) {
     }
 }
 
+//------------------------------------------------------
+// Conexão e sync com o DB
+//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
@@ -131,7 +134,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
 
-    // leads
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -170,9 +172,9 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     let totalVendasConvertidas = totalVendasGeradas;
 
     // =====================================================
-    // *** ADDED ***: Agora separamos a parte gerada e convertida:
-    // - Valor Gerado = sum dos "status in [pending, paid]" com pixGeneratedAt no período
-    // - Valor Convertido = sum dos "status=paid" com purchasedAt no período
+    // Agora separamos a parte gerada e convertida:
+    // - Valor Gerado => sum dos "status in [pending, paid]" c/ pixGeneratedAt no período
+    // - Valor Convertido => sum dos "status=paid" c/ purchasedAt no período
     // =====================================================
     const generatedWhere = {
         pixGeneratedAt: { [Op.between]: [startDate, endDate] },
@@ -208,7 +210,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     };
 }
 
-// helper para normalizar data p/ 00:00
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -348,7 +349,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // *** ADDED ***: stats7Days
+        // stats7Days
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -357,15 +358,22 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
 
-            // Pegamos stats usando a mesma funçâo:
             const dayStat = await getDetailedStats(dayStart, dayEnd, null);
-
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
                 totalVendasConvertidas: dayStat.totalVendasConvertidas,
                 totalVendasGeradas: dayStat.totalVendasGeradas
             });
         }
+
+        // *** NOVO: Pegar as últimas movimentações do dia => ex: 10 últimos
+        const lastMovements = await Purchase.findAll({
+            where: {
+                pixGeneratedAt: { [Op.between]: [startDate, endDate] }
+            },
+            order: [['pixGeneratedAt', 'DESC']],
+            limit: 10
+        });
 
         res.json({
             statsAll,
@@ -375,7 +383,8 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             statsPurchased,
             botRanking,
             botDetails,
-            stats7Days
+            stats7Days,
+            lastMovements // *** ENVIAMOS PRO FRONT
         });
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
