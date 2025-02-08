@@ -1,17 +1,16 @@
 // services/index.js
+
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se precisar
-// Caso use getDbConfig, pode importar do config.service:
-// const { getDbConfig } = require('./config.service');
 
-// Aqui definimos manualmente a conexão:
+// Cria a conexão manualmente com as novas credenciais:
 const sequelize = new Sequelize(
-  'd79nkunl7qtudq',
-  'u28b183g4sl1bp',
-  'pe5c008c522cdf34fdd17659a53e7887844b6225c5e04ea408745e8941de9be7a',
+  'd36d4dkqgtr6ut',          // Nome do DB
+  'ud4gfju6bdnki2',          // Usuário
+  'p2dfc875746ebbd4c8f65e63ecbb29426db19f49b15c9ec1d3a8941553abef74c', // Senha
   {
-    host: 'c6sfjnr30ch74e.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
-    port: '5432',
+    host: 'cbdhrtd93854d5.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
+    port: 5432,
     dialect: 'postgres',
     logging: false,
     dialectOptions: {
@@ -23,11 +22,12 @@ const sequelize = new Sequelize(
   }
 );
 
-// Importamos o model User.js e Purchase.js de dentro da pasta ../models
+// Importamos os models (User.js e Purchase.js) de dentro de ../models
+// Eles devem estar configurados com as colunas corretas (pixGeneratedAt etc.)
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
 
-// Relações (se houver)
+// Relações, se houver
 User.hasMany(Purchase, { foreignKey: 'userId' });
 Purchase.belongsTo(User, { foreignKey: 'userId' });
 
