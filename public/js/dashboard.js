@@ -1,5 +1,6 @@
 // public/js/dashboard.js
 $(document).ready(function () {
+    // Define a data atual no input date
     const today = new Date().toISOString().split('T')[0];
     $('#datePicker').val(today);
 
@@ -45,7 +46,7 @@ $(document).ready(function () {
             themeBtn.text('☀');
             localStorage.setItem('theme', 'dark');
         }
-        // Atualiza se já existirem gráficos
+        // Atualiza os gráficos, se existirem
         updateChartsIfExist();
     });
 
@@ -65,7 +66,7 @@ $(document).ready(function () {
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
-            gridColor: isDark ? '#555' : '#ccc',
+            gridColor: isDark ? '#555' : '#ccc'
         };
     }
 
@@ -91,7 +92,7 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Estatísticas do Dia
+            // Atualiza as estatísticas principais
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
@@ -110,7 +111,6 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
-
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
@@ -119,7 +119,7 @@ $(document).ready(function () {
                         responsive: true,
                         scales: {
                             y: { beginAtZero: true },
-                            x: {}
+                            x: {},
                         },
                         plugins: {
                             chartBackground: {},
@@ -133,17 +133,16 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Ontem vs Hoje)
+            // GRÁFICO DE LINHA (Últimos 7 dias - Valor Convertido)
             //--------------------------------------------------
+            // Espera que a API retorne em data.last7Days:
+            // { labels: [...], vendasConvertidas: [...] }
             const lineData = {
-                labels: ['Ontem', 'Hoje'],
+                labels: data.last7Days.labels, // exemplo: ['2025-01-20', '2025-01-21', ..., '2025-01-26']
                 datasets: [
                     {
-                        label: 'Valor Convertido (R$)',
-                        data: [
-                            data.statsYesterday.totalVendasConvertidas,
-                            data.statsAll.totalVendasConvertidas,
-                        ],
+                        label: 'Valor Convertido (R$) nos Últimos 7 dias',
+                        data: data.last7Days.vendasConvertidas,
                         fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
@@ -153,7 +152,6 @@ $(document).ready(function () {
                 ],
             };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
-
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
@@ -162,7 +160,7 @@ $(document).ready(function () {
                         responsive: true,
                         scales: {
                             y: { beginAtZero: false },
-                            x: {}
+                            x: {},
                         },
                         plugins: {
                             chartBackground: {},
@@ -191,11 +189,11 @@ $(document).ready(function () {
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach((bot) => {
                     botRankingTbody.append(`
-            <tr>
-              <td>${bot.botName || 'N/A'}</td>
-              <td>${bot.vendas}</td>
-            </tr>
-          `);
+                        <tr>
+                          <td>${bot.botName || 'N/A'}</td>
+                          <td>${bot.vendas}</td>
+                        </tr>
+                    `);
                 });
             }
 
@@ -208,81 +206,51 @@ $(document).ready(function () {
                 data.botDetails.forEach((bot) => {
                     let plansHtml = '';
                     bot.plans.forEach((plan) => {
-                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(
-                            2
-                        )}%)<br>`;
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
                     detailsTbody.append(`
-            <tr>
-              <td>${bot.botName}</td>
-              <td>R$${bot.valorGerado.toFixed(2)}</td>
-              <td>${bot.totalPurchases}</td>
-              <td>${plansHtml}</td>
-              <td>${bot.conversionRate.toFixed(2)}%</td>
-              <td>R$${bot.averageValue.toFixed(2)}</td>
-            </tr>
-          `);
+                        <tr>
+                          <td>${bot.botName}</td>
+                          <td>R$${bot.valorGerado.toFixed(2)}</td>
+                          <td>${bot.totalPurchases}</td>
+                          <td>${plansHtml}</td>
+                          <td>${bot.conversionRate.toFixed(2)}%</td>
+                          <td>R$${bot.averageValue.toFixed(2)}</td>
+                        </tr>
+                    `);
                 });
             }
 
             //--------------------------------------------------
-            // ESTATÍSTICAS DETALHADAS (4 colunas)
+            // ESTATÍSTICAS DETALHADAS (CARDS)
             //--------------------------------------------------
             // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(
-                data.statsAll.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardAllTotalVolume').text(
-                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardAllTotalPaidVolume').text(
-                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
+            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
 
             // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(
-                data.statsMain.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardMainTotalVolume').text(
-                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardMainTotalPaidVolume').text(
-                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
+            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
+            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
 
             // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(
-                data.statsNotPurchased.totalPurchases
-            );
-            $('#cardNotPurchasedConversionRateDetailed').text(
-                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardNotPurchasedTotalVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardNotPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
 
             // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(
-                data.statsPurchased.totalPurchases
-            );
-            $('#cardPurchasedConversionRateDetailed').text(
-                data.statsPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardPurchasedTotalVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -291,7 +259,7 @@ $(document).ready(function () {
     // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // (B) Atualiza ao mudar data
+    // (B) Atualiza ao mudar a data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
