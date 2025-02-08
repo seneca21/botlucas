@@ -133,17 +133,18 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Últimos 7 dias vs Hoje)
+            // GRÁFICO DE LINHA (Últimos 7 dias - Valor Convertido)
             //--------------------------------------------------
+            // Espera que a API retorne em data.last7Days:
+            // { labels: [dia1, dia2, ..., dia7], vendasConvertidas: [value1, value2, ..., value7] }
+            const last7Labels = data.last7Days.labels;
+            const last7Values = data.last7Days.vendasConvertidas;
             const lineData = {
-                labels: ['Últimos 7 dias', 'Hoje'],
+                labels: last7Labels,
                 datasets: [
                     {
-                        label: 'Valor Convertido (R$)',
-                        data: [
-                            data.statsLast7Days.totalVendasConvertidas,
-                            data.statsAll.totalVendasConvertidas,
-                        ],
+                        label: 'Valor Convertido (R$) nos Últimos 7 dias',
+                        data: last7Values,
                         fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
