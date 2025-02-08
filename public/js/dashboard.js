@@ -133,15 +133,15 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Ontem vs Hoje)
+            // GRÁFICO DE LINHA (Últimos 7 dias vs Hoje)
             //--------------------------------------------------
             const lineData = {
-                labels: ['Ontem', 'Hoje'],
+                labels: ['Últimos 7 dias', 'Hoje'],
                 datasets: [
                     {
                         label: 'Valor Convertido (R$)',
                         data: [
-                            data.statsYesterday.totalVendasConvertidas,
+                            data.statsLast7Days.totalVendasConvertidas,
                             data.statsAll.totalVendasConvertidas,
                         ],
                         fill: false,
@@ -208,9 +208,7 @@ $(document).ready(function () {
                 data.botDetails.forEach((bot) => {
                     let plansHtml = '';
                     bot.plans.forEach((plan) => {
-                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(
-                            2
-                        )}%)<br>`;
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
                     detailsTbody.append(`
             <tr>
@@ -231,58 +229,30 @@ $(document).ready(function () {
             // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(
-                data.statsAll.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardAllTotalVolume').text(
-                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardAllTotalPaidVolume').text(
-                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
+            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
 
             // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(
-                data.statsMain.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardMainTotalVolume').text(
-                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardMainTotalPaidVolume').text(
-                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
+            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
+            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
 
             // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(
-                data.statsNotPurchased.totalPurchases
-            );
-            $('#cardNotPurchasedConversionRateDetailed').text(
-                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardNotPurchasedTotalVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardNotPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
 
             // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(
-                data.statsPurchased.totalPurchases
-            );
-            $('#cardPurchasedConversionRateDetailed').text(
-                data.statsPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardPurchasedTotalVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
