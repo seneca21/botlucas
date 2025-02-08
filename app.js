@@ -15,23 +15,19 @@ const logger = require('./services/logger');
 
 // === MIDDLEWARE DE IP (CHECK IP) ===
 function checkIP(req, res, next) {
-    // Lista de IPs permitidos
     const allowedIPs = [
-        "189.29.145.193",   // Seu IP pessoal (exemplo)
-        "54.175.230.252",   // IP fixo do Heroku 1
-        "54.173.229.200"    // IP fixo do Heroku 2
+        "189.29.145.193",
+        "54.175.230.252",
+        "54.173.229.200"
     ];
 
-    // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)
     const forwarded = req.headers['x-forwarded-for'];
     let clientIp = forwarded
         ? forwarded.split(',')[0].trim()
         : req.ip;
 
-    // Remove prefixo "::ffff:" se houver
     clientIp = clientIp.replace('::ffff:', '');
 
-    // Se estiver na lista allowedIPs, segue
     if (allowedIPs.includes(clientIp)) {
         next();
     } else {
@@ -40,24 +36,17 @@ function checkIP(req, res, next) {
     }
 }
 
-// Inicia a aplicação Express
 const app = express();
 
-// BodyParser para formulários e JSON
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Configurações de sessão (para login)
 app.use(session({
-    secret: 'chave-super-secreta', // troque para algo mais seguro
+    secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
-/**
- * Função que checa se o usuário está logado.
- * Caso não esteja, redireciona para /login.
- */
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) {
         next();
@@ -66,9 +55,6 @@ function checkAuth(req, res, next) {
     }
 }
 
-//------------------------------------------------------
-// Conexão e sync com o DB
-//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
@@ -82,15 +68,10 @@ db.sequelize
 //------------------------------------------------------
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
-
-// GET /login -> exibe form
 app.get('/login', (req, res) => {
     if (req.session.loggedIn) {
-        // se já logado, vai direto p/ dashboard
         return res.redirect('/');
     }
-
-    // form simples de login
     const html = `
     <html>
       <head><title>Login</title></head>
@@ -109,16 +90,12 @@ app.get('/login', (req, res) => {
     res.send(html);
 });
 
-// POST /login -> valida usuário/senha fixos
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-
-    // Altere se quiser
     const ADMIN_USER = 'pfjru';
     const ADMIN_PASS = 'oppushin1234';
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
-        // se ok, define que está logado
         req.session.loggedIn = true;
         logger.info(`✅ Usuário ${username} logou com sucesso.`);
         return res.redirect('/');
@@ -128,7 +105,6 @@ app.post('/login', (req, res) => {
     }
 });
 
-// GET /logout -> sai e destrói a sessão
 app.get('/logout', (req, res) => {
     const username = req.session.loggedIn ? 'Admin' : 'Desconhecido';
     req.session.destroy(() => {
@@ -138,24 +114,16 @@ app.get('/logout', (req, res) => {
 });
 
 //------------------------------------------------------
-// ROTA PRINCIPAL ("/") -> carrega index.html (dashboard)
-// Agora requer checkAuth + checkIP
-//------------------------------------------------------
 app.get('/', checkAuth, checkIP, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-//------------------------------------------------------
-// Servindo a pasta 'public' (CSS, JS) - também com IP e Auth
-//------------------------------------------------------
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// Funções de estatísticas
+// Funções de estatísticas (original) + overrides
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
-    const { User, Purchase } = db;
-
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -176,14 +144,12 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     let totalUsers;
     if (!originCondition) {
-        // statsAll => leads = users c/ lastInteraction no dia
         totalUsers = await User.count({
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
             },
         });
     } else {
-        // statsX => leads = user que comprou nessa condition + interagiu
         totalUsers = await User.count({
             where: {
                 id: { [Op.in]: userIdsWithCondition },
@@ -192,18 +158,46 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         });
     }
 
-    // totalPurchases
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
-
-    // conversionRate
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
-    // totalVendasGeradas
-    const totalVendasGeradas =
-        (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
+    // (Antes, totalVendasGeradas era sum do purchaseWhere)
+    let totalVendasGeradas = (await Purchase.sum('planValue', {
+        where: purchaseWhere
+    })) || 0;
 
-    // totalVendasConvertidas (se está em Purchase, está pago)
-    const totalVendasConvertidas = totalVendasGeradas;
+    // (Antes, totalVendasConvertidas = totalVendasGeradas)
+    let totalVendasConvertidas = totalVendasGeradas;
+
+    // =====================================================
+    // *** ADDED ***: Agora separamos a parte gerada e convertida:
+    // - Valor Gerado = sum dos "status in [pending, paid]" com pixGeneratedAt no período
+    // - Valor Convertido = sum dos "status=paid" com purchasedAt no período
+    // =====================================================
+    const generatedWhere = {
+        pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+        status: { [Op.in]: ['pending', 'paid'] }
+    };
+    if (originCondition) {
+        generatedWhere.originCondition = originCondition;
+    }
+
+    const sumGerado = (await Purchase.sum('planValue', { where: generatedWhere })) || 0;
+
+    const convertedWhere = {
+        purchasedAt: { [Op.between]: [startDate, endDate] },
+        status: 'paid'
+    };
+    if (originCondition) {
+        convertedWhere.originCondition = originCondition;
+    }
+
+    const sumConvertido = (await Purchase.sum('planValue', { where: convertedWhere })) || 0;
+
+    // Agora sobrescrevemos
+    totalVendasGeradas = sumGerado;
+    totalVendasConvertidas = sumConvertido;
+    // =====================================================
 
     return {
         totalUsers,
@@ -214,7 +208,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     };
 }
 
-// helper: normaliza data para 00:00
+// helper para normalizar data p/ 00:00
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -222,37 +216,29 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// /api/bots-stats -> rota JSON (precisa Auth e IP)
+// /api/bots-stats
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
 
-        // Dia atual
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // Dia anterior
         const yesterday = new Date(startDate);
         yesterday.setDate(yesterday.getDate() - 1);
         const startYesterday = makeDay(yesterday);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
 
-        // statsAll
         const statsAll = await getDetailedStats(startDate, endDate, null);
-        // statsYesterday
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
-        // statsMain
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
-        // statsNotPurchased
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
-        // statsPurchased
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -269,7 +255,6 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -283,7 +268,6 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             group: ['botName'],
         });
 
-        // totalUsers por bot
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -302,7 +286,6 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botUsersMap[bName] = uCount;
         });
 
-        // planSalesByBot
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -365,9 +348,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // -----------------------------------------
-        // stats7Days -> array c/ totalVendasGeradas e totalVendasConvertidas
-        // -----------------------------------------
+        // *** ADDED ***: stats7Days
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -376,15 +357,16 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
 
+            // Pegamos stats usando a mesma funçâo:
             const dayStat = await getDetailedStats(dayStart, dayEnd, null);
+
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
                 totalVendasConvertidas: dayStat.totalVendasConvertidas,
-                totalVendasGeradas: dayStat.totalVendasGeradas,
+                totalVendasGeradas: dayStat.totalVendasGeradas
             });
         }
 
-        // Retorna JSON final
         res.json({
             statsAll,
             statsYesterday,
@@ -395,15 +377,12 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botDetails,
             stats7Days
         });
-
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
 
-//------------------------------------------------------
-// Importa o bot e inicia o servidor
 //------------------------------------------------------
 require('./services/bot.service.js');
 
