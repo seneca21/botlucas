@@ -26,11 +26,15 @@ $(document).ready(function () {
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
+
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
-        if (themeBtn.length) themeBtn.text('☀');
+        if (themeBtn.length) {
+            themeBtn.text('☀');
+        }
     }
+
     themeBtn.on('click', function () {
         if (body.hasClass('dark-mode')) {
             body.removeClass('dark-mode');
@@ -41,6 +45,7 @@ $(document).ready(function () {
             themeBtn.text('☀');
             localStorage.setItem('theme', 'dark');
         }
+        // Atualiza se já existirem gráficos
         updateChartsIfExist();
     });
 
@@ -60,7 +65,7 @@ $(document).ready(function () {
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
-            gridColor: isDark ? '#555' : '#ccc'
+            gridColor: isDark ? '#555' : '#ccc',
         };
     }
 
@@ -100,11 +105,12 @@ $(document).ready(function () {
                     {
                         label: 'Quantidade',
                         data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#4BC0C0']
-                    }
-                ]
+                        backgroundColor: ['#36A2EB', '#4BC0C0'],
+                    },
+                ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
+
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
@@ -116,9 +122,9 @@ $(document).ready(function () {
                             x: {}
                         },
                         plugins: {
-                            chartBackground: {}
-                        }
-                    }
+                            chartBackground: {},
+                        },
+                    },
                 });
             } else {
                 salesChart.data = barData;
@@ -127,42 +133,27 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Últimos 7 dias – Valor Convertido)
+            // GRÁFICO DE LINHA (Ontem vs Hoje)
             //--------------------------------------------------
-            // Se o objeto data possuir a propriedade statsLast7Days, usa-o; caso contrário, utiliza o fallback antigo.
-            let lineData;
-            if (data.statsLast7Days && data.statsLast7Days.labels && data.statsLast7Days.totalVendasConvertidas) {
-                lineData = {
-                    labels: data.statsLast7Days.labels,
-                    datasets: [
-                        {
-                            label: 'Valor Convertido (R$) - Últimos 7 dias',
-                            data: data.statsLast7Days.totalVendasConvertidas,
-                            fill: false,
-                            borderColor: '#ff5c5c',
-                            pointBackgroundColor: '#ff5c5c',
-                            pointHoverRadius: 7,
-                            tension: 0.2
-                        }
-                    ]
-                };
-            } else {
-                lineData = {
-                    labels: ['Ontem', 'Hoje'],
-                    datasets: [
-                        {
-                            label: 'Valor Convertido (R$)',
-                            data: [data.statsYesterday.totalVendasConvertidas, data.statsAll.totalVendasConvertidas],
-                            fill: false,
-                            borderColor: '#ff5c5c',
-                            pointBackgroundColor: '#ff5c5c',
-                            pointHoverRadius: 7,
-                            tension: 0.2
-                        }
-                    ]
-                };
-            }
+            const lineData = {
+                labels: ['Ontem', 'Hoje'],
+                datasets: [
+                    {
+                        label: 'Valor Convertido (R$)',
+                        data: [
+                            data.statsYesterday.totalVendasConvertidas,
+                            data.statsAll.totalVendasConvertidas,
+                        ],
+                        fill: false,
+                        borderColor: '#ff5c5c',
+                        pointBackgroundColor: '#ff5c5c',
+                        pointHoverRadius: 7,
+                        tension: 0.2,
+                    },
+                ],
+            };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
@@ -180,11 +171,11 @@ $(document).ready(function () {
                                     label: function (context) {
                                         const value = context.parsed.y || 0;
                                         return `R$ ${value.toFixed(2)}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                    },
+                                },
+                            },
+                        },
+                    },
                 });
             } else {
                 lineComparisonChart.data = lineData;
@@ -200,11 +191,11 @@ $(document).ready(function () {
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach((bot) => {
                     botRankingTbody.append(`
-                        <tr>
-                          <td>${bot.botName || 'N/A'}</td>
-                          <td>${bot.vendas}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName || 'N/A'}</td>
+              <td>${bot.vendas}</td>
+            </tr>
+          `);
                 });
             }
 
@@ -217,47 +208,81 @@ $(document).ready(function () {
                 data.botDetails.forEach((bot) => {
                     let plansHtml = '';
                     bot.plans.forEach((plan) => {
-                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(
+                            2
+                        )}%)<br>`;
                     });
                     detailsTbody.append(`
-                        <tr>
-                          <td>${bot.botName}</td>
-                          <td>R$${bot.valorGerado.toFixed(2)}</td>
-                          <td>${bot.totalPurchases}</td>
-                          <td>${plansHtml}</td>
-                          <td>${bot.conversionRate.toFixed(2)}%</td>
-                          <td>R$${bot.averageValue.toFixed(2)}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName}</td>
+              <td>R$${bot.valorGerado.toFixed(2)}</td>
+              <td>${bot.totalPurchases}</td>
+              <td>${plansHtml}</td>
+              <td>${bot.conversionRate.toFixed(2)}%</td>
+              <td>R$${bot.averageValue.toFixed(2)}</td>
+            </tr>
+          `);
                 });
             }
 
             //--------------------------------------------------
-            // ESTATÍSTICAS DETALHADAS (Cards)
+            // ESTATÍSTICAS DETALHADAS (4 colunas)
             //--------------------------------------------------
+            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
-            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
-            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
+            $('#cardAllConversionRateDetailed').text(
+                data.statsAll.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardAllTotalVolume').text(
+                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardAllTotalPaidVolume').text(
+                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
+            );
 
+            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
-            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
-            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
+            $('#cardMainConversionRateDetailed').text(
+                data.statsMain.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardMainTotalVolume').text(
+                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardMainTotalPaidVolume').text(
+                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
+            );
 
+            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
-            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
+            $('#cardNotPurchasedPaymentsConfirmed').text(
+                data.statsNotPurchased.totalPurchases
+            );
+            $('#cardNotPurchasedConversionRateDetailed').text(
+                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardNotPurchasedTotalVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardNotPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
+            );
 
+            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
-            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
+            $('#cardPurchasedPaymentsConfirmed').text(
+                data.statsPurchased.totalPurchases
+            );
+            $('#cardPurchasedConversionRateDetailed').text(
+                data.statsPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardPurchasedTotalVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
+            );
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -266,7 +291,7 @@ $(document).ready(function () {
     // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // (B) Atualiza ao mudar a data
+    // (B) Atualiza ao mudar data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
@@ -276,14 +301,20 @@ $(document).ready(function () {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
-        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection').addClass('d-none');
+
+        $('#statsSection').addClass('d-none');
+        $('#rankingSimplesSection').addClass('d-none');
+        $('#rankingDetalhadoSection').addClass('d-none');
+        $('#statsDetailedSection').addClass('d-none');
+
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Botão hambúrguer -> recolhe/expande sidebar + main
+    // (D) Botão hamburguer -> recolhe/expande sidebar + main
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
+        // Ao mesmo tempo, main expande para 100%
         $('main[role="main"]').toggleClass('expanded');
     });
 });
