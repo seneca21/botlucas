@@ -4,53 +4,50 @@ module.exports = (sequelize, DataTypes) => {
     const Purchase = sequelize.define(
         'Purchase',
         {
-            // ========================================
-            // CAMPOS ORIGINAIS:
-            // ========================================
+            // Seu userId (chave estrangeira)
+            userId: {
+                type: DataTypes.INTEGER,
+                allowNull: false
+            },
             planName: {
                 type: DataTypes.STRING,
-                allowNull: false,
+                allowNull: false
             },
             planValue: {
                 type: DataTypes.FLOAT,
-                allowNull: false,
+                allowNull: false
             },
             botName: {
                 type: DataTypes.STRING,
-                allowNull: true,
+                allowNull: true
             },
-            // Antes era allowNull: false e defaultValue: DataTypes.NOW
-            // Agora, deixamos purchasedAt como nullable, pois só é preenchido se for pago
+            // Agora purchasedAt é opcional (null se estiver pendente)
             purchasedAt: {
                 type: DataTypes.DATE,
-                allowNull: true,
+                allowNull: true
             },
-            // originCondition: "main", "not_purchased", "purchased", etc
+            // "main", "not_purchased", "purchased", etc
             originCondition: {
                 type: DataTypes.STRING,
                 allowNull: false,
-                defaultValue: 'main',
+                defaultValue: 'main'
             },
-
-            // ========================================
-            // CAMPOS NOVOS (ADICIONADOS):
-            // ========================================
-            // Data em que o PIX foi gerado (criamos o registro)
+            // Campo para salvar data/hora em que o Pix foi gerado
             pixGeneratedAt: {
                 type: DataTypes.DATE,
                 allowNull: false,
-                defaultValue: DataTypes.NOW,
+                defaultValue: DataTypes.NOW
             },
-            // status: "pending" (gerado) ou "paid" (quando confirmamos o pagamento)
+            // "pending" (gerado) ou "paid" (quando confirmamos)
             status: {
                 type: DataTypes.STRING,
                 allowNull: false,
-                defaultValue: 'pending',
-            },
+                defaultValue: 'pending'
+            }
         },
         {
             tableName: 'Purchases',
-            timestamps: false, // Se não quiser createdAt/updatedAt
+            timestamps: false // Se não quiser createdAt/updatedAt
         }
     );
 
