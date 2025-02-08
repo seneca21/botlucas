@@ -15,24 +15,28 @@
         <nav id="sidebar">
             <div id="sidebarContent">
                 <ul class="nav flex-column" id="sidebarNav">
+                    <!-- SEÇÃO 1: Estatísticas do Dia -->
                     <li class="nav-item">
                         <a class="nav-link active" href="#" data-section="statsSection">
                             Estatísticas do Dia
                         </a>
                     </li>
+                    <!-- SEÇÃO 2: Ranking (antes: "Ranking de Bots (Simples)") -->
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="rankingSimplesSection">
-                            Ranking de Bots (Simples)
+                            Ranking
                         </a>
                     </li>
+                    <!-- SEÇÃO 3: Dashboard Detalhado (antes: "Ranking de Bots Detalhado") -->
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="rankingDetalhadoSection">
-                            Ranking de Bots Detalhado
+                            Dashboard Detalhado
                         </a>
                     </li>
+                    <!-- SEÇÃO 4: Estatísticas do Dia (antes: "Estatísticas do Dia (Detalhado)") -->
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
-                            Estatísticas do Dia (Detalhado)
+                            Estatísticas do Dia
                         </a>
                     </li>
                 </ul>
@@ -72,7 +76,7 @@
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
                     <p>
-                        Usuários que Geraram Pix:
+                        Usuários Ativos:
                         <span id="totalUsers">0</span>
                     </p>
                     <p>
@@ -87,20 +91,22 @@
                     <!-- 2 colunas: gráfico de barras e gráfico de linha -->
                     <div class="row">
                         <div class="col-md-6">
-                            <h4 class="text-center">Usuários x Compras (Hoje)</h4>
+                            <!-- Antes: "Usuários x Compras (Hoje)" -->
+                            <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
 
                         <div class="col-md-6">
-                            <h4 class="text-center">Comparativo Ontem vs Hoje (Valor Convertido)</h4>
+                            <!-- Antes: "Comparativo Ontem vs Hoje (Valor Convertido)" -->
+                            <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
                         </div>
                     </div>
                 </section>
 
-                <!-- SEÇÃO 2: Ranking Simples -->
+                <!-- SEÇÃO 2: Ranking (antes: "Ranking de Bots (Simples)") -->
                 <section id="rankingSimplesSection" class="d-none">
-                    <h3>Ranking de Bots (Simples)</h3>
+                    <h3>Ranking</h3>
                     <table class="table table-striped">
                         <thead>
                             <tr>
@@ -112,16 +118,18 @@
                     </table>
                 </section>
 
-                <!-- SEÇÃO 3: Ranking Detalhado -->
+                <!-- SEÇÃO 3: Dashboard Detalhado (antes: "Ranking de Bots com Mais Vendas - Detalhado") -->
                 <section id="rankingDetalhadoSection" class="d-none">
-                    <h3>Ranking de Bots com Mais Vendas - Detalhado</h3>
+                    <h3>Dashboard Detalhado</h3>
                     <table class="table table-striped">
                         <thead>
                             <tr>
                                 <th>Bot</th>
-                                <th>Valor Gerado (R$)</th>
+                                <!-- Antes: "Valor Gerado (R$)" -->
+                                <th>Valor Convertido(R$)</th>
                                 <th>Vendas</th>
-                                <th>Planos (Vendas e Conversão %)</th>
+                                <!-- Antes: "Planos (Vendas e Conversão %)" -->
+                                <th>Planos e Conversão</th>
                                 <th>Conversão (%)</th>
                                 <th>Valor Médio (R$)</th>
                             </tr>
@@ -130,13 +138,14 @@
                     </table>
                 </section>
 
-                <!-- SEÇÃO 4: Estatísticas do Dia (Detalhado) -->
+                <!-- SEÇÃO 4: Estatísticas do Dia (antes: "Estatísticas do Dia (Detalhado)") -->
                 <section id="statsDetailedSection" class="d-none">
-                    <h3>Estatísticas do Dia (Detalhado)</h3>
+                    <h3>Estatísticas do Dia</h3>
                     <div class="row">
                         <!-- COL 1: All -->
                         <div class="col-md-3 mb-3">
-                            <h5 class="text-center">[TODAS AS COMPRAS]</h5>
+                            <!-- Antes: "[TODAS AS COMPRAS]" (mantém igual pois você pediu "TODAS AS COMPRAS") -->
+                            <h5 class="text-center">TODAS AS COMPRAS</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Total de Leads</h5>
@@ -171,7 +180,8 @@
 
                         <!-- COL 2: Main -->
                         <div class="col-md-3 mb-3">
-                            <h5 class="text-center">[PLANO PRINCIPAL]</h5>
+                            <!-- Antes: "[PLANO PRINCIPAL]" (mantém igual pois você pediu "PLANO PRINCIPAL") -->
+                            <h5 class="text-center">PLANO PRINCIPAL</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Total de Leads</h5>
@@ -206,7 +216,8 @@
 
                         <!-- COL 3: Not_Purchased -->
                         <div class="col-md-3 mb-3">
-                            <h5 class="text-center">[REMARKETING - NOT_PURCHASED]</h5>
+                            <!-- Antes: "[REMARKETING - NOT_PURCHASED]" => "REMARKETING" -->
+                            <h5 class="text-center">REMARKETING</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Total de Leads</h5>
@@ -241,7 +252,8 @@
 
                         <!-- COL 4: Purchased -->
                         <div class="col-md-3 mb-3">
-                            <h5 class="text-center">[UPSELL - PURCHASED]</h5>
+                            <!-- Antes: "[UPSELL - PURCHASED]" => "UPSELL" -->
+                            <h5 class="text-center">UPSELL</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
                                     <h5 class="card-title">Total de Leads</h5>
