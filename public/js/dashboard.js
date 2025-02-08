@@ -97,7 +97,7 @@ $(document).ready(function () {
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
             //--------------------------------------------------
-            // GRÁFICO DE BARRAS
+            // GRÁFICO DE BARRAS (Usuários x Compras, dia selecionado)
             //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
@@ -133,17 +133,17 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Ontem vs Hoje)
+            // GRÁFICO DE LINHA (Últimos 7 dias - Valor Convertido)
             //--------------------------------------------------
+            const lineLabels = data.stats7Days.map(item => item.date);
+            const lineValues = data.stats7Days.map(item => item.totalVendasConvertidas);
+
             const lineData = {
-                labels: ['Ontem', 'Hoje'],
+                labels: lineLabels,
                 datasets: [
                     {
                         label: 'Valor Convertido (R$)',
-                        data: [
-                            data.statsYesterday.totalVendasConvertidas,
-                            data.statsAll.totalVendasConvertidas,
-                        ],
+                        data: lineValues,
                         fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
@@ -191,11 +191,11 @@ $(document).ready(function () {
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach((bot) => {
                     botRankingTbody.append(`
-            <tr>
-              <td>${bot.botName || 'N/A'}</td>
-              <td>${bot.vendas}</td>
-            </tr>
-          `);
+                        <tr>
+                            <td>${bot.botName || 'N/A'}</td>
+                            <td>${bot.vendas}</td>
+                        </tr>
+                    `);
                 });
             }
 
@@ -208,20 +208,18 @@ $(document).ready(function () {
                 data.botDetails.forEach((bot) => {
                     let plansHtml = '';
                     bot.plans.forEach((plan) => {
-                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(
-                            2
-                        )}%)<br>`;
+                        plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
                     detailsTbody.append(`
-            <tr>
-              <td>${bot.botName}</td>
-              <td>R$${bot.valorGerado.toFixed(2)}</td>
-              <td>${bot.totalPurchases}</td>
-              <td>${plansHtml}</td>
-              <td>${bot.conversionRate.toFixed(2)}%</td>
-              <td>R$${bot.averageValue.toFixed(2)}</td>
-            </tr>
-          `);
+                        <tr>
+                            <td>${bot.botName}</td>
+                            <td>R$${bot.valorGerado.toFixed(2)}</td>
+                            <td>${bot.totalPurchases}</td>
+                            <td>${plansHtml}</td>
+                            <td>${bot.conversionRate.toFixed(2)}%</td>
+                            <td>R$${bot.averageValue.toFixed(2)}</td>
+                        </tr>
+                    `);
                 });
             }
 
