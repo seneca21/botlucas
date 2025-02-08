@@ -4,41 +4,50 @@ module.exports = (sequelize, DataTypes) => {
     const Purchase = sequelize.define(
         'Purchase',
         {
-            // Seu userId (chave estrangeira)
+            // Relação com userId
             userId: {
                 type: DataTypes.INTEGER,
                 allowNull: false
             },
+
             planName: {
                 type: DataTypes.STRING,
                 allowNull: false
             },
+
             planValue: {
                 type: DataTypes.FLOAT,
                 allowNull: false
             },
+
             botName: {
                 type: DataTypes.STRING,
                 allowNull: true
             },
-            // Agora purchasedAt é opcional (null se estiver pendente)
+
+            // Antes era always not null, mas pra evitar erros no alter, deixamos null
             purchasedAt: {
                 type: DataTypes.DATE,
                 allowNull: true
             },
-            // "main", "not_purchased", "purchased", etc
+
             originCondition: {
                 type: DataTypes.STRING,
                 allowNull: false,
                 defaultValue: 'main'
             },
-            // Campo para salvar data/hora em que o Pix foi gerado
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Agora allowNull: true
+            // para evitar erro nas linhas antigas
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             pixGeneratedAt: {
                 type: DataTypes.DATE,
-                allowNull: false,
+                allowNull: true,
                 defaultValue: DataTypes.NOW
             },
-            // "pending" (gerado) ou "paid" (quando confirmamos)
+
+            // "pending" (gerado) ou "paid" (confirmado)
             status: {
                 type: DataTypes.STRING,
                 allowNull: false,
