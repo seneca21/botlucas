@@ -7,7 +7,7 @@ $(document).ready(function () {
     let lineComparisonChart;
 
     //------------------------------------------------------------
-    // 1) Plugin para pintar o background do gráfico
+    // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -22,7 +22,7 @@ $(document).ready(function () {
     Chart.register(chartBackgroundPlugin);
 
     //------------------------------------------------------------
-    // 2) Dark Mode
+    // 2) DARK MODE
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
@@ -76,7 +76,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // 3) Função principal: Puxa /api/bots-stats e desenha os gráficos
+    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
     //------------------------------------------------------------
     async function updateDashboard(date) {
         try {
@@ -86,7 +86,7 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Atualiza estatísticas principais
+            // Estatísticas do Dia
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
@@ -129,21 +129,39 @@ $(document).ready(function () {
             //--------------------------------------------------
             // GRÁFICO DE LINHA (Últimos 7 dias – Valor Convertido)
             //--------------------------------------------------
-            // O endpoint deverá retornar data.last7Days com "labels" e "vendasConvertidas"
-            const lineData = {
-                labels: data.last7Days.labels, // Ex.: ["2025-01-21", "2025-01-22", ..., "2025-01-27"]
-                datasets: [
-                    {
-                        label: 'Valor Convertido (R$) - Últimos 7 dias',
-                        data: data.last7Days.vendasConvertidas,
-                        fill: false,
-                        borderColor: '#ff5c5c',
-                        pointBackgroundColor: '#ff5c5c',
-                        pointHoverRadius: 7,
-                        tension: 0.2
-                    }
-                ]
-            };
+            // Se o objeto data possuir a propriedade statsLast7Days, usa-o; caso contrário, utiliza o fallback antigo.
+            let lineData;
+            if (data.statsLast7Days && data.statsLast7Days.labels && data.statsLast7Days.totalVendasConvertidas) {
+                lineData = {
+                    labels: data.statsLast7Days.labels,
+                    datasets: [
+                        {
+                            label: 'Valor Convertido (R$) - Últimos 7 dias',
+                            data: data.statsLast7Days.totalVendasConvertidas,
+                            fill: false,
+                            borderColor: '#ff5c5c',
+                            pointBackgroundColor: '#ff5c5c',
+                            pointHoverRadius: 7,
+                            tension: 0.2
+                        }
+                    ]
+                };
+            } else {
+                lineData = {
+                    labels: ['Ontem', 'Hoje'],
+                    datasets: [
+                        {
+                            label: 'Valor Convertido (R$)',
+                            data: [data.statsYesterday.totalVendasConvertidas, data.statsAll.totalVendasConvertidas],
+                            fill: false,
+                            borderColor: '#ff5c5c',
+                            pointBackgroundColor: '#ff5c5c',
+                            pointHoverRadius: 7,
+                            tension: 0.2
+                        }
+                    ]
+                };
+            }
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -175,7 +193,7 @@ $(document).ready(function () {
             lineComparisonChart.update();
 
             //--------------------------------------------------
-            // Atualiza tabelas de Ranking e Estatísticas Detalhadas
+            // RANKING SIMPLES
             //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -190,6 +208,9 @@ $(document).ready(function () {
                 });
             }
 
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -212,7 +233,7 @@ $(document).ready(function () {
             }
 
             //--------------------------------------------------
-            // Atualiza os cards de Estatísticas Detalhadas
+            // ESTATÍSTICAS DETALHADAS (Cards)
             //--------------------------------------------------
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
@@ -242,15 +263,15 @@ $(document).ready(function () {
         }
     }
 
-    // Atualiza ao carregar
+    // (A) Atualiza ao carregar
     updateDashboard($('#datePicker').val());
 
-    // Atualiza ao mudar a data
+    // (B) Atualiza ao mudar a data
     $('#datePicker').on('change', function () {
         updateDashboard($(this).val());
     });
 
-    // Troca de seções no sidebar
+    // (C) Troca de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -260,7 +281,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hambúrguer: recolhe/expande sidebar + main
+    // (D) Botão hambúrguer -> recolhe/expande sidebar + main
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');

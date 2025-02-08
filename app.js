@@ -21,10 +21,9 @@ function checkIP(req, res, next) {
         "54.175.230.252",   // IP fixo do Heroku 1
         "54.173.229.200"    // IP fixo do Heroku 2
     ];
-    // Tenta extrair o IP real do cabeçalho x-forwarded-for, se existir
+    // Extrai IP real do cabeçalho x-forwarded-for, se existir
     const forwarded = req.headers['x-forwarded-for'];
     let clientIp = forwarded ? forwarded.split(',')[0].trim() : req.ip;
-    // Remove o prefixo "::ffff:" se houver
     clientIp = clientIp.replace('::ffff:', '');
     if (allowedIPs.includes(clientIp)) {
         next();
@@ -98,7 +97,6 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    // Altere se quiser
     const ADMIN_USER = 'pfjru';
     const ADMIN_PASS = 'oppushin1234';
     if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -137,9 +135,7 @@ app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const { User, Purchase } = db;
-    const purchaseWhere = {
-        purchasedAt: { [Op.between]: [startDate, endDate] }
-    };
+    const purchaseWhere = { purchasedAt: { [Op.between]: [startDate, endDate] } };
     if (originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
@@ -155,9 +151,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     let totalUsers;
     if (!originCondition) {
         totalUsers = await User.count({
-            where: {
-                lastInteraction: { [Op.between]: [startDate, endDate] }
-            }
+            where: { lastInteraction: { [Op.between]: [startDate, endDate] } }
         });
     } else {
         totalUsers = await User.count({
@@ -187,7 +181,7 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// /api/bots-stats -> rota JSON (precisa de Auth e IP)
+// /api/bots-stats -> rota JSON (precisa Auth e IP)
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
@@ -209,13 +203,8 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
         const botRankingRaw = await Purchase.findAll({
-            attributes: [
-                'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas']
-            ],
-            where: {
-                purchasedAt: { [Op.between]: [startDate, endDate] }
-            },
+            attributes: ['botName', [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas']],
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
             group: ['botName'],
             order: [[Sequelize.literal('"vendas"'), 'DESC']]
         });
@@ -225,27 +214,14 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         }));
 
         const botsWithPurchases = await Purchase.findAll({
-            attributes: [
-                'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue']
-            ],
-            where: {
-                purchasedAt: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null }
-            },
+            attributes: ['botName', [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'], [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue']],
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
             group: ['botName']
         });
 
         const botsWithInteractions = await User.findAll({
-            attributes: [
-                'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers']
-            ],
-            where: {
-                lastInteraction: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null }
-            },
+            attributes: ['botName', [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers']],
+            where: { lastInteraction: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
             group: ['botName']
         });
         const botUsersMap = {};
@@ -256,17 +232,8 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         });
 
         const planSalesByBot = await Purchase.findAll({
-            attributes: [
-                'botName',
-                'planName',
-                [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue']
-            ],
-            where: {
-                purchasedAt: { [Op.between]: [startDate, endDate] },
-                planName: { [Op.ne]: null },
-                botName: { [Op.ne]: null }
-            },
+            attributes: ['botName', 'planName', [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'], [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue']],
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] }, planName: { [Op.ne]: null }, botName: { [Op.ne]: null } },
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']]
         });
