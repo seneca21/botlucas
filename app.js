@@ -21,17 +21,11 @@ function checkIP(req, res, next) {
         "54.175.230.252",   // IP fixo do Heroku 1
         "54.173.229.200"    // IP fixo do Heroku 2
     ];
-
-    // Tenta extrair IP real do cabeçalho x-forwarded-for (caso exista)
+    // Tenta extrair o IP real do cabeçalho x-forwarded-for, se existir
     const forwarded = req.headers['x-forwarded-for'];
-    let clientIp = forwarded
-        ? forwarded.split(',')[0].trim()
-        : req.ip;
-
-    // Remove prefixo "::ffff:" se houver
+    let clientIp = forwarded ? forwarded.split(',')[0].trim() : req.ip;
+    // Remove o prefixo "::ffff:" se houver
     clientIp = clientIp.replace('::ffff:', '');
-
-    // Se estiver na lista allowedIPs, segue
     if (allowedIPs.includes(clientIp)) {
         next();
     } else {
@@ -49,7 +43,7 @@ app.use(bodyParser.json());
 
 // Configurações de sessão (para login)
 app.use(session({
-    secret: 'chave-super-secreta', // troque para algo mais seguro
+    secret: 'chave-super-secreta', // Troque para algo mais seguro
     resave: false,
     saveUninitialized: false
 }));
@@ -82,15 +76,8 @@ db.sequelize
 //------------------------------------------------------
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
-
-// GET /login -> exibe form
 app.get('/login', (req, res) => {
-    if (req.session.loggedIn) {
-        // se já logado, vai direto p/ dashboard
-        return res.redirect('/');
-    }
-
-    // form simples de login
+    if (req.session.loggedIn) return res.redirect('/');
     const html = `
     <html>
       <head><title>Login</title></head>
@@ -109,16 +96,12 @@ app.get('/login', (req, res) => {
     res.send(html);
 });
 
-// POST /login -> valida usuário/senha fixos
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-
     // Altere se quiser
     const ADMIN_USER = 'pfjru';
     const ADMIN_PASS = 'oppushin1234';
-
     if (username === ADMIN_USER && password === ADMIN_PASS) {
-        // se ok, define que está logado
         req.session.loggedIn = true;
         logger.info(`✅ Usuário ${username} logou com sucesso.`);
         return res.redirect('/');
@@ -128,7 +111,6 @@ app.post('/login', (req, res) => {
     }
 });
 
-// GET /logout -> sai e destrói a sessão
 app.get('/logout', (req, res) => {
     const username = req.session.loggedIn ? 'Admin' : 'Desconhecido';
     req.session.destroy(() => {
@@ -146,7 +128,7 @@ app.get('/', checkAuth, checkIP, (req, res) => {
 });
 
 //------------------------------------------------------
-// Servindo a pasta 'public' (CSS, JS) - também com IP e Auth
+// Servindo a pasta 'public' (CSS, JS) – também com IP e Auth
 //------------------------------------------------------
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
@@ -155,66 +137,49 @@ app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const { User, Purchase } = db;
-
     const purchaseWhere = {
-        purchasedAt: { [Op.between]: [startDate, endDate] },
+        purchasedAt: { [Op.between]: [startDate, endDate] }
     };
     if (originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
-
-    // leads
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
             attributes: ['userId'],
             where: purchaseWhere,
-            group: ['userId'],
+            group: ['userId']
         });
         userIdsWithCondition = condPurchases.map((p) => p.userId);
     }
-
     let totalUsers;
     if (!originCondition) {
-        // statsAll => leads = users c/ lastInteraction no dia
         totalUsers = await User.count({
             where: {
-                lastInteraction: { [Op.between]: [startDate, endDate] },
-            },
+                lastInteraction: { [Op.between]: [startDate, endDate] }
+            }
         });
     } else {
-        // statsX => leads = user que comprou nessa condition + interagiu
         totalUsers = await User.count({
             where: {
                 id: { [Op.in]: userIdsWithCondition },
-                lastInteraction: { [Op.between]: [startDate, endDate] },
-            },
+                lastInteraction: { [Op.between]: [startDate, endDate] }
+            }
         });
     }
-
-    // totalPurchases
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
-
-    // conversionRate
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
-
-    // totalVendasGeradas
-    const totalVendasGeradas =
-        (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
-
-    // totalVendasConvertidas (se está em Purchase, está pago)
+    const totalVendasGeradas = (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
     const totalVendasConvertidas = totalVendasGeradas;
-
     return {
         totalUsers,
         totalPurchases,
         conversionRate,
         totalVendasGeradas,
-        totalVendasConvertidas,
+        totalVendasConvertidas
     };
 }
 
-// helper: normaliza data para 00:00
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -222,78 +187,66 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// /api/bots-stats -> rota JSON (precisa Auth e IP)
+// /api/bots-stats -> rota JSON (precisa de Auth e IP)
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
-
-        // Dia atual
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
-
-        // Dia anterior
         const yesterday = new Date(startDate);
         yesterday.setDate(yesterday.getDate() - 1);
         const startYesterday = makeDay(yesterday);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
 
-        // statsAll
         const statsAll = await getDetailedStats(startDate, endDate, null);
-        // statsYesterday
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
-        // statsMain
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
-        // statsNotPurchased
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
-        // statsPurchased
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas']
             ],
             where: {
-                purchasedAt: { [Op.between]: [startDate, endDate] },
+                purchasedAt: { [Op.between]: [startDate, endDate] }
             },
             group: ['botName'],
-            order: [[Sequelize.literal('"vendas"'), 'DESC']],
+            order: [[Sequelize.literal('"vendas"'), 'DESC']]
         });
         const botRanking = botRankingRaw.map((item) => ({
             botName: item.botName,
-            vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
+            vendas: parseInt(item.getDataValue('vendas'), 10) || 0
         }));
 
-        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue']
             ],
             where: {
                 purchasedAt: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
-            group: ['botName'],
+            group: ['botName']
         });
 
-        // totalUsers por bot
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers']
             ],
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
-            group: ['botName'],
+            group: ['botName']
         });
         const botUsersMap = {};
         botsWithInteractions.forEach((item) => {
@@ -302,21 +255,20 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botUsersMap[bName] = uCount;
         });
 
-        // planSalesByBot
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
                 'planName',
                 [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue']
             ],
             where: {
                 purchasedAt: { [Op.between]: [startDate, endDate] },
                 planName: { [Op.ne]: null },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
             group: ['botName', 'planName'],
-            order: [[Sequelize.literal('"salesCount"'), 'DESC']],
+            order: [[Sequelize.literal('"salesCount"'), 'DESC']]
         });
         const botPlansMap = {};
         planSalesByBot.forEach((row) => {
@@ -328,32 +280,24 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
-        // Monta array final
         const botDetails = [];
         botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
-            const totalPurchasesBot =
-                parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
-            const totalValueBot =
-                parseFloat(bot.getDataValue('totalValue')) || 0;
+            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-            const conversionRateBot =
-                totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
-            const averageValueBot =
-                totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
-
+            const conversionRateBot = totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
+            const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
-                const planConvRate =
-                    totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
+                const planConvRate = totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
                 plansArray.push({
                     planName,
                     salesCount: info.salesCount,
-                    conversionRate: planConvRate,
+                    conversionRate: planConvRate
                 });
             }
-
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -361,7 +305,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
                 totalUsers: totalUsersBot,
                 conversionRate: conversionRateBot,
                 averageValue: averageValueBot,
-                plans: plansArray,
+                plans: plansArray
             });
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
@@ -374,7 +318,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             statsNotPurchased,
             statsPurchased,
             botRanking,
-            botDetails,
+            botDetails
         });
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
