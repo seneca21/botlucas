@@ -97,7 +97,7 @@ $(document).ready(function () {
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
             //--------------------------------------------------
-            // GRÁFICO DE BARRAS (Usuários x Compras, dia selecionado)
+            // GRÁFICO DE BARRAS (Usuários x Compras)
             //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
@@ -134,8 +134,13 @@ $(document).ready(function () {
 
             //--------------------------------------------------
             // GRÁFICO DE LINHA (Últimos 7 dias - Valor Convertido)
+            //   1) Só mostra o DIA no eixo X (ex: '08', '09', etc)
+            //   2) Tensão e cubicInterpolationMode para deixar mais curvo
             //--------------------------------------------------
-            const lineLabels = data.stats7Days.map(item => item.date);
+            const lineLabels = data.stats7Days.map(item => {
+                const parts = item.date.split('-'); // "YYYY-MM-DD"
+                return parts[2]; // Pega só o dia (ex: '08')
+            });
             const lineValues = data.stats7Days.map(item => item.totalVendasConvertidas);
 
             const lineData = {
@@ -148,7 +153,8 @@ $(document).ready(function () {
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 7,
-                        tension: 0.2,
+                        tension: 0.4,                    // maior curvatura
+                        cubicInterpolationMode: 'monotone'
                     },
                 ],
             };
