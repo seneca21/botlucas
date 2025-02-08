@@ -229,7 +229,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         const { date } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
 
-        // Dia atual (com base na data selecionada)
+        // Dia atual
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
@@ -366,8 +366,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
         // -----------------------------------------
-        // stats7Days -> gera array com totalVendasConvertidas
-        // para cada dia (do dia selecionado até 6 dias atrás)
+        // stats7Days -> array c/ totalVendasGeradas e totalVendasConvertidas
         // -----------------------------------------
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
@@ -380,7 +379,8 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             const dayStat = await getDetailedStats(dayStart, dayEnd, null);
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
-                totalVendasConvertidas: dayStat.totalVendasConvertidas
+                totalVendasConvertidas: dayStat.totalVendasConvertidas,
+                totalVendasGeradas: dayStat.totalVendasGeradas,
             });
         }
 

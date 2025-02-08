@@ -133,29 +133,47 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Últimos 7 dias - Valor Convertido)
-            //   1) Só mostra o DIA no eixo X (ex: '08', '09', etc)
-            //   2) Tensão e cubicInterpolationMode para deixar mais curvo
+            // GRÁFICO DE LINHA (Últimos 7 dias)
+            //   Agora com 2 linhas: Valor Convertido e Valor Gerado
+            //   E no eixo X: DIA/ANO (ex: "08/2025")
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
-                const parts = item.date.split('-'); // "YYYY-MM-DD"
-                return parts[2]; // Pega só o dia (ex: '08')
+                // item.date -> "YYYY-MM-DD"
+                const parts = item.date.split('-');
+                // Mostra DIa/ANO => ex: "07/2025"
+                const day = parts[2];
+                const year = parts[0];
+                return day + '/' + year;
             });
-            const lineValues = data.stats7Days.map(item => item.totalVendasConvertidas);
+
+            // Vetor p/ valor convertido
+            const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
+            // Vetor p/ valor gerado
+            const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
 
             const lineData = {
                 labels: lineLabels,
                 datasets: [
                     {
                         label: 'Valor Convertido (R$)',
-                        data: lineValues,
+                        data: convertedValues,
                         fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
-                        pointHoverRadius: 7,
-                        tension: 0.4,                    // maior curvatura
+                        pointHoverRadius: 6,
+                        tension: 0.4,
                         cubicInterpolationMode: 'monotone'
                     },
+                    {
+                        label: 'Valor Gerado (R$)',
+                        data: generatedValues,
+                        fill: false,
+                        borderColor: '#36A2EB',
+                        pointBackgroundColor: '#36A2EB',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone'
+                    }
                 ],
             };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
