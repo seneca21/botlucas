@@ -80,22 +80,15 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para formatar uma duração em ms -> "Xh Ym"
+    // Função para formatar uma duração em ms -> "Xm Ys"
+    // Ignoramos horas. Se passou de 60 min, aparecerá algo tipo 122m 30s.
     //------------------------------------------------------------
     function formatDuration(ms) {
-        if (ms <= 0) return '0m';
-
-        const totalMinutes = Math.floor(ms / 60000);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-
-        if (hours > 0 && minutes > 0) {
-            return `${hours}h ${minutes}m`;
-        } else if (hours > 0) {
-            return `${hours}h`;
-        } else {
-            return `${minutes}m`;
-        }
+        if (ms <= 0) return '0s';
+        const totalSec = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSec / 60);
+        const seconds = totalSec % 60;
+        return `${minutes}m ${seconds}s`;
     }
 
     //------------------------------------------------------------
@@ -119,12 +112,9 @@ $(document).ready(function () {
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // ============ Tempo médio de pagamento ============
-            // data.statsAll.averagePaymentDelayMs
-            const avgPayDelay = data.statsAll.averagePaymentDelayMs || 0;
-            const avgPayDelayFormatted = formatDuration(avgPayDelay);
-            // Colocamos logo abaixo do "Taxa de Conversão"
-            $('#avgPaymentTimeText').text(avgPayDelayFormatted);
+            // ============ Tempo médio de pagamento em minutos/segundos ============
+            const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
+            $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
             //--------------------------------------------------
             // GRÁFICO DE BARRAS
@@ -408,6 +398,7 @@ $(document).ready(function () {
         updateDashboard(date, movStatus);
     });
 
+    // Toggle de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
