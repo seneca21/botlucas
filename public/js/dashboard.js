@@ -102,7 +102,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Renderiza o "rodapé" de paginação das últimas movs
+    // Nova função: renderiza botões de paginação de forma mais "discreta"
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
@@ -112,13 +112,50 @@ $(document).ready(function () {
         // Se só houver 1 página, não exibe nada
         if (totalPages <= 1) return;
 
-        for (let p = 1; p <= totalPages; p++) {
-            const btn = $(`<button class="btn btn-sm btn-outline-primary ml-1 ${p === page ? 'active' : ''}">${p}</button>`);
-            btn.on('click', function () {
-                currentPage = p;
+        // Botão: Voltar 10
+        if (page > 10) {
+            const btnBack10 = $('<button class="btn btn-sm btn-light mr-1">&laquo; Voltar 10</button>');
+            btnBack10.on('click', () => {
+                currentPage = Math.max(1, page - 10);
                 refreshDashboard();
             });
-            paginationContainer.append(btn);
+            paginationContainer.append(btnBack10);
+        }
+
+        // Botão: Anterior
+        if (page > 1) {
+            const btnPrev = $('<button class="btn btn-sm btn-light mr-1">Anterior</button>');
+            btnPrev.on('click', () => {
+                currentPage = page - 1;
+                refreshDashboard();
+            });
+            paginationContainer.append(btnPrev);
+        }
+
+        // Info: "Página X de Y"
+        const pageInfo = $(
+            `<span style="margin-right:1rem; font-weight:bold;">Página ${page} de ${totalPages}</span>`
+        );
+        paginationContainer.append(pageInfo);
+
+        // Botão: Próxima
+        if (page < totalPages) {
+            const btnNext = $('<button class="btn btn-sm btn-light ml-1">Próxima</button>');
+            btnNext.on('click', () => {
+                currentPage = page + 1;
+                refreshDashboard();
+            });
+            paginationContainer.append(btnNext);
+        }
+
+        // Botão: Avançar 10
+        if (page + 10 <= totalPages) {
+            const btnNext10 = $('<button class="btn btn-sm btn-light ml-1">Avançar 10 &raquo;</button>');
+            btnNext10.on('click', () => {
+                currentPage = Math.min(totalPages, page + 10);
+                refreshDashboard();
+            });
+            paginationContainer.append(btnNext10);
         }
     }
 
@@ -444,8 +481,7 @@ $(document).ready(function () {
     // 1) Carrega a lista de bots do back-end
     loadBotList();
 
-    // 2) Carregar inicial (após pequeno delay, caso queira garantir que botList foi populada)
-    // mas em geral pode chamar direto: 
+    // 2) Carregar inicial
     refreshDashboard();
 
     // Mudar data

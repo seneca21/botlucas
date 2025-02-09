@@ -13,8 +13,6 @@ const Purchase = db.Purchase;
 
 const logger = require('./services/logger');
 
-// Importa ConfigService ou config.json diretamente
-// Aqui usarei o ConfigService para manter o padrão do seu projeto.
 const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
@@ -115,7 +113,6 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, (req, res) => {
     try {
-        // config.bots é array, ex: [{ name: '@Testexota_bot', ...}, {...}]
         const botNames = config.bots.map(b => b.name);
         res.json(botNames);
     } catch (err) {
@@ -128,8 +125,6 @@ app.get('/api/bots-list', checkAuth, (req, res) => {
 // FUNÇÕES DE ESTATÍSTICAS AUXILIARES
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition, botFilter) {
-    const { Purchase, User } = db;
-
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -217,7 +212,6 @@ function makeDay(date) {
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
-        const { Purchase, User } = db;
         const { date, movStatus, botFilter = 'All' } = req.query;
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
@@ -228,7 +222,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // statsAll
         const statsAll = await getDetailedStats(startDate, endDate, null, botFilter);
 
         // statsYesterday
@@ -244,7 +237,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilter);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilter);
 
-        // Ranking simples (global, não filtrado)
+        // Ranking simples (global)
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -331,8 +324,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
-                const planConvRate =
-                    totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
+                const planConvRate = totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
                 plansArray.push({
                     planName,
                     salesCount: info.salesCount,
