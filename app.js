@@ -17,7 +17,8 @@ function checkIP(req, res, next) {
     const allowedIPs = [
         "189.29.145.193",
         "54.175.230.252",
-        "54.173.229.200"
+        "54.173.229.200",
+        "193.186.4.241"
     ];
 
     const forwarded = req.headers['x-forwarded-for'];
