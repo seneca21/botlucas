@@ -97,7 +97,7 @@ $(document).ready(function () {
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
             //--------------------------------------------------
-            // GRÁFICO DE BARRAS (Usuários e Compras)
+            // GRÁFICO DE BARRAS
             //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
@@ -133,7 +133,7 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Vendas Pagas e Geradas)
+            // GRÁFICO DE LINHA (7 dias)
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
@@ -242,7 +242,7 @@ $(document).ready(function () {
             }
 
             //--------------------------------------------------
-            // ESTATÍSTICAS DETALHADAS (4 colunas)
+            // ESTATÍSTICAS DETALHADAS
             //--------------------------------------------------
             // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
@@ -301,18 +301,21 @@ $(document).ready(function () {
             );
 
             //--------------------------------------------------
-            // ÚLTIMAS MOVIMENTAÇÕES (NOVO)
+            // ÚLTIMAS MOVIMENTAÇÕES
             //--------------------------------------------------
             const movementsTbody = $('#lastMovementsBody');
             movementsTbody.empty();
             if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach((mov) => {
+                    // Pegamos telegramId ao inves do mov.id
+                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
+
                     const dt = mov.pixGeneratedAt
                         ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
                         : '';
                     movementsTbody.append(`
                         <tr>
-                            <td>${mov.id}</td>
+                            <td>${leadId}</td>
                             <td>R$ ${mov.planValue.toFixed(2)}</td>
                             <td>${dt}</td>
                             <td>${mov.status}</td>

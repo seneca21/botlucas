@@ -168,14 +168,9 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         where: purchaseWhere
     })) || 0;
 
-    // (Antes, totalVendasConvertidas = totalVendasGeradas)
     let totalVendasConvertidas = totalVendasGeradas;
 
-    // =====================================================
-    // Agora separamos a parte gerada e convertida:
-    // - Valor Gerado => sum dos "status in [pending, paid]" c/ pixGeneratedAt no período
-    // - Valor Convertido => sum dos "status=paid" c/ purchasedAt no período
-    // =====================================================
+    // Agora separamos
     const generatedWhere = {
         pixGeneratedAt: { [Op.between]: [startDate, endDate] },
         status: { [Op.in]: ['pending', 'paid'] }
@@ -196,10 +191,8 @@ async function getDetailedStats(startDate, endDate, originCondition) {
 
     const sumConvertido = (await Purchase.sum('planValue', { where: convertedWhere })) || 0;
 
-    // Agora sobrescrevemos
     totalVendasGeradas = sumGerado;
     totalVendasConvertidas = sumConvertido;
-    // =====================================================
 
     return {
         totalUsers,
@@ -366,13 +359,19 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // *** NOVO: Pegar as últimas movimentações do dia => ex: 10 últimos
+        // *** Ajustado: incluir o 'User' para pegar telegramId
         const lastMovements = await Purchase.findAll({
             where: {
                 pixGeneratedAt: { [Op.between]: [startDate, endDate] }
             },
             order: [['pixGeneratedAt', 'DESC']],
-            limit: 10
+            limit: 10,
+            include: [
+                {
+                    model: User, // Precisamos do telegramId
+                    attributes: ['telegramId']
+                }
+            ]
         });
 
         res.json({
@@ -384,7 +383,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botRanking,
             botDetails,
             stats7Days,
-            lastMovements // *** ENVIAMOS PRO FRONT
+            lastMovements
         });
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
