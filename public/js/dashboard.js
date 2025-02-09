@@ -6,6 +6,11 @@ $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
 
+    // Variáveis para paginação das movimentações
+    let movimentacoesData = [];
+    let currentPage = 1;
+    let itemsPerPage = parseInt($('#itemsPerPage').val(), 10);
+
     //------------------------------------------------------------
     // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
@@ -26,15 +31,11 @@ $(document).ready(function () {
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
-
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
-        if (themeBtn.length) {
-            themeBtn.text('☀');
-        }
+        if (themeBtn.length) themeBtn.text('☀');
     }
-
     themeBtn.on('click', function () {
         if (body.hasClass('dark-mode')) {
             body.removeClass('dark-mode');
@@ -64,7 +65,7 @@ $(document).ready(function () {
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
-            gridColor: isDark ? '#555' : '#ccc',
+            gridColor: isDark ? '#555' : '#ccc'
         };
     }
 
@@ -80,27 +81,11 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para formatar uma duração em ms -> "Xm Ys"
+    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos e movimentações
     //------------------------------------------------------------
-    function formatDuration(ms) {
-        if (ms <= 0) return '0s';
-        const totalSec = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSec / 60);
-        const seconds = totalSec % 60;
-        return `${minutes}m ${seconds}s`;
-    }
-
-    //------------------------------------------------------------
-    // FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
-    //------------------------------------------------------------
-    async function updateDashboard(date, movStatus) {
+    async function updateDashboard(date) {
         try {
-            let url = `/api/bots-stats?date=${date}`;
-            if (movStatus) {
-                url += `&movStatus=${movStatus}`;
-            }
-
-            const response = await fetch(url);
+            const response = await fetch(`/api/bots-stats?date=${date}`);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
@@ -111,40 +96,27 @@ $(document).ready(function () {
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // Tempo médio de pagamento
-            const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
-            $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
-
             //--------------------------------------------------
             // GRÁFICO DE BARRAS
             //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
-                datasets: [
-                    {
-                        label: 'Quantidade',
-                        // Alteramos a segunda cor para vermelho
-                        data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#FF0000']
-                    },
-                ],
+                datasets: [{
+                    label: 'Quantidade',
+                    data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
+                    backgroundColor: ['#36A2EB', '#4BC0C0']
+                }]
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
-
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
                     data: barData,
                     options: {
                         responsive: true,
-                        scales: {
-                            y: { beginAtZero: true },
-                            x: {}
-                        },
-                        plugins: {
-                            chartBackground: {},
-                        },
-                    },
+                        scales: { y: { beginAtZero: true }, x: {} },
+                        plugins: { chartBackground: {} }
+                    }
                 });
             } else {
                 salesChart.data = barData;
@@ -153,55 +125,44 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (7 dias)
+            // GRÁFICO DE LINHA (Últimos 7 dias – Valor Convertido)
             //--------------------------------------------------
-            const lineLabels = data.stats7Days.map(item => {
-                const parts = item.date.split('-');
-                const day = parts[2];
-                const year = parts[0];
-                return day + '/' + year;
-            });
-
-            const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
-            const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
-
-            const lineData = {
-                labels: lineLabels,
-                datasets: [
-                    {
-                        label: 'Valor Convertido (R$)',
-                        data: convertedValues,
+            let lineData;
+            if (data.statsLast7Days && data.statsLast7Days.labels && data.statsLast7Days.totalVendasConvertidas) {
+                lineData = {
+                    labels: data.statsLast7Days.labels,
+                    datasets: [{
+                        label: 'Valor Convertido (R$) - Últimos 7 dias',
+                        data: data.statsLast7Days.totalVendasConvertidas,
                         fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
-                        pointHoverRadius: 6,
-                        tension: 0.4,
-                        cubicInterpolationMode: 'monotone'
-                    },
-                    {
-                        label: 'Valor Gerado (R$)',
-                        data: generatedValues,
+                        pointHoverRadius: 7,
+                        tension: 0.2
+                    }]
+                };
+            } else {
+                lineData = {
+                    labels: ['Ontem', 'Hoje'],
+                    datasets: [{
+                        label: 'Valor Convertido (R$)',
+                        data: [data.statsYesterday.totalVendasConvertidas, data.statsAll.totalVendasConvertidas],
                         fill: false,
-                        borderColor: '#36A2EB',
-                        pointBackgroundColor: '#36A2EB',
-                        pointHoverRadius: 6,
-                        tension: 0.4,
-                        cubicInterpolationMode: 'monotone'
-                    }
-                ],
-            };
+                        borderColor: '#ff5c5c',
+                        pointBackgroundColor: '#ff5c5c',
+                        pointHoverRadius: 7,
+                        tension: 0.2
+                    }]
+                };
+            }
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
-
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
                     data: lineData,
                     options: {
                         responsive: true,
-                        scales: {
-                            y: { beginAtZero: false },
-                            x: {}
-                        },
+                        scales: { y: { beginAtZero: false }, x: {} },
                         plugins: {
                             chartBackground: {},
                             tooltip: {
@@ -209,11 +170,11 @@ $(document).ready(function () {
                                     label: function (context) {
                                         const value = context.parsed.y || 0;
                                         return `R$ ${value.toFixed(2)}`;
-                                    },
-                                },
-                            },
-                        },
-                    },
+                                    }
+                                }
+                            }
+                        }
+                    }
                 });
             } else {
                 lineComparisonChart.data = lineData;
@@ -230,8 +191,8 @@ $(document).ready(function () {
                 data.botRanking.forEach((bot) => {
                     botRankingTbody.append(`
                         <tr>
-                            <td>${bot.botName || 'N/A'}</td>
-                            <td>${bot.vendas}</td>
+                          <td>${bot.botName || 'N/A'}</td>
+                          <td>${bot.vendas}</td>
                         </tr>
                     `);
                 });
@@ -250,170 +211,146 @@ $(document).ready(function () {
                     });
                     detailsTbody.append(`
                         <tr>
-                            <td>${bot.botName}</td>
-                            <td>R$${bot.valorGerado.toFixed(2)}</td>
-                            <td>${bot.totalPurchases}</td>
-                            <td>${plansHtml}</td>
-                            <td>${bot.conversionRate.toFixed(2)}%</td>
-                            <td>R$${bot.averageValue.toFixed(2)}</td>
+                          <td>${bot.botName}</td>
+                          <td>R$${bot.valorGerado.toFixed(2)}</td>
+                          <td>${bot.totalPurchases}</td>
+                          <td>${plansHtml}</td>
+                          <td>${bot.conversionRate.toFixed(2)}%</td>
+                          <td>R$${bot.averageValue.toFixed(2)}</td>
                         </tr>
                     `);
                 });
             }
 
             //--------------------------------------------------
-            // ESTATÍSTICAS DETALHADAS
+            // ESTATÍSTICAS DETALHADAS (Cards)
             //--------------------------------------------------
-            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(
-                data.statsAll.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardAllTotalVolume').text(
-                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardAllTotalPaidVolume').text(
-                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
+            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
 
-            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(
-                data.statsMain.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardMainTotalVolume').text(
-                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardMainTotalPaidVolume').text(
-                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
+            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
+            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
 
-            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(
-                data.statsNotPurchased.totalPurchases
-            );
-            $('#cardNotPurchasedConversionRateDetailed').text(
-                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardNotPurchasedTotalVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardNotPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
 
-            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(
-                data.statsPurchased.totalPurchases
-            );
-            $('#cardPurchasedConversionRateDetailed').text(
-                data.statsPurchased.conversionRate.toFixed(2) + '%'
-            );
-            $('#cardPurchasedTotalVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
-            );
-            $('#cardPurchasedTotalPaidVolume').text(
-                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
-            );
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
+            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
+            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
 
             //--------------------------------------------------
-            // ÚLTIMAS MOVIMENTAÇÕES
+            // MOVIMENTAÇÕES – Paginação
             //--------------------------------------------------
-            const movementsTbody = $('#lastMovementsBody');
-            movementsTbody.empty();
-            if (data.lastMovements && data.lastMovements.length > 0) {
-                data.lastMovements.forEach((mov) => {
-                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
-
-                    // Format data/hora gerado
-                    let dtGen = mov.pixGeneratedAt
-                        ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
-                        : '';
-
-                    // Format data/hora pago
-                    let dtPaid = mov.purchasedAt
-                        ? new Date(mov.purchasedAt).toLocaleString('pt-BR')
-                        : '—';
-
-                    // Status
-                    let statusHtml = '';
-                    if (mov.status === 'paid') {
-                        statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
-                    } else if (mov.status === 'pending') {
-                        statusHtml = '<span style="font-weight:bold; color:#ff9900;">Pending</span>';
-                    } else {
-                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
-                    }
-
-                    // Tempo p/ pagar
-                    let payDelayHtml = '—';
-                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
-                        const diffMs = new Date(mov.purchasedAt).getTime() - new Date(mov.pixGeneratedAt).getTime();
-                        if (diffMs >= 0) {
-                            payDelayHtml = formatDuration(diffMs);
-                        }
-                    }
-
-                    movementsTbody.append(`
-                        <tr>
-                            <td>${leadId}</td>
-                            <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td>${dtGen}</td>
-                            <td>${dtPaid}</td>
-                            <td>${statusHtml}</td>
-                            <td>${payDelayHtml}</td>
-                        </tr>
-                    `);
-                });
-            } else {
-                movementsTbody.append(`
-                    <tr>
-                        <td colspan="6">Nenhuma movimentação encontrada</td>
-                    </tr>
-                `);
+            if (data.movimentacoes && Array.isArray(data.movimentacoes)) {
+                movimentacoesData = data.movimentacoes;
+                currentPage = 1;
+                renderMovimentacoes();
             }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    // Carregar inicial
-    const initialStatus = $('#movStatusFilter').val() || '';
-    updateDashboard($('#datePicker').val(), initialStatus);
+    // Função para renderizar a tabela de movimentações com paginação
+    function renderMovimentacoes() {
+        const tableBody = $('#movimentacoesTableBody');
+        tableBody.empty();
 
-    // Mudar data
+        itemsPerPage = parseInt($('#itemsPerPage').val(), 10);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const pageItems = movimentacoesData.slice(startIndex, endIndex);
+
+        pageItems.forEach(item => {
+            tableBody.append(`
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.descricao}</td>
+                    <td>${new Date(item.data).toLocaleString()}</td>
+                </tr>
+            `);
+        });
+
+        renderPaginationControls();
+    }
+
+    // Função para renderizar os controles de paginação
+    function renderPaginationControls() {
+        const paginationControls = $('#paginationControls');
+        paginationControls.empty();
+
+        const totalPages = Math.ceil(movimentacoesData.length / itemsPerPage);
+        // Botão Página Anterior
+        const prevClass = currentPage === 1 ? 'disabled' : '';
+        paginationControls.append(`
+            <li class="page-item ${prevClass}">
+                <a class="page-link" href="#" data-page="${currentPage - 1}">Anterior</a>
+            </li>
+        `);
+        // Botões de cada página
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = currentPage === i ? 'active' : '';
+            paginationControls.append(`
+                <li class="page-item ${activeClass}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `);
+        }
+        // Botão Próximo
+        const nextClass = currentPage === totalPages ? 'disabled' : '';
+        paginationControls.append(`
+            <li class="page-item ${nextClass}">
+                <a class="page-link" href="#" data-page="${currentPage + 1}">Próximo</a>
+            </li>
+        `);
+    }
+
+    // Eventos para os controles de paginação e filtro
+    $('#paginationControls').on('click', 'a.page-link', function (e) {
+        e.preventDefault();
+        const selectedPage = parseInt($(this).data('page'), 10);
+        const totalPages = Math.ceil(movimentacoesData.length / itemsPerPage);
+        if (selectedPage >= 1 && selectedPage <= totalPages) {
+            currentPage = selectedPage;
+            renderMovimentacoes();
+        }
+    });
+
+    $('#itemsPerPage').on('change', function () {
+        currentPage = 1;
+        renderMovimentacoes();
+    });
+
+    // (A) Atualiza ao carregar
+    updateDashboard($('#datePicker').val());
+
+    // (B) Atualiza ao mudar a data
     $('#datePicker').on('change', function () {
-        const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard($(this).val(), movStatus);
+        updateDashboard($(this).val());
     });
 
-    // Mudar status
-    $('#movStatusFilter').on('change', function () {
-        const date = $('#datePicker').val();
-        const movStatus = $(this).val() || '';
-        updateDashboard(date, movStatus);
-    });
-
-    // Toggle de seções no sidebar
+    // (C) Troca de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
-
-        $('#statsSection').addClass('d-none');
-        $('#rankingSimplesSection').addClass('d-none');
-        $('#rankingDetalhadoSection').addClass('d-none');
-        $('#statsDetailedSection').addClass('d-none');
-
+        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #movimentacoesSection').addClass('d-none');
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hamburguer -> recolhe/expande
+    // (D) Botão hambúrguer -> recolhe/expande sidebar + main
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
