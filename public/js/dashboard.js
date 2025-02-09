@@ -5,10 +5,6 @@ $(document).ready(function () {
 
     let salesChart;
     let lineComparisonChart;
-    // Variáveis para paginação dos últimos movimentos
-    let currentMovPage = 1;
-    let currentMovPageSize = 10;
-    let currentMovStatus = ""; // "" para todos; "pending" ou "paid" para filtrar
 
     //------------------------------------------------------------
     // 1) PLUGIN para pintar o background do gráfico
@@ -30,11 +26,15 @@ $(document).ready(function () {
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
+
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
-        if (themeBtn.length) themeBtn.text('☀');
+        if (themeBtn.length) {
+            themeBtn.text('☀');
+        }
     }
+
     themeBtn.on('click', function () {
         if (body.hasClass('dark-mode')) {
             body.removeClass('dark-mode');
@@ -64,7 +64,7 @@ $(document).ready(function () {
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
-            gridColor: isDark ? '#555' : '#ccc'
+            gridColor: isDark ? '#555' : '#ccc',
         };
     }
 
@@ -80,20 +80,40 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    // Função para formatar uma duração em ms -> "Xm Ys"
     //------------------------------------------------------------
-    async function updateDashboard(date) {
+    function formatDuration(ms) {
+        if (ms <= 0) return '0s';
+        const totalSec = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSec / 60);
+        const seconds = totalSec % 60;
+        return `${minutes}m ${seconds}s`;
+    }
+
+    //------------------------------------------------------------
+    // FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    //------------------------------------------------------------
+    async function updateDashboard(date, movStatus) {
         try {
-            const response = await fetch(`/api/bots-stats?date=${date}`);
+            let url = `/api/bots-stats?date=${date}`;
+            if (movStatus) {
+                url += `&movStatus=${movStatus}`;
+            }
+
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
 
-            // Atualiza estatísticas gerais
+            // Estatísticas do Dia
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
+
+            // Tempo médio de pagamento
+            const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
+            $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
             //--------------------------------------------------
             // GRÁFICO DE BARRAS
@@ -103,21 +123,28 @@ $(document).ready(function () {
                 datasets: [
                     {
                         label: 'Quantidade',
+                        // Alteramos a segunda cor para vermelho
                         data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#4BC0C0']
-                    }
-                ]
+                        backgroundColor: ['#36A2EB', '#FF0000']
+                    },
+                ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
+
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
                     data: barData,
                     options: {
                         responsive: true,
-                        scales: { y: { beginAtZero: true }, x: {} },
-                        plugins: { chartBackground: {} }
-                    }
+                        scales: {
+                            y: { beginAtZero: true },
+                            x: {}
+                        },
+                        plugins: {
+                            chartBackground: {},
+                        },
+                    },
                 });
             } else {
                 salesChart.data = barData;
@@ -126,51 +153,55 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (Últimos 7 dias – Valor Convertido)
+            // GRÁFICO DE LINHA (7 dias)
             //--------------------------------------------------
-            let lineData;
-            if (data.stats7Days && data.stats7Days.length > 0) {
-                // Extrai os labels e os valores do total de vendas convertidas
-                const labels = data.stats7Days.map(item => item.date);
-                const totalVendasConvertidas = data.stats7Days.map(item => item.totalVendasConvertidas);
-                lineData = {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Valor Convertido (R$) - Últimos 7 dias',
-                            data: totalVendasConvertidas,
-                            fill: false,
-                            borderColor: '#ff5c5c',
-                            pointBackgroundColor: '#ff5c5c',
-                            pointHoverRadius: 7,
-                            tension: 0.2
-                        }
-                    ]
-                };
-            } else {
-                lineData = {
-                    labels: ['Ontem', 'Hoje'],
-                    datasets: [
-                        {
-                            label: 'Valor Convertido (R$)',
-                            data: [data.statsYesterday.totalVendasConvertidas, data.statsAll.totalVendasConvertidas],
-                            fill: false,
-                            borderColor: '#ff5c5c',
-                            pointBackgroundColor: '#ff5c5c',
-                            pointHoverRadius: 7,
-                            tension: 0.2
-                        }
-                    ]
-                };
-            }
+            const lineLabels = data.stats7Days.map(item => {
+                const parts = item.date.split('-');
+                const day = parts[2];
+                const year = parts[0];
+                return day + '/' + year;
+            });
+
+            const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
+            const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
+
+            const lineData = {
+                labels: lineLabels,
+                datasets: [
+                    {
+                        label: 'Valor Convertido (R$)',
+                        data: convertedValues,
+                        fill: false,
+                        borderColor: '#ff5c5c',
+                        pointBackgroundColor: '#ff5c5c',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone'
+                    },
+                    {
+                        label: 'Valor Gerado (R$)',
+                        data: generatedValues,
+                        fill: false,
+                        borderColor: '#36A2EB',
+                        pointBackgroundColor: '#36A2EB',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone'
+                    }
+                ],
+            };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
                     data: lineData,
                     options: {
                         responsive: true,
-                        scales: { y: { beginAtZero: false }, x: {} },
+                        scales: {
+                            y: { beginAtZero: false },
+                            x: {}
+                        },
                         plugins: {
                             chartBackground: {},
                             tooltip: {
@@ -178,11 +209,11 @@ $(document).ready(function () {
                                     label: function (context) {
                                         const value = context.parsed.y || 0;
                                         return `R$ ${value.toFixed(2)}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                    },
+                                },
+                            },
+                        },
+                    },
                 });
             } else {
                 lineComparisonChart.data = lineData;
@@ -191,7 +222,7 @@ $(document).ready(function () {
             lineComparisonChart.update();
 
             //--------------------------------------------------
-            // Atualiza Ranking e Dashboard Detalhado
+            // RANKING SIMPLES
             //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
@@ -205,6 +236,10 @@ $(document).ready(function () {
                     `);
                 });
             }
+
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -226,125 +261,159 @@ $(document).ready(function () {
                 });
             }
 
-            // Atualiza os cards de estatísticas
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS
+            //--------------------------------------------------
+            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
-            $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
-            $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
+            $('#cardAllConversionRateDetailed').text(
+                data.statsAll.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardAllTotalVolume').text(
+                'R$ ' + data.statsAll.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardAllTotalPaidVolume').text(
+                'R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2)
+            );
+
+            // statsMain
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
-            $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
-            $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
+            $('#cardMainConversionRateDetailed').text(
+                data.statsMain.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardMainTotalVolume').text(
+                'R$ ' + data.statsMain.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardMainTotalPaidVolume').text(
+                'R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2)
+            );
+
+            // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
-            $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
+            $('#cardNotPurchasedPaymentsConfirmed').text(
+                data.statsNotPurchased.totalPurchases
+            );
+            $('#cardNotPurchasedConversionRateDetailed').text(
+                data.statsNotPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardNotPurchasedTotalVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardNotPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2)
+            );
+
+            // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
-            $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
-            $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
-            $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
+            $('#cardPurchasedPaymentsConfirmed').text(
+                data.statsPurchased.totalPurchases
+            );
+            $('#cardPurchasedConversionRateDetailed').text(
+                data.statsPurchased.conversionRate.toFixed(2) + '%'
+            );
+            $('#cardPurchasedTotalVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2)
+            );
+            $('#cardPurchasedTotalPaidVolume').text(
+                'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
+            );
+
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES
+            //--------------------------------------------------
+            const movementsTbody = $('#lastMovementsBody');
+            movementsTbody.empty();
+            if (data.lastMovements && data.lastMovements.length > 0) {
+                data.lastMovements.forEach((mov) => {
+                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
+
+                    // Format data/hora gerado
+                    let dtGen = mov.pixGeneratedAt
+                        ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
+                        : '';
+
+                    // Format data/hora pago
+                    let dtPaid = mov.purchasedAt
+                        ? new Date(mov.purchasedAt).toLocaleString('pt-BR')
+                        : '—';
+
+                    // Status
+                    let statusHtml = '';
+                    if (mov.status === 'paid') {
+                        statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
+                    } else if (mov.status === 'pending') {
+                        statusHtml = '<span style="font-weight:bold; color:#ff9900;">Pending</span>';
+                    } else {
+                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+                    }
+
+                    // Tempo p/ pagar
+                    let payDelayHtml = '—';
+                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                        const diffMs = new Date(mov.purchasedAt).getTime() - new Date(mov.pixGeneratedAt).getTime();
+                        if (diffMs >= 0) {
+                            payDelayHtml = formatDuration(diffMs);
+                        }
+                    }
+
+                    movementsTbody.append(`
+                        <tr>
+                            <td>${leadId}</td>
+                            <td>R$ ${mov.planValue.toFixed(2)}</td>
+                            <td>${dtGen}</td>
+                            <td>${dtPaid}</td>
+                            <td>${statusHtml}</td>
+                            <td>${payDelayHtml}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                movementsTbody.append(`
+                    <tr>
+                        <td colspan="6">Nenhuma movimentação encontrada</td>
+                    </tr>
+                `);
+            }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    //------------------------------------------------------------
-    // NOVA FUNÇÃO: Atualiza a Tabela de Últimas Movimentações com Paginação
-    //------------------------------------------------------------
-    async function updateLastMovements() {
-        try {
-            const params = new URLSearchParams();
-            params.append('page', currentMovPage);
-            params.append('pageSize', currentMovPageSize);
-            if (currentMovStatus) {
-                params.append('status', currentMovStatus);
-            }
-            const response = await fetch(`/api/last-movements?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error('Erro ao obter movimentações');
-            }
-            const data = await response.json();
-            const items = data.items;
-            const total = data.total;
-            const tbody = $('#lastMovementsBody');
-            tbody.empty();
-            items.forEach(item => {
-                tbody.append(`
-                    <tr>
-                        <td>${item.telegramId || ''}</td>
-                        <td>${item.valor}</td>
-                        <td>${item.geradoEm}</td>
-                        <td>${item.pagoEm}</td>
-                        <td>${item.status}</td>
-                        <td>${item.tempoParaPagar}</td>
-                    </tr>
-                `);
-            });
-            renderPagination(total, currentMovPage, currentMovPageSize);
-        } catch (err) {
-            console.error('Erro ao atualizar movimentações:', err);
-        }
-    }
+    // Carregar inicial
+    const initialStatus = $('#movStatusFilter').val() || '';
+    updateDashboard($('#datePicker').val(), initialStatus);
 
-    function renderPagination(totalItems, currentPage, pageSize) {
-        const totalPages = Math.ceil(totalItems / pageSize);
-        const paginationContainer = $('#lastMovementsPagination');
-        paginationContainer.empty();
-        if (totalPages <= 1) return;
-        const prevClass = currentPage === 1 ? 'disabled' : '';
-        paginationContainer.append(`<li class="page-item ${prevClass}"><a class="page-link" href="#" data-page="${currentPage - 1}">Anterior</a></li>`);
-        for (let i = 1; i <= totalPages; i++) {
-            const activeClass = currentPage === i ? 'active' : '';
-            paginationContainer.append(`<li class="page-item ${activeClass}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`);
-        }
-        const nextClass = currentPage === totalPages ? 'disabled' : '';
-        paginationContainer.append(`<li class="page-item ${nextClass}"><a class="page-link" href="#" data-page="${currentPage + 1}">Próximo</a></li>`);
-    }
-
-    // Event listeners para paginação e filtros
-    $(document).on('click', '#lastMovementsPagination a.page-link', function (e) {
-        e.preventDefault();
-        const page = parseInt($(this).data('page'));
-        if (!isNaN(page) && page >= 1) {
-            currentMovPage = page;
-            updateLastMovements();
-        }
-    });
-
-    $('#movPageSize').on('change', function () {
-        currentMovPageSize = parseInt($(this).val());
-        currentMovPage = 1;
-        updateLastMovements();
-    });
-
-    $('#movStatusFilter').on('change', function () {
-        currentMovStatus = $(this).val();
-        currentMovPage = 1;
-        updateLastMovements();
-    });
-
-    // Atualizações iniciais
-    updateDashboard($('#datePicker').val());
-    updateLastMovements();
-
+    // Mudar data
     $('#datePicker').on('change', function () {
-        updateDashboard($(this).val());
-        updateLastMovements();
+        const movStatus = $('#movStatusFilter').val() || '';
+        updateDashboard($(this).val(), movStatus);
     });
 
+    // Mudar status
+    $('#movStatusFilter').on('change', function () {
+        const date = $('#datePicker').val();
+        const movStatus = $(this).val() || '';
+        updateDashboard(date, movStatus);
+    });
+
+    // Toggle de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
-        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection').addClass('d-none');
+
+        $('#statsSection').addClass('d-none');
+        $('#rankingSimplesSection').addClass('d-none');
+        $('#rankingDetalhadoSection').addClass('d-none');
+        $('#statsDetailedSection').addClass('d-none');
+
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
     });
 
+    // Botão hamburguer -> recolhe/expande
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');

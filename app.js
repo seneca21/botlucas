@@ -19,8 +19,12 @@ function checkIP(req, res, next) {
         "54.175.230.252",
         "54.173.229.200"
     ];
+
     const forwarded = req.headers['x-forwarded-for'];
-    let clientIp = forwarded ? forwarded.split(',')[0].trim() : req.ip;
+    let clientIp = forwarded
+        ? forwarded.split(',')[0].trim()
+        : req.ip;
+
     clientIp = clientIp.replace('::ffff:', '');
     if (allowedIPs.includes(clientIp)) {
         next();
@@ -92,6 +96,7 @@ app.post('/login', (req, res) => {
     const { username, password } = req.body;
     const ADMIN_USER = 'pfjru';
     const ADMIN_PASS = 'oppushin1234';
+
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         req.session.loggedIn = true;
         logger.info(`✅ Usuário ${username} logou com sucesso.`);
@@ -130,6 +135,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     if (originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
+
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -139,29 +145,87 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         });
         userIdsWithCondition = condPurchases.map((p) => p.userId);
     }
+
+    // Contagem de usuários
     let totalUsers;
     if (!originCondition) {
         totalUsers = await User.count({
-            where: { lastInteraction: { [Op.between]: [startDate, endDate] } }
+            where: {
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+            },
         });
     } else {
         totalUsers = await User.count({
             where: {
                 id: { [Op.in]: userIdsWithCondition },
-                lastInteraction: { [Op.between]: [startDate, endDate] }
-            }
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+            },
         });
     }
+
+    // Compras + taxa de conversão
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
-    const totalVendasGeradas = (await Purchase.sum('planValue', { where: purchaseWhere })) || 0;
-    const totalVendasConvertidas = totalVendasGeradas;
+
+    // Valor gerado x convertido
+    let totalVendasGeradas = (await Purchase.sum('planValue', {
+        where: purchaseWhere
+    })) || 0;
+    let totalVendasConvertidas = totalVendasGeradas;
+
+    const generatedWhere = {
+        pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+        status: { [Op.in]: ['pending', 'paid'] }
+    };
+    if (originCondition) {
+        generatedWhere.originCondition = originCondition;
+    }
+    const sumGerado = (await Purchase.sum('planValue', { where: generatedWhere })) || 0;
+
+    const convertedWhere = {
+        purchasedAt: { [Op.between]: [startDate, endDate] },
+        status: 'paid'
+    };
+    if (originCondition) {
+        convertedWhere.originCondition = originCondition;
+    }
+    const sumConvertido = (await Purchase.sum('planValue', { where: convertedWhere })) || 0;
+
+    totalVendasGeradas = sumGerado;
+    totalVendasConvertidas = sumConvertido;
+
+    // Tempo médio de pagamento (para paid)
+    const paidPurchases = await Purchase.findAll({
+        where: {
+            status: 'paid',
+            purchasedAt: { [Op.between]: [startDate, endDate] },
+            ...(originCondition && { originCondition })
+        },
+        attributes: ['pixGeneratedAt', 'purchasedAt']
+    });
+    let sumDiffMs = 0;
+    let countPaid = 0;
+    for (const p of paidPurchases) {
+        if (p.pixGeneratedAt && p.purchasedAt) {
+            const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+            if (diff >= 0) {
+                sumDiffMs += diff;
+                countPaid++;
+            }
+        }
+    }
+    let averagePaymentDelayMs = 0;
+    if (countPaid > 0) {
+        averagePaymentDelayMs = Math.round(sumDiffMs / countPaid);
+    }
+
     return {
         totalUsers,
         totalPurchases,
         conversionRate,
         totalVendasGeradas,
-        totalVendasConvertidas
+        totalVendasConvertidas,
+        averagePaymentDelayMs
     };
 }
 
@@ -172,18 +236,23 @@ function makeDay(date) {
 }
 
 //------------------------------------------------------
-// Endpoint: /api/bots-stats
+// /api/bots-stats
+// Agora com checkAuth e checkIP, e usando movStatus
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
+        // Desestruturamos data e movStatus do query
         const { date, movStatus } = req.query;
+
         const selectedDate = date ? new Date(date) : new Date();
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
+        // statsAll
         const statsAll = await getDetailedStats(startDate, endDate, null);
 
+        // statsYesterday
         const yesterday = new Date(startDate);
         yesterday.setDate(yesterday.getDate() - 1);
         const startYesterday = makeDay(yesterday);
@@ -191,44 +260,55 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         endYesterday.setHours(23, 59, 59, 999);
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
 
+        // statsMain, statsNotPurchased, statsPurchased
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
+        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas']
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
             ],
-            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+            },
             group: ['botName'],
-            order: [[Sequelize.literal('"vendas"'), 'DESC']]
+            order: [[Sequelize.literal('"vendas"'), 'DESC']],
         });
-        const botRanking = botRankingRaw.map(item => ({
+        const botRanking = botRankingRaw.map((item) => ({
             botName: item.botName,
-            vendas: parseInt(item.getDataValue('vendas'), 10) || 0
+            vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
+        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue']
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
             ],
-            where: { purchasedAt: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
-            group: ['botName']
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
+            group: ['botName'],
         });
 
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers']
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
             ],
-            where: { lastInteraction: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
-            group: ['botName']
+            where: {
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
+            group: ['botName'],
         });
         const botUsersMap = {};
-        botsWithInteractions.forEach(item => {
+        botsWithInteractions.forEach((item) => {
             const bName = item.botName;
             const uCount = parseInt(item.getDataValue('totalUsers'), 10) || 0;
             botUsersMap[bName] = uCount;
@@ -239,18 +319,18 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
                 'botName',
                 'planName',
                 [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue']
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue'],
             ],
             where: {
                 purchasedAt: { [Op.between]: [startDate, endDate] },
                 planName: { [Op.ne]: null },
-                botName: { [Op.ne]: null }
+                botName: { [Op.ne]: null },
             },
             group: ['botName', 'planName'],
-            order: [[Sequelize.literal('"salesCount"'), 'DESC']]
+            order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
         const botPlansMap = {};
-        planSalesByBot.forEach(row => {
+        planSalesByBot.forEach((row) => {
             const bName = row.botName;
             const pName = row.planName;
             const sCount = parseInt(row.getDataValue('salesCount'), 10) || 0;
@@ -260,23 +340,30 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         });
 
         const botDetails = [];
-        botsWithPurchases.forEach(bot => {
+        botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
-            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
-            const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
+            const totalPurchasesBot =
+                parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalValueBot =
+                parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-            const conversionRateBot = totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
-            const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+            const conversionRateBot =
+                totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
+            const averageValueBot =
+                totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
-                const planConvRate = totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
+                const planConvRate =
+                    totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
                 plansArray.push({
                     planName,
                     salesCount: info.salesCount,
-                    conversionRate: planConvRate
+                    conversionRate: planConvRate,
                 });
             }
+
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -284,12 +371,12 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
                 totalUsers: totalUsersBot,
                 conversionRate: conversionRateBot,
                 averageValue: averageValueBot,
-                plans: plansArray
+                plans: plansArray,
             });
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Estatísticas dos últimos 7 dias
+        // 7 dias
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -297,6 +384,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
+
             const dayStat = await getDetailedStats(dayStart, dayEnd, null);
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
@@ -305,7 +393,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // Movimentações (últimas)
+        // Movimentações
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
@@ -314,6 +402,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         } else if (movStatus === 'paid') {
             lastMovementsWhere.status = 'paid';
         }
+
         const lastMovements = await Purchase.findAll({
             attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
@@ -338,80 +427,17 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             stats7Days,
             lastMovements
         });
+
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
 
-//------------------------------------------------------
-// Novo endpoint: /api/last-movements (com paginação)
-//------------------------------------------------------
-app.get('/api/last-movements', checkAuth, checkIP, async (req, res) => {
-    try {
-        const { page = 1, pageSize = 10, status, date } = req.query;
-        const pageInt = parseInt(page, 10);
-        const pageSizeInt = parseInt(pageSize, 10);
-
-        let startDate, endDate;
-        if (date) {
-            const selectedDate = new Date(date);
-            startDate = new Date(selectedDate);
-            startDate.setHours(0, 0, 0, 0);
-            endDate = new Date(startDate);
-            endDate.setHours(23, 59, 59, 999);
-        } else {
-            const today = new Date();
-            startDate = new Date(today);
-            startDate.setHours(0, 0, 0, 0);
-            endDate = new Date(today);
-            endDate.setHours(23, 59, 59, 999);
-        }
-
-        const whereClause = {
-            pixGeneratedAt: { [Op.between]: [startDate, endDate] }
-        };
-        if (status) {
-            whereClause.status = status;
-        }
-
-        const total = await Purchase.count({ where: whereClause });
-        const items = await Purchase.findAll({
-            where: whereClause,
-            order: [['pixGeneratedAt', 'DESC']],
-            limit: pageSizeInt,
-            offset: (pageInt - 1) * pageSizeInt,
-            include: [
-                {
-                    model: User,
-                    attributes: ['telegramId']
-                }
-            ]
-        });
-        const transformed = items.map(item => ({
-            telegramId: item.User ? item.User.telegramId : '',
-            valor: item.planValue,
-            geradoEm: item.pixGeneratedAt,
-            pagoEm: item.purchasedAt,
-            status: item.status,
-            tempoParaPagar: item.tempoParaPagar
-        }));
-        res.json({
-            items: transformed,
-            total
-        });
-    } catch (error) {
-        logger.error('Erro ao obter movimentações:', error);
-        res.status(500).json({ error: 'Erro ao obter movimentações' });
-    }
-});
-
-//------------------------------------------------------
 // Inicializa o bot
-//------------------------------------------------------
 require('./services/bot.service.js');
 
-// Sobe o servidor
+// Sobe servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
