@@ -81,7 +81,6 @@ $(document).ready(function () {
 
     //------------------------------------------------------------
     // Função para formatar uma duração em ms -> "Xm Ys"
-    // Ignoramos horas. Se passou de 60 min, aparecerá algo tipo 122m 30s.
     //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
@@ -92,7 +91,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    // FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
     //------------------------------------------------------------
     async function updateDashboard(date, movStatus) {
         try {
@@ -112,7 +111,7 @@ $(document).ready(function () {
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
-            // ============ Tempo médio de pagamento em minutos/segundos ============
+            // Tempo médio de pagamento
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
@@ -124,8 +123,9 @@ $(document).ready(function () {
                 datasets: [
                     {
                         label: 'Quantidade',
+                        // Alteramos a segunda cor para vermelho
                         data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#4BC0C0'],
+                        backgroundColor: ['#36A2EB', '#FF0000']
                     },
                 ],
             };

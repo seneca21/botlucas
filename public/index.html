@@ -7,6 +7,15 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/style.css" />
+    <style>
+        /* CSS extra para deixar as estatísticas em branco e negrito */
+        .stats-display {
+            color: #fff !important;
+            /* cor branca */
+            font-weight: 700;
+            /* negrito */
+        }
+    </style>
 </head>
 
 <body>
@@ -79,8 +88,8 @@
                             <div class="card shadow-sm">
                                 <div class="card-body">
                                     <h5 class="card-title">Usuários Ativos</h5>
-                                    <!-- texto branco e negrito -->
-                                    <p class="card-text display-4 text-white font-weight-bold" id="totalUsers">0</p>
+                                    <!-- Adicionamos stats-display -->
+                                    <p class="card-text display-4 stats-display" id="totalUsers">0</p>
                                 </div>
                             </div>
                         </div>
@@ -90,8 +99,7 @@
                             <div class="card shadow-sm">
                                 <div class="card-body">
                                     <h5 class="card-title">Total de Compras</h5>
-                                    <!-- texto branco e negrito -->
-                                    <p class="card-text display-4 text-white font-weight-bold" id="totalPurchases">0</p>
+                                    <p class="card-text display-4 stats-display" id="totalPurchases">0</p>
                                 </div>
                             </div>
                         </div>
@@ -101,9 +109,7 @@
                             <div class="card shadow-sm">
                                 <div class="card-body">
                                     <h5 class="card-title">Taxa de Conversão</h5>
-                                    <!-- texto branco e negrito -->
-                                    <p class="card-text display-4 text-white font-weight-bold" id="conversionRate">0%
-                                    </p>
+                                    <p class="card-text display-4 stats-display" id="conversionRate">0%</p>
                                 </div>
                             </div>
                         </div>
@@ -113,9 +119,7 @@
                             <div class="card shadow-sm">
                                 <div class="card-body">
                                     <h5 class="card-title">Tempo médio de pagamento</h5>
-                                    <!-- texto branco e negrito -->
-                                    <p class="card-text display-4 text-white font-weight-bold" id="avgPaymentTimeText">
-                                        0s</p>
+                                    <p class="card-text display-4 stats-display" id="avgPaymentTimeText">0s</p>
                                 </div>
                             </div>
                         </div>
