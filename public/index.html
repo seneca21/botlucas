@@ -11,7 +11,6 @@
         /* CSS extra para deixar as estatísticas em branco e negrito */
         .stats-display {
             color: #fff !important;
-            /* cor branca */
             font-weight: 700;
             /* negrito */
         }
@@ -71,30 +70,41 @@
             <div class="py-3">
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
-                <!-- Data -->
+                <!-- Data + Filtro de Bots -->
                 <div class="form-group">
                     <label for="datePicker">Selecione a Data:</label>
                     <input type="date" id="datePicker" class="form-control" value="" />
+                </div>
+
+                <!-- 
+                     MULTISELECT de bots
+                     Substitua as options pelos bots reais do seu config.json
+                     Ex: @Testexota_bot, @Senecagay_bot...
+                -->
+                <div class="form-group">
+                    <label for="botFilter">Bots (selecione 1 ou vários):</label>
+                    <select id="botFilter" multiple class="form-control">
+                        <option value="all" selected>TODOS</option>
+                        <option value="@Testexota_bot">@Testexota_bot</option>
+                        <option value="@Senecagay_bot">@Senecagay_bot</option>
+                        <!-- Adicione mais se tiver -->
+                    </select>
                 </div>
 
                 <!-- SEÇÃO 1: Estatísticas do Dia -->
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
 
-                    <!-- Nova row com 4 colunas (cards) lado a lado -->
+                    <!-- row com 4 colunas (cards) -->
                     <div class="row text-center">
-                        <!-- COL 1: Usuários Ativos -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
                                     <h5 class="card-title">Usuários Ativos</h5>
-                                    <!-- Adicionamos stats-display -->
                                     <p class="card-text display-4 stats-display" id="totalUsers">0</p>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 2: Total de Compras -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -103,8 +113,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 3: Taxa de Conversão -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -113,8 +121,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 4: Tempo médio de pagamento -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -131,7 +137,6 @@
                             <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
-
                         <div class="col-md-6">
                             <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
@@ -175,8 +180,6 @@
                         </thead>
                         <tbody id="lastMovementsBody"></tbody>
                     </table>
-
-                    <!-- Container de paginação (botões de página) -->
                     <div id="paginationContainer" class="mt-2"></div>
                 </section>
 

@@ -6,15 +6,28 @@ $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
 
-    // -----------------------------------------------------------
     // Variáveis de estado para paginação e filtro
-    // -----------------------------------------------------------
-    let currentPage = 1;            // Página atual (inicialmente 1)
-    let currentPerPage = 10;        // Quantas mov. exibir por página
-    let totalMovementsCount = 0;    // Recebemos do back-end
-    let totalPages = 1;            // Calculado
+    let currentPage = 1;           // Página atual (inicialmente 1)
+    let currentPerPage = 10;       // Quantas movs por página
+    let totalMovementsCount = 0;   // Para calcular paginação
+    let totalPages = 1;
 
-    //------------------------------------------------------------
+    // Função para capturar bots selecionados
+    // Se user escolher "all" ou não escolher nada => ''
+    function getSelectedBotsParam() {
+        const values = $('#botFilter').val(); // array de bots, ex. ["all", "@BotA", ...]
+        if (!values || values.length === 0) {
+            // Nenhum bot selecionado => consideramos "all"
+            return '';
+        }
+        if (values.includes('all')) {
+            return '';
+        }
+        // Caso contrário, retornamos string CSV
+        return values.join(',');
+    }
+
+    // -----------------------------------------------------------
     // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
@@ -99,19 +112,15 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Renderiza o "rodapé" de paginação das últimas movs
+    // Renderiza "rodapé" de paginação
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
-        // Ex: total = 35, perPage = 10 => totalPages = 4
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
         paginationContainer.empty();
 
-        // Se só houver 1 página, não exibe nada
         if (totalPages <= 1) return;
 
-        // Construção simples: Botões de página 1,2,3...
-        // (poderíamos melhorar para exibir menos botões caso haja muitas páginas)
         for (let p = 1; p <= totalPages; p++) {
             const btn = $(`<button class="btn btn-sm btn-outline-primary ml-1 ${p === page ? 'active' : ''}">${p}</button>`);
             btn.on('click', function () {
@@ -123,15 +132,19 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função principal para puxar /api/bots-stats e desenhar
+    // Função principal: Puxa /api/bots-stats e atualiza
     //------------------------------------------------------------
-    async function updateDashboard(date, movStatus, page, perPage) {
+    async function updateDashboard(date, movStatus, page, perPage, botsParam) {
         try {
             let url = `/api/bots-stats?date=${date}`;
             if (movStatus) {
                 url += `&movStatus=${movStatus}`;
             }
             url += `&page=${page}&perPage=${perPage}`;
+
+            if (botsParam) {
+                url += `&bots=${encodeURIComponent(botsParam)}`;
+            }
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -156,7 +169,6 @@ $(document).ready(function () {
                 datasets: [
                     {
                         label: 'Quantidade',
-                        // Alteramos a segunda cor para vermelho
                         data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
                         backgroundColor: ['#36A2EB', '#FF0000']
                     },
@@ -268,6 +280,12 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                botRankingTbody.append(`
+                    <tr>
+                        <td colspan="2">Nenhum resultado</td>
+                    </tr>
+                `);
             }
 
             //--------------------------------------------------
@@ -292,6 +310,12 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                detailsTbody.append(`
+                    <tr>
+                        <td colspan="6">Nenhum resultado</td>
+                    </tr>
+                `);
             }
 
             //--------------------------------------------------
@@ -413,12 +437,13 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para "forçar" o refresh, lendo os filtros e chamando update
+    // refreshDashboard => refaz a chamada c/ todos filtros
     //------------------------------------------------------------
     function refreshDashboard() {
         const date = $('#datePicker').val();
         const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard(date, movStatus, currentPage, currentPerPage);
+        const botsParam = getSelectedBotsParam();
+        updateDashboard(date, movStatus, currentPage, currentPerPage, botsParam);
     }
 
     // Carregar inicial
@@ -426,20 +451,26 @@ $(document).ready(function () {
 
     // Mudar data
     $('#datePicker').on('change', function () {
-        currentPage = 1; // reset para primeira página
+        currentPage = 1;
         refreshDashboard();
     });
 
     // Mudar status
     $('#movStatusFilter').on('change', function () {
-        currentPage = 1; // reset para primeira página
+        currentPage = 1;
+        refreshDashboard();
+    });
+
+    // Mudar bots
+    $('#botFilter').on('change', function () {
+        currentPage = 1;
         refreshDashboard();
     });
 
     // Mudar "quantas por página"
     $('#movPerPage').on('change', function () {
         currentPerPage = parseInt($(this).val(), 10);
-        currentPage = 1; // volta pra página 1
+        currentPage = 1;
         refreshDashboard();
     });
 
