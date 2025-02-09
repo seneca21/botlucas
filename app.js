@@ -52,7 +52,7 @@ db.sequelize
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
-    // Página de login sofisticada, com fundo cinza, formulário centralizado e "olho" para mostrar/esconder senha
+    // Página de login sofisticada com fundo cinza, formulário centralizado e "olho" para alternar senha
     const html = `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -110,13 +110,11 @@ app.get('/login', (req, res) => {
         </form>
       </div>
       <script>
-        // Alterna a visibilidade da senha
         document.getElementById('togglePassword').addEventListener('click', function () {
           const passwordInput = document.getElementById('password');
           const currentType = passwordInput.getAttribute('type');
           const newType = currentType === 'password' ? 'text' : 'password';
           passwordInput.setAttribute('type', newType);
-          // Alterar o ícone se desejar; aqui mantemos o mesmo emoji
         });
       </script>
     </body>
@@ -181,7 +179,7 @@ function makeDay(date) {
 }
 
 async function getDetailedStats(startDate, endDate, originCondition, botFilters) {
-    // "botFilters" é um array, ex: ["@Bot1", "@Bot2"] ou ["All"].
+    // "botFilters" é um array, ex: ["@Bot1", "@Bot2"] ou ["All"]
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
