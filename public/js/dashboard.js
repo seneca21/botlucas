@@ -7,18 +7,18 @@ $(document).ready(function () {
     let lineComparisonChart;
 
     // -----------------------------------------------------------
-    // Estado de paginação e filtros
+    // Variáveis de estado para paginação e filtro
     // -----------------------------------------------------------
     let currentPage = 1;
     let currentPerPage = 10;
     let totalMovementsCount = 0;
     let totalPages = 1;
 
-    // Agora, botFilter é um array (strings). Vamos passar para o back-end como "botA,botB"
-    let currentBotFilterArray = [];
+    // Armazenamos os bots selecionados num array
+    let botsSelected = ['All'];
 
     //------------------------------------------------------------
-    // 1) PLUGIN chartBackground
+    // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -37,8 +37,8 @@ $(document).ready(function () {
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
-    const savedTheme = localStorage.getItem('theme');
 
+    const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
         if (themeBtn.length) {
@@ -91,7 +91,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para formatar duração (ms-> X m Y s)
+    // Função para formatar uma duração em ms -> "Xm Ys"
     //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
@@ -102,7 +102,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função de paginação
+    // Renderiza paginação (3 botões + setas)
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
@@ -137,7 +137,7 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // Janela de 3 páginas
+        // Janela de 3
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -191,7 +191,8 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Carregar lista de bots
+    // Carregar lista de bots dinamicamente
+    // (select multiple)
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
@@ -199,10 +200,11 @@ $(document).ready(function () {
             .then(botNames => {
                 const botSelect = $('#botFilter');
                 botSelect.empty();
-                // Agora não tem "All" pois iremos permitir multi. 
-                // Se user não selecionar nada => "All"
+                // Adicionamos "All" sempre no topo
+                botSelect.append(`<option value="All" selected>All</option>`);
 
                 botNames.forEach(name => {
+                    // Se o array original for 'All', nenhum outro item está "selected" no load
                     botSelect.append(`<option value="${name}">${name}</option>`);
                 });
             })
@@ -210,36 +212,58 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função principal: chama /api/bots-stats
+    // Coleta os bots selecionados
     //------------------------------------------------------------
-    async function updateDashboard(date, movStatus, page, perPage, botFilterArray) {
+    function getSelectedBots() {
+        const selectedValues = $('#botFilter').val() || [];
+        // Se for nulo, consideramos []
+        return selectedValues;
+    }
+
+    //------------------------------------------------------------
+    // Função principal: /api/bots-stats => param "botsSelected"
+    //------------------------------------------------------------
+    async function updateDashboard(date, movStatus, page, perPage, botsArray) {
         try {
-            // Ex: botFilterArray = ["@BotUm","@BotDois"]
-            // Montamos query: botFilter=@BotUm,@BotDois
-            let botFilterQuery = '';
-            if (botFilterArray && botFilterArray.length > 0) {
-                botFilterQuery = botFilterArray.join(',');
+            // Montamos CSV ou "All"
+            let botsParam = 'All';
+            if (botsArray.length === 1 && botsArray[0] === 'All') {
+                botsParam = 'All';
+            } else if (botsArray.length > 0) {
+                // Se "All" está dentro e > 1, ignoramos "All"
+                // ou se "All" não está, pegamos a CSV
+                const arrWithoutAll = botsArray.filter(b => b !== 'All');
+                if (arrWithoutAll.length > 0) {
+                    botsParam = arrWithoutAll.join(',');
+                } else {
+                    // se arrWithoutAll = []
+                    botsParam = 'All';
+                }
             }
 
             let url = `/api/bots-stats?date=${date}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
-            if (botFilterQuery) url += `&botFilter=${botFilterQuery}`;
+            url += `&botsSelected=${encodeURIComponent(botsParam)}`;
             url += `&page=${page}&perPage=${perPage}`;
 
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Erro ao obter dados da API');
-
+            if (!response.ok) {
+                throw new Error('Erro ao obter dados da API');
+            }
             const data = await response.json();
 
-            // Preenche estatísticas do Dia
+            // Estatísticas do Dia
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
 
+            // Tempo médio de pagamento
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // Gráfico de barras
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -251,6 +275,7 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
+
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
@@ -272,13 +297,16 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
-            // Gráfico de linha (7 dias)
+            //--------------------------------------------------
+            // GRÁFICO DE LINHA (7 dias)
+            //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 const day = parts[2];
                 const year = parts[0];
                 return day + '/' + year;
             });
+
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
 
@@ -308,6 +336,7 @@ $(document).ready(function () {
                 ],
             };
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
                     type: 'line',
@@ -337,7 +366,9 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            // Ranking Simples
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -351,7 +382,9 @@ $(document).ready(function () {
                 });
             }
 
-            // Ranking Detalhado
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -373,7 +406,9 @@ $(document).ready(function () {
                 });
             }
 
-            // Estatísticas Detalhadas
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS
+            //--------------------------------------------------
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -401,7 +436,9 @@ $(document).ready(function () {
 
             // statsNotPurchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedPaymentsConfirmed').text(
+                data.statsNotPurchased.totalPurchases
+            );
             $('#cardNotPurchasedConversionRateDetailed').text(
                 data.statsNotPurchased.conversionRate.toFixed(2) + '%'
             );
@@ -414,7 +451,9 @@ $(document).ready(function () {
 
             // statsPurchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedPaymentsConfirmed').text(
+                data.statsPurchased.totalPurchases
+            );
             $('#cardPurchasedConversionRateDetailed').text(
                 data.statsPurchased.conversionRate.toFixed(2) + '%'
             );
@@ -425,7 +464,9 @@ $(document).ready(function () {
                 'R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2)
             );
 
-            // Movimentações
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES
+            //--------------------------------------------------
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
@@ -483,28 +524,44 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Refresh + leitura do multi-select
+    // refreshDashboard => usa getSelectedBots
     //------------------------------------------------------------
     function refreshDashboard() {
         const date = $('#datePicker').val();
         const movStatus = $('#movStatusFilter').val() || '';
-
-        // Lê os bots selecionados no multiple
-        const selectedOptions = $('#botFilter').val(); // array de strings
-        if (selectedOptions && selectedOptions.length > 0) {
-            currentBotFilterArray = selectedOptions;
-        } else {
-            currentBotFilterArray = []; // Se nada selecionado => "All"
-        }
-
-        updateDashboard(date, movStatus, currentPage, currentPerPage, currentBotFilterArray);
+        // Lê bots
+        const selected = getSelectedBots();
+        updateDashboard(date, movStatus, currentPage, currentPerPage, selected);
     }
 
-    // Carrega a lista de bots
+    //------------------------------------------------------------
+    // 1) Carrega a lista de bots
+    // 2) Configura event handler p/ selection
+    // 3) Carrega dashboard
+    //------------------------------------------------------------
     loadBotList();
-
-    // Carrega inicial
     refreshDashboard();
+
+    // Regras: se user clica "All", desmarca outros; se clica outro, desmarca "All"
+    $('#botFilter').on('change', function () {
+        const allValues = $(this).val() || [];
+        // se ALL está no array e array.length > 1 => removemos ALL
+        if (allValues.includes('All') && allValues.length > 1) {
+            // então ficamos só com 'All'
+            $(this).val(['All']);
+        }
+        else if (!allValues.includes('All') && allValues.length === 0) {
+            // se user desmarcou e sobrou zero -> forçamos 'All'
+            $(this).val(['All']);
+        }
+        else if (allValues.length > 1 && allValues.includes('All') === false) {
+            // normal, se user clica um monte e não clica 'All'
+            // sem intervenção
+        }
+        else if (!allValues.includes('All') && allValues.length >= 1) {
+            // se user clica 1 ou mais, mas sem 'All' => normal
+        }
+    });
 
     // Mudar data
     $('#datePicker').on('change', function () {
@@ -525,13 +582,7 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // Mudar bots (multiple)
-    $('#botFilter').on('change', function () {
-        currentPage = 1;
-        refreshDashboard();
-    });
-
-    // Sidebar nav
+    // Toggle de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -546,7 +597,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hamburguer
+    // Botão hamburguer -> recolhe/expande
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
