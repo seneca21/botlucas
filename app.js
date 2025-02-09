@@ -12,7 +12,6 @@ const User = db.User;
 const Purchase = db.Purchase;
 
 const logger = require('./services/logger');
-
 const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
@@ -108,8 +107,7 @@ app.get('/', checkAuth, (req, res) => {
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// NOVA ROTA: /api/bots-list
-// Retorna array de nomes de bots vindo do config.bots
+// ROTA: /api/bots-list => retorna array de nomes de bots
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, (req, res) => {
     try {
@@ -124,6 +122,12 @@ app.get('/api/bots-list', checkAuth, (req, res) => {
 //------------------------------------------------------
 // FUNÇÕES DE ESTATÍSTICAS AUXILIARES
 //------------------------------------------------------
+function makeDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
 async function getDetailedStats(startDate, endDate, originCondition, botFilter) {
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
@@ -199,12 +203,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilter) 
         totalVendasConvertidas: sumConvertido,
         averagePaymentDelayMs
     };
-}
-
-function makeDay(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
 }
 
 //------------------------------------------------------

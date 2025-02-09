@@ -102,7 +102,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Nova função: renderiza botões de paginação de forma mais "discreta"
+    // Nova função: renderiza botões (janela de 3 páginas) + setas
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
@@ -112,51 +112,86 @@ $(document).ready(function () {
         // Se só houver 1 página, não exibe nada
         if (totalPages <= 1) return;
 
-        // Botão: Voltar 10
+        // Cria um "grupo" de botões
+        const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
+
+        // << (Volta 10)
+        const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
-            const btnBack10 = $('<button class="btn btn-sm btn-light mr-1">&laquo; Voltar 10</button>');
-            btnBack10.on('click', () => {
+            doubleLeft.on('click', () => {
                 currentPage = Math.max(1, page - 10);
                 refreshDashboard();
             });
-            paginationContainer.append(btnBack10);
+        } else {
+            doubleLeft.prop('disabled', true);
         }
+        group.append(doubleLeft);
 
-        // Botão: Anterior
+        // < (Volta 1)
+        const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
-            const btnPrev = $('<button class="btn btn-sm btn-light mr-1">Anterior</button>');
-            btnPrev.on('click', () => {
+            singleLeft.on('click', () => {
                 currentPage = page - 1;
                 refreshDashboard();
             });
-            paginationContainer.append(btnPrev);
+        } else {
+            singleLeft.prop('disabled', true);
+        }
+        group.append(singleLeft);
+
+        // Calcula a janela de 3 páginas em torno da atual
+        let startPage = page - 1;
+        let endPage = page + 1;
+
+        // Ajustes se sair do range
+        if (startPage < 1) {
+            startPage = 1;
+            endPage = 3;
+        }
+        if (endPage > totalPages) {
+            endPage = totalPages;
+            startPage = endPage - 2;
+            if (startPage < 1) startPage = 1;
         }
 
-        // Info: "Página X de Y"
-        const pageInfo = $(
-            `<span style="margin-right:1rem; font-weight:bold;">Página ${page} de ${totalPages}</span>`
-        );
-        paginationContainer.append(pageInfo);
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = $(`<button class="btn btn-light">${p}</button>`);
+            if (p === page) {
+                btn.addClass('btn-primary');
+            } else {
+                btn.on('click', () => {
+                    currentPage = p;
+                    refreshDashboard();
+                });
+            }
+            group.append(btn);
+        }
 
-        // Botão: Próxima
+        // > (Avança 1)
+        const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
-            const btnNext = $('<button class="btn btn-sm btn-light ml-1">Próxima</button>');
-            btnNext.on('click', () => {
+            singleRight.on('click', () => {
                 currentPage = page + 1;
                 refreshDashboard();
             });
-            paginationContainer.append(btnNext);
+        } else {
+            singleRight.prop('disabled', true);
         }
+        group.append(singleRight);
 
-        // Botão: Avançar 10
+        // >> (Avança 10)
+        const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
-            const btnNext10 = $('<button class="btn btn-sm btn-light ml-1">Avançar 10 &raquo;</button>');
-            btnNext10.on('click', () => {
+            doubleRight.on('click', () => {
                 currentPage = Math.min(totalPages, page + 10);
                 refreshDashboard();
             });
-            paginationContainer.append(btnNext10);
+        } else {
+            doubleRight.prop('disabled', true);
         }
+        group.append(doubleRight);
+
+        paginationContainer.append(group);
     }
 
     //------------------------------------------------------------
@@ -477,7 +512,6 @@ $(document).ready(function () {
     //------------------------------------------------------------
     // EVENTOS
     //------------------------------------------------------------
-
     // 1) Carrega a lista de bots do back-end
     loadBotList();
 
