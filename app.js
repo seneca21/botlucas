@@ -12,6 +12,7 @@ const Purchase = db.Purchase;
 
 const logger = require('./services/logger');
 
+// MIDDLEWARE: Checa IP
 function checkIP(req, res, next) {
     const allowedIPs = [
         "189.29.145.193",
@@ -37,12 +38,14 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// SESSÃO
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
+// MIDDLEWARE: Checa se usuário está logado
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) {
         next();
@@ -52,7 +55,7 @@ function checkAuth(req, res, next) {
 }
 
 //------------------------------------------------------
-// Conexão DB
+// Conecta DB
 //------------------------------------------------------
 db.sequelize
     .authenticate()
@@ -113,13 +116,17 @@ app.get('/logout', (req, res) => {
 });
 
 //------------------------------------------------------
+// Rota principal -> index.html
+//------------------------------------------------------
 app.get('/', checkAuth, checkIP, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Servimos a pasta public também com checkAuth e checkIP
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// Funções de estatísticas
+// FUNÇÕES DE ESTATÍSTICAS
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const purchaseWhere = {
@@ -139,6 +146,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         userIdsWithCondition = condPurchases.map((p) => p.userId);
     }
 
+    // Contagem de usuários
     let totalUsers;
     if (!originCondition) {
         totalUsers = await User.count({
@@ -155,9 +163,11 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         });
     }
 
+    // Compras + taxa de conversão
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
+    // Valor gerado x convertido
     let totalVendasGeradas = (await Purchase.sum('planValue', {
         where: purchaseWhere
     })) || 0;
@@ -184,12 +194,38 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     totalVendasGeradas = sumGerado;
     totalVendasConvertidas = sumConvertido;
 
+    // Tempo médio de pagamento (para paid)
+    const paidPurchases = await Purchase.findAll({
+        where: {
+            status: 'paid',
+            purchasedAt: { [Op.between]: [startDate, endDate] },
+            ...(originCondition && { originCondition })
+        },
+        attributes: ['pixGeneratedAt', 'purchasedAt']
+    });
+    let sumDiffMs = 0;
+    let countPaid = 0;
+    for (const p of paidPurchases) {
+        if (p.pixGeneratedAt && p.purchasedAt) {
+            const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+            if (diff >= 0) {
+                sumDiffMs += diff;
+                countPaid++;
+            }
+        }
+    }
+    let averagePaymentDelayMs = 0;
+    if (countPaid > 0) {
+        averagePaymentDelayMs = Math.round(sumDiffMs / countPaid);
+    }
+
     return {
         totalUsers,
         totalPurchases,
         conversionRate,
         totalVendasGeradas,
         totalVendasConvertidas,
+        averagePaymentDelayMs
     };
 }
 
@@ -201,28 +237,35 @@ function makeDay(date) {
 
 //------------------------------------------------------
 // /api/bots-stats
+// Agora com checkAuth e checkIP, e usando movStatus
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
+        // Desestruturamos data e movStatus do query
         const { date, movStatus } = req.query;
-        const selectedDate = date ? new Date(date) : new Date();
 
+        const selectedDate = date ? new Date(date) : new Date();
         const startDate = makeDay(selectedDate);
         const endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
 
+        // statsAll
+        const statsAll = await getDetailedStats(startDate, endDate, null);
+
+        // statsYesterday
         const yesterday = new Date(startDate);
         yesterday.setDate(yesterday.getDate() - 1);
         const startYesterday = makeDay(yesterday);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
-
-        const statsAll = await getDetailedStats(startDate, endDate, null);
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null);
+
+        // statsMain, statsNotPurchased, statsPurchased
         const statsMain = await getDetailedStats(startDate, endDate, 'main');
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased');
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased');
 
+        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -239,6 +282,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
+        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -332,7 +376,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // stats7Days
+        // 7 dias
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -349,7 +393,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // *** Filtra lastMovements de acordo com movStatus
+        // Movimentações
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
@@ -360,7 +404,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
         }
 
         const lastMovements = await Purchase.findAll({
-            attributes: ['id', 'pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
+            attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
             order: [['pixGeneratedAt', 'DESC']],
             limit: 10,
@@ -372,7 +416,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             ]
         });
 
-        res.json({
+        return res.json({
             statsAll,
             statsYesterday,
             statsMain,
@@ -383,14 +427,17 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             stats7Days,
             lastMovements
         });
+
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
 
+// Inicializa o bot
 require('./services/bot.service.js');
 
+// Sobe servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);

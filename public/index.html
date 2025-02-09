@@ -83,6 +83,11 @@
                         Taxa de Conversão:
                         <span id="conversionRate">0%</span>
                     </p>
+                    <!-- NOVO: Tempo médio de pagamento -->
+                    <p>
+                        Tempo médio de pagamento:
+                        <span id="avgPaymentTimeText">0m</span>
+                    </p>
 
                     <!-- 2 colunas: gráfico de barras e gráfico de linha -->
                     <div class="row">
@@ -109,7 +114,7 @@
                         </div>
                     </div>
 
-                    <!-- Tabela de Últimas Movimentações (agora table-bordered) -->
+                    <!-- Tabela de Últimas Movimentações -->
                     <table class="table table-bordered table-striped mt-2" id="lastMovementsTable">
                         <thead>
                             <tr>
@@ -118,6 +123,7 @@
                                 <th>Gerado em</th>
                                 <th>Pago em</th>
                                 <th>Status</th>
+                                <th>Tempo p/ Pagar</th>
                             </tr>
                         </thead>
                         <tbody id="lastMovementsBody"></tbody>
@@ -127,7 +133,6 @@
                 <!-- SEÇÃO 2: Ranking -->
                 <section id="rankingSimplesSection" class="d-none">
                     <h3>Ranking</h3>
-                    <!-- Adiciona table-bordered aqui também -->
                     <table class="table table-bordered table-striped">
                         <thead>
                             <tr>
@@ -142,7 +147,6 @@
                 <!-- SEÇÃO 3: Dashboard Detalhado -->
                 <section id="rankingDetalhadoSection" class="d-none">
                     <h3>Dashboard Detalhado</h3>
-                    <!-- Adiciona table-bordered -->
                     <table class="table table-bordered table-striped">
                         <thead>
                             <tr>

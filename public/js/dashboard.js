@@ -80,6 +80,25 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
+    // Função para formatar uma duração em ms -> "Xh Ym"
+    //------------------------------------------------------------
+    function formatDuration(ms) {
+        if (ms <= 0) return '0m';
+
+        const totalMinutes = Math.floor(ms / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours > 0 && minutes > 0) {
+            return `${hours}h ${minutes}m`;
+        } else if (hours > 0) {
+            return `${hours}h`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+
+    //------------------------------------------------------------
     // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
     //------------------------------------------------------------
     async function updateDashboard(date, movStatus) {
@@ -99,6 +118,13 @@ $(document).ready(function () {
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
+
+            // ============ Tempo médio de pagamento ============
+            // data.statsAll.averagePaymentDelayMs
+            const avgPayDelay = data.statsAll.averagePaymentDelayMs || 0;
+            const avgPayDelayFormatted = formatDuration(avgPayDelay);
+            // Colocamos logo abaixo do "Taxa de Conversão"
+            $('#avgPaymentTimeText').text(avgPayDelayFormatted);
 
             //--------------------------------------------------
             // GRÁFICO DE BARRAS
@@ -323,7 +349,7 @@ $(document).ready(function () {
                         ? new Date(mov.purchasedAt).toLocaleString('pt-BR')
                         : '—';
 
-                    // Status em negrito e com cor
+                    // Status
                     let statusHtml = '';
                     if (mov.status === 'paid') {
                         statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
@@ -333,6 +359,15 @@ $(document).ready(function () {
                         statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
                     }
 
+                    // Tempo p/ pagar
+                    let payDelayHtml = '—';
+                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                        const diffMs = new Date(mov.purchasedAt).getTime() - new Date(mov.pixGeneratedAt).getTime();
+                        if (diffMs >= 0) {
+                            payDelayHtml = formatDuration(diffMs);
+                        }
+                    }
+
                     movementsTbody.append(`
                         <tr>
                             <td>${leadId}</td>
@@ -340,13 +375,14 @@ $(document).ready(function () {
                             <td>${dtGen}</td>
                             <td>${dtPaid}</td>
                             <td>${statusHtml}</td>
+                            <td>${payDelayHtml}</td>
                         </tr>
                     `);
                 });
             } else {
                 movementsTbody.append(`
                     <tr>
-                        <td colspan="5">Nenhuma movimentação encontrada</td>
+                        <td colspan="6">Nenhuma movimentação encontrada</td>
                     </tr>
                 `);
             }
