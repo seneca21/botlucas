@@ -11,6 +11,7 @@
         /* CSS extra para deixar as estatísticas em branco e negrito */
         .stats-display {
             color: #fff !important;
+            /* cor branca */
             font-weight: 700;
             /* negrito */
         }
@@ -70,33 +71,19 @@
             <div class="py-3">
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
-                <!-- Data + Filtro de Bots -->
+                <!-- Data -->
                 <div class="form-group">
                     <label for="datePicker">Selecione a Data:</label>
                     <input type="date" id="datePicker" class="form-control" value="" />
-                </div>
-
-                <!-- 
-                     MULTISELECT de bots
-                     Substitua as options pelos bots reais do seu config.json
-                     Ex: @Testexota_bot, @Senecagay_bot...
-                -->
-                <div class="form-group">
-                    <label for="botFilter">Bots (selecione 1 ou vários):</label>
-                    <select id="botFilter" multiple class="form-control">
-                        <option value="all" selected>TODOS</option>
-                        <option value="@Testexota_bot">@Testexota_bot</option>
-                        <option value="@Senecagay_bot">@Senecagay_bot</option>
-                        <!-- Adicione mais se tiver -->
-                    </select>
                 </div>
 
                 <!-- SEÇÃO 1: Estatísticas do Dia -->
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
 
-                    <!-- row com 4 colunas (cards) -->
+                    <!-- Nova row com 4 colunas (cards) lado a lado -->
                     <div class="row text-center">
+                        <!-- COL 1: Usuários Ativos -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -105,6 +92,8 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- COL 2: Total de Compras -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -113,6 +102,8 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- COL 3: Taxa de Conversão -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -121,6 +112,8 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- COL 4: Tempo médio de pagamento -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -137,16 +130,29 @@
                             <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
+
                         <div class="col-md-6">
                             <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
                         </div>
                     </div>
 
-                    <!-- Filtro de Movimentações -->
-                    <div class="d-flex mt-4 align-items-center" style="gap:1rem;">
-                        <h4 class="mb-0">Últimas Movimentações</h4>
-                        <div>
+                    <!-- Filtros -->
+                    <div class="d-flex mt-4 align-items-center" style="gap:1rem; flex-wrap: wrap;">
+                        <!-- Bot Filter -->
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right:0.5rem;">Bot:</label>
+                            <select id="botFilter" class="form-control form-control-sm">
+                                <option value="All" selected>All</option>
+                                <option value="@Testexota_bot">@Testexota_bot</option>
+                                <option value="@Senecagay_bot">@Senecagay_bot</option>
+                                <!-- Se tiver outros bots, adicione aqui ou gere dinamicamente -->
+                            </select>
+                        </div>
+
+                        <!-- MovStatus Filter -->
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right:0.5rem; margin-left:1rem;">Status:</label>
                             <select id="movStatusFilter" class="form-control form-control-sm">
                                 <option value="">Todos</option>
                                 <option value="pending">Pendentes</option>
@@ -154,9 +160,9 @@
                             </select>
                         </div>
 
-                        <!-- Novo select p/ escolher 10,20,50,100 por página -->
-                        <div class="ml-3">
-                            <label style="margin-bottom:0;font-size:0.9rem;">Exibir por página:</label>
+                        <!-- PerPage Filter -->
+                        <div class="d-flex align-items-center" style="margin-left:1rem;">
+                            <label style="margin-bottom:0; margin-right:0.5rem;">Exibir por página:</label>
                             <select id="movPerPage" class="form-control form-control-sm">
                                 <option value="10" selected>10</option>
                                 <option value="20">20</option>
@@ -180,6 +186,8 @@
                         </thead>
                         <tbody id="lastMovementsBody"></tbody>
                     </table>
+
+                    <!-- Container de paginação (botões de página) -->
                     <div id="paginationContainer" class="mt-2"></div>
                 </section>
 
