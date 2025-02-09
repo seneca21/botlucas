@@ -126,7 +126,7 @@ app.get('/', checkAuth, checkIP, (req, res) => {
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS
+// FUNÇÕES DE ESTATÍSTICAS AUXILIARES
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const purchaseWhere = {
@@ -237,12 +237,17 @@ function makeDay(date) {
 
 //------------------------------------------------------
 // /api/bots-stats
-// Agora com checkAuth e checkIP, e usando movStatus
+// Agora com paginação (page, perPage) para últimas movs
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
         // Desestruturamos data e movStatus do query
         const { date, movStatus } = req.query;
+
+        // Paginação (movimentações)
+        const page = parseInt(req.query.page) || 1;
+        const perPage = parseInt(req.query.perPage) || 10;
+        const offset = (page - 1) * perPage;
 
         const selectedDate = date ? new Date(date) : new Date();
         const startDate = makeDay(selectedDate);
@@ -393,7 +398,7 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // Movimentações
+        // Movimentações + paginação
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
@@ -403,11 +408,13 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             lastMovementsWhere.status = 'paid';
         }
 
-        const lastMovements = await Purchase.findAll({
+        // findAndCountAll => retorna { rows, count }
+        const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
             attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
             order: [['pixGeneratedAt', 'DESC']],
-            limit: 10,
+            limit: perPage,
+            offset: offset,
             include: [
                 {
                     model: User,
@@ -425,7 +432,8 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             botRanking,
             botDetails,
             stats7Days,
-            lastMovements
+            lastMovements,
+            totalMovements // total de registros p/ saber quantas páginas
         });
 
     } catch (error) {

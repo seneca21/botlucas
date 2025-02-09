@@ -6,6 +6,14 @@ $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
 
+    // -----------------------------------------------------------
+    // Variáveis de estado para paginação e filtro
+    // -----------------------------------------------------------
+    let currentPage = 1;            // Página atual (inicialmente 1)
+    let currentPerPage = 10;        // Quantas mov. exibir por página
+    let totalMovementsCount = 0;    // Recebemos do back-end
+    let totalPages = 1;            // Calculado
+
     //------------------------------------------------------------
     // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
@@ -91,14 +99,39 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
+    // Renderiza o "rodapé" de paginação das últimas movs
     //------------------------------------------------------------
-    async function updateDashboard(date, movStatus) {
+    function renderPagination(total, page, perPage) {
+        // Ex: total = 35, perPage = 10 => totalPages = 4
+        totalPages = Math.ceil(total / perPage);
+        const paginationContainer = $('#paginationContainer');
+        paginationContainer.empty();
+
+        // Se só houver 1 página, não exibe nada
+        if (totalPages <= 1) return;
+
+        // Construção simples: Botões de página 1,2,3...
+        // (poderíamos melhorar para exibir menos botões caso haja muitas páginas)
+        for (let p = 1; p <= totalPages; p++) {
+            const btn = $(`<button class="btn btn-sm btn-outline-primary ml-1 ${p === page ? 'active' : ''}">${p}</button>`);
+            btn.on('click', function () {
+                currentPage = p;
+                refreshDashboard();
+            });
+            paginationContainer.append(btn);
+        }
+    }
+
+    //------------------------------------------------------------
+    // Função principal para puxar /api/bots-stats e desenhar
+    //------------------------------------------------------------
+    async function updateDashboard(date, movStatus, page, perPage) {
         try {
             let url = `/api/bots-stats?date=${date}`;
             if (movStatus) {
                 url += `&movStatus=${movStatus}`;
             }
+            url += `&page=${page}&perPage=${perPage}`;
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -321,25 +354,24 @@ $(document).ready(function () {
             );
 
             //--------------------------------------------------
-            // ÚLTIMAS MOVIMENTAÇÕES
+            // ÚLTIMAS MOVIMENTAÇÕES (com paginação)
             //--------------------------------------------------
+            totalMovementsCount = data.totalMovements || 0;
+            renderPagination(totalMovementsCount, page, perPage);
+
             const movementsTbody = $('#lastMovementsBody');
             movementsTbody.empty();
             if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach((mov) => {
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
 
-                    // Format data/hora gerado
                     let dtGen = mov.pixGeneratedAt
                         ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
                         : '';
-
-                    // Format data/hora pago
                     let dtPaid = mov.purchasedAt
                         ? new Date(mov.purchasedAt).toLocaleString('pt-BR')
                         : '—';
 
-                    // Status
                     let statusHtml = '';
                     if (mov.status === 'paid') {
                         statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
@@ -349,7 +381,6 @@ $(document).ready(function () {
                         statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
                     }
 
-                    // Tempo p/ pagar
                     let payDelayHtml = '—';
                     if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                         const diffMs = new Date(mov.purchasedAt).getTime() - new Date(mov.pixGeneratedAt).getTime();
@@ -381,21 +412,35 @@ $(document).ready(function () {
         }
     }
 
+    //------------------------------------------------------------
+    // Função para "forçar" o refresh, lendo os filtros e chamando update
+    //------------------------------------------------------------
+    function refreshDashboard() {
+        const date = $('#datePicker').val();
+        const movStatus = $('#movStatusFilter').val() || '';
+        updateDashboard(date, movStatus, currentPage, currentPerPage);
+    }
+
     // Carregar inicial
-    const initialStatus = $('#movStatusFilter').val() || '';
-    updateDashboard($('#datePicker').val(), initialStatus);
+    refreshDashboard();
 
     // Mudar data
     $('#datePicker').on('change', function () {
-        const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard($(this).val(), movStatus);
+        currentPage = 1; // reset para primeira página
+        refreshDashboard();
     });
 
     // Mudar status
     $('#movStatusFilter').on('change', function () {
-        const date = $('#datePicker').val();
-        const movStatus = $(this).val() || '';
-        updateDashboard(date, movStatus);
+        currentPage = 1; // reset para primeira página
+        refreshDashboard();
+    });
+
+    // Mudar "quantas por página"
+    $('#movPerPage').on('change', function () {
+        currentPerPage = parseInt($(this).val(), 10);
+        currentPage = 1; // volta pra página 1
+        refreshDashboard();
     });
 
     // Toggle de seções no sidebar
