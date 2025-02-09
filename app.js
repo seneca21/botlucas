@@ -6,33 +6,17 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
+
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
 const logger = require('./services/logger');
 
-// ~~ Removemos o checkIP ~~
-/*
-function checkIP(req, res, next) {
-    const allowedIPs = [
-        "189.29.145.193",
-        "54.175.230.252",
-        "54.173.229.200"
-    ];
-    const forwarded = req.headers['x-forwarded-for'];
-    let clientIp = forwarded
-        ? forwarded.split(',')[0].trim()
-        : req.ip;
-    clientIp = clientIp.replace('::ffff:', '');
-    if (allowedIPs.includes(clientIp)) {
-        next();
-    } else {
-        logger.warn(`IP Bloqueado: ${clientIp}`);
-        return res.status(403).send("Acesso negado. Seu IP não está na whitelist.");
-    }
-}
-*/
+// Importa ConfigService ou config.json diretamente
+// Aqui usarei o ConfigService para manter o padrão do seu projeto.
+const ConfigService = require('./services/config.service');
+const config = ConfigService.loadConfig(); // carrega config.json
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -122,14 +106,30 @@ app.get('/', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ~~ Removemos o checkIP do static ~~
+// Servimos a pasta public
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
+
+//------------------------------------------------------
+// NOVA ROTA: /api/bots-list
+// Retorna array de nomes de bots vindo do config.bots
+//------------------------------------------------------
+app.get('/api/bots-list', checkAuth, (req, res) => {
+    try {
+        // config.bots é array, ex: [{ name: '@Testexota_bot', ...}, {...}]
+        const botNames = config.bots.map(b => b.name);
+        res.json(botNames);
+    } catch (err) {
+        logger.error('Erro ao retornar lista de bots:', err);
+        res.status(500).json({ error: 'Erro ao retornar lista de bots' });
+    }
+});
 
 //------------------------------------------------------
 // FUNÇÕES DE ESTATÍSTICAS AUXILIARES
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition, botFilter) {
-    // Filtra por originCondition e por botName (se != "All")
+    const { Purchase, User } = db;
+
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -140,7 +140,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilter) 
         purchaseWhere.botName = botFilter;
     }
 
-    // Para Users, se botFilter != 'All', também filtra user.botName
     let userWhere = {
         lastInteraction: { [Op.between]: [startDate, endDate] }
     };
@@ -149,13 +148,11 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilter) 
     }
 
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
-    // Contagem de usuários
     const totalUsers = await User.count({ where: userWhere });
 
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
     // Valor gerado x convertido
-    // para "purchasedAt" (só que se a originCondition for 'main' etc. filtra) + botName se for o caso
     const generatedWhere = {
         pixGeneratedAt: { [Op.between]: [startDate, endDate] },
         status: { [Op.in]: ['pending', 'paid'] },
@@ -217,14 +214,11 @@ function makeDay(date) {
 
 //------------------------------------------------------
 // /api/bots-stats
-// => Agora recebe movStatus, page, perPage, e botFilter
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
-        // Desestruturamos data e movStatus do query
+        const { Purchase, User } = db;
         const { date, movStatus, botFilter = 'All' } = req.query;
-
-        // Paginação (movimentações)
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
@@ -250,10 +244,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilter);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilter);
 
-        // Ranking simples => se filtrar por botFilter != 'All', só exibe 1?
-        // Para manter a coerência, iremos sempre mostrar ranking de todos os bots desse range
-        // MAS, se quiser filtrar o ranking também, aplique o botFilter no "where" abaixo. 
-        // Aqui vou deixar SEM filtrar, para ver ranking completo do dia.
+        // Ranking simples (global, não filtrado)
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -270,7 +261,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado (também sem filtrar por botFilter)
+        // Ranking detalhado (global)
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -317,6 +308,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
+
         const botPlansMap = {};
         planSalesByBot.forEach((row) => {
             const bName = row.botName;
@@ -330,15 +322,11 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const botDetails = [];
         botsWithPurchases.forEach((bot) => {
             const bName = bot.botName;
-            const totalPurchasesBot =
-                parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
-            const totalValueBot =
-                parseFloat(bot.getDataValue('totalValue')) || 0;
+            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-            const conversionRateBot =
-                totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
-            const averageValueBot =
-                totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+            const conversionRateBot = totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
+            const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
 
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
@@ -408,7 +396,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             ]
         });
 
-        return res.json({
+        res.json({
             statsAll,
             statsYesterday,
             statsMain,
@@ -420,7 +408,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             lastMovements,
             totalMovements
         });
-
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });

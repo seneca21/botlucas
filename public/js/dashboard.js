@@ -14,7 +14,7 @@ $(document).ready(function () {
     let totalMovementsCount = 0;    // Recebemos do back-end
     let totalPages = 1;            // Calculado
 
-    // Novo: botFilter
+    // Filtro de bot
     let currentBotFilter = 'All';   // Por padrão "All"
 
     //------------------------------------------------------------
@@ -120,6 +120,25 @@ $(document).ready(function () {
             });
             paginationContainer.append(btn);
         }
+    }
+
+    //------------------------------------------------------------
+    // Carregar lista de bots dinamicamente
+    //------------------------------------------------------------
+    function loadBotList() {
+        fetch('/api/bots-list')
+            .then(res => res.json())
+            .then(botNames => {
+                const botSelect = $('#botFilter');
+                // Limpa e adiciona "All"
+                botSelect.empty();
+                botSelect.append(`<option value="All" selected>All</option>`);
+
+                botNames.forEach(name => {
+                    botSelect.append(`<option value="${name}">${name}</option>`);
+                });
+            })
+            .catch(err => console.error('Erro ao carregar bots-list:', err));
     }
 
     //------------------------------------------------------------
@@ -295,7 +314,6 @@ $(document).ready(function () {
             //--------------------------------------------------
             // ESTATÍSTICAS DETALHADAS
             //--------------------------------------------------
-            // statsAll
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(
@@ -352,7 +370,7 @@ $(document).ready(function () {
             );
 
             //--------------------------------------------------
-            // ÚLTIMAS MOVIMENTAÇÕES (com paginação)
+            // ÚLTIMAS MOVIMENTAÇÕES
             //--------------------------------------------------
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
@@ -411,7 +429,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para "forçar" o refresh, lendo os filtros e chamando update
+    // Função para "forçar" o refresh
     //------------------------------------------------------------
     function refreshDashboard() {
         const date = $('#datePicker').val();
@@ -419,7 +437,15 @@ $(document).ready(function () {
         updateDashboard(date, movStatus, currentPage, currentPerPage, currentBotFilter);
     }
 
-    // Carregar inicial
+    //------------------------------------------------------------
+    // EVENTOS
+    //------------------------------------------------------------
+
+    // 1) Carrega a lista de bots do back-end
+    loadBotList();
+
+    // 2) Carregar inicial (após pequeno delay, caso queira garantir que botList foi populada)
+    // mas em geral pode chamar direto: 
     refreshDashboard();
 
     // Mudar data

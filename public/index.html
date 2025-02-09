@@ -83,7 +83,6 @@
 
                     <!-- Nova row com 4 colunas (cards) lado a lado -->
                     <div class="row text-center">
-                        <!-- COL 1: Usuários Ativos -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -92,8 +91,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 2: Total de Compras -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -102,8 +99,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 3: Taxa de Conversão -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -112,8 +107,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 4: Tempo médio de pagamento -->
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
                                 <div class="card-body">
@@ -139,14 +132,11 @@
 
                     <!-- Filtros -->
                     <div class="d-flex mt-4 align-items-center" style="gap:1rem; flex-wrap: wrap;">
-                        <!-- Bot Filter -->
+                        <!-- Bot Filter (dinâmico) -->
                         <div class="d-flex align-items-center">
                             <label style="margin-right:0.5rem;">Bot:</label>
                             <select id="botFilter" class="form-control form-control-sm">
-                                <option value="All" selected>All</option>
-                                <option value="@Testexota_bot">@Testexota_bot</option>
-                                <option value="@Senecagay_bot">@Senecagay_bot</option>
-                                <!-- Se tiver outros bots, adicione aqui ou gere dinamicamente -->
+                                <!-- Será populado dinamicamente em dashboard.js -->
                             </select>
                         </div>
 
