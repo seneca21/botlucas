@@ -52,24 +52,76 @@ db.sequelize
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
-    if (req.session.loggedIn) {
-        return res.redirect('/');
-    }
+    // Página de login sofisticada, com fundo cinza, formulário centralizado e "olho" para mostrar/esconder senha
     const html = `
-    <html>
-      <head><title>Login</title></head>
-      <body>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Login</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+      <style>
+        body {
+          background-color: #f8f9fa;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .login-container {
+          background-color: #fff;
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          width: 300px;
+        }
+        .login-container h1 {
+          font-size: 1.5rem;
+          margin-bottom: 1.5rem;
+          text-align: center;
+        }
+        .btn-login {
+          border-radius: 50px;
+        }
+        .input-group-text {
+          cursor: pointer;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="login-container">
         <h1>Login</h1>
         <form method="POST" action="/login">
-          <label>Usuário:</label>
-          <input type="text" name="username" /><br/><br/>
-          <label>Senha:</label>
-          <input type="password" name="password" /><br/><br/>
-          <button type="submit">Entrar</button>
+          <div class="form-group">
+            <label for="username">Usuário</label>
+            <input type="text" class="form-control" id="username" name="username" placeholder="Digite seu usuário" required>
+          </div>
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="password" name="password" placeholder="Digite sua senha" required>
+              <div class="input-group-append">
+                <span class="input-group-text" id="togglePassword">&#128065;</span>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-login">Entrar</button>
         </form>
-      </body>
+      </div>
+      <script>
+        // Alterna a visibilidade da senha
+        document.getElementById('togglePassword').addEventListener('click', function () {
+          const passwordInput = document.getElementById('password');
+          const currentType = passwordInput.getAttribute('type');
+          const newType = currentType === 'password' ? 'text' : 'password';
+          passwordInput.setAttribute('type', newType);
+          // Alterar o ícone se desejar; aqui mantemos o mesmo emoji
+        });
+      </script>
+    </body>
     </html>
-  `;
+    `;
     res.send(html);
 });
 
@@ -148,7 +200,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
 
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
     const totalUsers = await User.count({ where: userWhere });
-
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
     const generatedWhere = {
@@ -212,8 +263,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { date, movStatus } = req.query;
-
-        // Parse do botFilter em array (ex: "@Bot1,@Bot2" -> ["@Bot1", "@Bot2"])
         let botFilters = [];
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
