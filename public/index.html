@@ -14,22 +14,16 @@
             font-weight: 700;
         }
 
-        /* Estilos para o dropdown de checkboxes do filtro de Bots */
+        /* Estilos para o dropdown de checkboxes do filtro de bots */
         .dropdown-multi {
             position: relative;
             display: inline-block;
         }
 
-        /* Botão que abre o dropdown: igual ao .form-control dos selects */
         .dropdown-multi .dropdown-toggle {
             background-color: #fff;
             border: 1px solid #ced4da;
-            border-radius: .25rem;
-            padding: .375rem .75rem;
-            font-size: 0.875rem;
-            color: #495057;
-            width: 200px;
-            text-align: left;
+            border-radius: 0.25rem;
         }
 
         .dropdown-multi .dropdown-menu {
@@ -39,26 +33,13 @@
             z-index: 999;
             background-color: #fff;
             border: 1px solid #ced4da;
-            border-radius: .25rem;
+            border-radius: 0.25rem;
             padding: 0.5rem;
-            max-height: 250px;
-            overflow-y: auto;
-            width: 200px;
+            min-width: 200px;
         }
 
         .dropdown-multi .dropdown-menu.show {
             display: block;
-        }
-
-        .dropdown-multi .form-check {
-            margin-bottom: 0.25rem;
-        }
-
-        .dropdown-multi .form-check-label {
-            margin-left: .3rem;
-            margin-bottom: 0;
-            color: #495057;
-            cursor: pointer;
         }
     </style>
 </head>
@@ -105,6 +86,7 @@
                         <span></span>
                     </div>
                 </button>
+
                 <div>
                     <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;" title="Alternar tema">
                         🌙
@@ -125,7 +107,7 @@
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
 
-                    <!-- Row dos cards -->
+                    <!-- Nova row com 4 colunas (cards) lado a lado -->
                     <div class="row text-center">
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
@@ -161,12 +143,13 @@
                         </div>
                     </div>
 
-                    <!-- Gráficos -->
+                    <!-- 2 colunas: gráfico de barras e gráfico de linha -->
                     <div class="row">
                         <div class="col-md-6">
                             <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
+
                         <div class="col-md-6">
                             <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
@@ -175,10 +158,10 @@
 
                     <!-- Filtros -->
                     <div class="d-flex mt-4 align-items-center" style="gap:1rem; flex-wrap: wrap;">
-                        <!-- Dropdown custom para seleção de bots -->
+                        <!-- Bot Filter: container para dropdown custom -->
                         <div id="botFilterContainer"></div>
 
-                        <!-- Status Filter -->
+                        <!-- MovStatus Filter -->
                         <div class="d-flex align-items-center">
                             <label style="margin-right:0.5rem; margin-left:1rem;">Status:</label>
                             <select id="movStatusFilter" class="form-control form-control-sm">
@@ -325,7 +308,7 @@
                             </div>
                         </div>
 
-                        <!-- COL 3: Not Purchased -->
+                        <!-- COL 3: Not_Purchased -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">REMARKETING</h5>
                             <div class="card text-center shadow-sm mb-3">
