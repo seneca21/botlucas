@@ -45,7 +45,6 @@ $(document).ready(function () {
             themeBtn.text('☀');
             localStorage.setItem('theme', 'dark');
         }
-        // Atualiza se já existirem gráficos
         updateChartsIfExist();
     });
 
@@ -85,7 +84,6 @@ $(document).ready(function () {
     //------------------------------------------------------------
     async function updateDashboard(date, movStatus) {
         try {
-            // Monta a URL com data e movStatus
             let url = `/api/bots-stats?date=${date}`;
             if (movStatus) {
                 url += `&movStatus=${movStatus}`;
@@ -314,22 +312,41 @@ $(document).ready(function () {
             if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach((mov) => {
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
-                    const dt = mov.pixGeneratedAt
+
+                    // Format data/hora gerado
+                    let dtGen = mov.pixGeneratedAt
                         ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
                         : '';
+
+                    // Format data/hora pago
+                    let dtPaid = mov.purchasedAt
+                        ? new Date(mov.purchasedAt).toLocaleString('pt-BR')
+                        : '—';
+
+                    // Status em negrito e com cor
+                    let statusHtml = '';
+                    if (mov.status === 'paid') {
+                        statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
+                    } else if (mov.status === 'pending') {
+                        statusHtml = '<span style="font-weight:bold; color:#ff9900;">Pending</span>';
+                    } else {
+                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+                    }
+
                     movementsTbody.append(`
                         <tr>
                             <td>${leadId}</td>
                             <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td>${dt}</td>
-                            <td>${mov.status}</td>
+                            <td>${dtGen}</td>
+                            <td>${dtPaid}</td>
+                            <td>${statusHtml}</td>
                         </tr>
                     `);
                 });
             } else {
                 movementsTbody.append(`
                     <tr>
-                        <td colspan="4">Nenhuma movimentação encontrada</td>
+                        <td colspan="5">Nenhuma movimentação encontrada</td>
                     </tr>
                 `);
             }
@@ -338,24 +355,23 @@ $(document).ready(function () {
         }
     }
 
-    // Ao carregar
+    // Carregar inicial
     const initialStatus = $('#movStatusFilter').val() || '';
     updateDashboard($('#datePicker').val(), initialStatus);
 
-    // Quando mudar data
+    // Mudar data
     $('#datePicker').on('change', function () {
         const movStatus = $('#movStatusFilter').val() || '';
         updateDashboard($(this).val(), movStatus);
     });
 
-    // Quando mudar status
+    // Mudar status
     $('#movStatusFilter').on('change', function () {
         const date = $('#datePicker').val();
         const movStatus = $(this).val() || '';
         updateDashboard(date, movStatus);
     });
 
-    // (C) Troca de seções no sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -370,7 +386,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // Botão hamburguer -> recolhe/expande sidebar + main
+    // Botão hamburguer -> recolhe/expande
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');

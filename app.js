@@ -10,10 +10,8 @@ const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 
-// 1) IMPORTA O LOGGER
 const logger = require('./services/logger');
 
-// === MIDDLEWARE DE IP (CHECK IP) ===
 function checkIP(req, res, next) {
     const allowedIPs = [
         "189.29.145.193",
@@ -27,7 +25,6 @@ function checkIP(req, res, next) {
         : req.ip;
 
     clientIp = clientIp.replace('::ffff:', '');
-
     if (allowedIPs.includes(clientIp)) {
         next();
     } else {
@@ -37,7 +34,6 @@ function checkIP(req, res, next) {
 }
 
 const app = express();
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
@@ -55,6 +51,9 @@ function checkAuth(req, res, next) {
     }
 }
 
+//------------------------------------------------------
+// Conexão DB
+//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
@@ -117,7 +116,6 @@ app.get('/logout', (req, res) => {
 app.get('/', checkAuth, checkIP, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
@@ -131,7 +129,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
 
-    // leads
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -164,7 +161,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     let totalVendasGeradas = (await Purchase.sum('planValue', {
         where: purchaseWhere
     })) || 0;
-
     let totalVendasConvertidas = totalVendasGeradas;
 
     const generatedWhere = {
@@ -174,7 +170,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     if (originCondition) {
         generatedWhere.originCondition = originCondition;
     }
-
     const sumGerado = (await Purchase.sum('planValue', { where: generatedWhere })) || 0;
 
     const convertedWhere = {
@@ -184,7 +179,6 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     if (originCondition) {
         convertedWhere.originCondition = originCondition;
     }
-
     const sumConvertido = (await Purchase.sum('planValue', { where: convertedWhere })) || 0;
 
     totalVendasGeradas = sumGerado;
@@ -210,7 +204,7 @@ function makeDay(date) {
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
-        const { date, movStatus } = req.query;  // movStatus = "pending", "paid" ou vazio (todos)
+        const { date, movStatus } = req.query;
         const selectedDate = date ? new Date(date) : new Date();
 
         const startDate = makeDay(selectedDate);
@@ -355,19 +349,18 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // *** lastMovements: se movStatus = "pending" ou "paid", filtra. senão, todos
+        // *** Filtra lastMovements de acordo com movStatus
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
-
         if (movStatus === 'pending') {
             lastMovementsWhere.status = 'pending';
         } else if (movStatus === 'paid') {
             lastMovementsWhere.status = 'paid';
         }
-        // se for "" ou undefined => sem filtro de status
 
         const lastMovements = await Purchase.findAll({
+            attributes: ['id', 'pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
             order: [['pixGeneratedAt', 'DESC']],
             limit: 10,
@@ -396,7 +389,6 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     }
 });
 
-//------------------------------------------------------
 require('./services/bot.service.js');
 
 const PORT = process.env.PORT || 3000;
