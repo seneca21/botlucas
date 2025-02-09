@@ -55,9 +55,6 @@ function checkAuth(req, res, next) {
     }
 }
 
-//------------------------------------------------------
-// Conexão e sync com o DB
-//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
@@ -124,7 +121,7 @@ app.get('/', checkAuth, checkIP, (req, res) => {
 app.use(checkAuth, checkIP, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// Funções de estatísticas (original) + overrides
+// Funções de estatísticas
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition) {
     const purchaseWhere = {
@@ -134,6 +131,7 @@ async function getDetailedStats(startDate, endDate, originCondition) {
         purchaseWhere.originCondition = originCondition;
     }
 
+    // leads
     let userIdsWithCondition = [];
     if (originCondition) {
         const condPurchases = await Purchase.findAll({
@@ -163,14 +161,12 @@ async function getDetailedStats(startDate, endDate, originCondition) {
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
     const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
-    // (Antes, totalVendasGeradas era sum do purchaseWhere)
     let totalVendasGeradas = (await Purchase.sum('planValue', {
         where: purchaseWhere
     })) || 0;
 
     let totalVendasConvertidas = totalVendasGeradas;
 
-    // Agora separamos
     const generatedWhere = {
         pixGeneratedAt: { [Op.between]: [startDate, endDate] },
         status: { [Op.in]: ['pending', 'paid'] }
@@ -214,7 +210,7 @@ function makeDay(date) {
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, movStatus } = req.query;  // movStatus = "pending", "paid" ou vazio (todos)
         const selectedDate = date ? new Date(date) : new Date();
 
         const startDate = makeDay(selectedDate);
@@ -359,16 +355,25 @@ app.get('/api/bots-stats', checkAuth, checkIP, async (req, res) => {
             });
         }
 
-        // *** Ajustado: incluir o 'User' para pegar telegramId
+        // *** lastMovements: se movStatus = "pending" ou "paid", filtra. senão, todos
+        const lastMovementsWhere = {
+            pixGeneratedAt: { [Op.between]: [startDate, endDate] }
+        };
+
+        if (movStatus === 'pending') {
+            lastMovementsWhere.status = 'pending';
+        } else if (movStatus === 'paid') {
+            lastMovementsWhere.status = 'paid';
+        }
+        // se for "" ou undefined => sem filtro de status
+
         const lastMovements = await Purchase.findAll({
-            where: {
-                pixGeneratedAt: { [Op.between]: [startDate, endDate] }
-            },
+            where: lastMovementsWhere,
             order: [['pixGeneratedAt', 'DESC']],
             limit: 10,
             include: [
                 {
-                    model: User, // Precisamos do telegramId
+                    model: User,
                     attributes: ['telegramId']
                 }
             ]

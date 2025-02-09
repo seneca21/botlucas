@@ -83,9 +83,15 @@ $(document).ready(function () {
     //------------------------------------------------------------
     // 3) FUNÇÃO PRINCIPAL: Puxa /api/bots-stats e desenha os gráficos
     //------------------------------------------------------------
-    async function updateDashboard(date) {
+    async function updateDashboard(date, movStatus) {
         try {
-            const response = await fetch(`/api/bots-stats?date=${date}`);
+            // Monta a URL com data e movStatus
+            let url = `/api/bots-stats?date=${date}`;
+            if (movStatus) {
+                url += `&movStatus=${movStatus}`;
+            }
+
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
@@ -307,9 +313,7 @@ $(document).ready(function () {
             movementsTbody.empty();
             if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach((mov) => {
-                    // Pegamos telegramId ao inves do mov.id
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
-
                     const dt = mov.pixGeneratedAt
                         ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR')
                         : '';
@@ -334,12 +338,21 @@ $(document).ready(function () {
         }
     }
 
-    // (A) Atualiza ao carregar
-    updateDashboard($('#datePicker').val());
+    // Ao carregar
+    const initialStatus = $('#movStatusFilter').val() || '';
+    updateDashboard($('#datePicker').val(), initialStatus);
 
-    // (B) Atualiza ao mudar data
+    // Quando mudar data
     $('#datePicker').on('change', function () {
-        updateDashboard($(this).val());
+        const movStatus = $('#movStatusFilter').val() || '';
+        updateDashboard($(this).val(), movStatus);
+    });
+
+    // Quando mudar status
+    $('#movStatusFilter').on('change', function () {
+        const date = $('#datePicker').val();
+        const movStatus = $(this).val() || '';
+        updateDashboard(date, movStatus);
     });
 
     // (C) Troca de seções no sidebar
@@ -357,7 +370,7 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    // (D) Botão hamburguer -> recolhe/expande sidebar + main
+    // Botão hamburguer -> recolhe/expande sidebar + main
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
