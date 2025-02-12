@@ -52,7 +52,7 @@ db.sequelize
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
-    // Página de login sofisticada com fundo cinza, formulário centralizado e "olho" para alternar senha
+    // Página de login sofisticada, com fundo cinza, formulário centralizado e "olho" para mostrar/esconder senha
     const html = `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -110,6 +110,7 @@ app.get('/login', (req, res) => {
         </form>
       </div>
       <script>
+        // Alterna a visibilidade da senha
         document.getElementById('togglePassword').addEventListener('click', function () {
           const passwordInput = document.getElementById('password');
           const currentType = passwordInput.getAttribute('type');
@@ -125,7 +126,7 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    const ADMIN_USER = 'pfjru';
+    const ADMIN_USER = 'perufe';
     const ADMIN_PASS = 'oppushin1234';
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -179,7 +180,7 @@ function makeDay(date) {
 }
 
 async function getDetailedStats(startDate, endDate, originCondition, botFilters) {
-    // "botFilters" é um array, ex: ["@Bot1", "@Bot2"] ou ["All"]
+    // Obtém os valores gerados e convertidos (pago) em um período.
     const purchaseWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
     };
@@ -196,29 +197,27 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
         userWhere.botName = { [Op.in]: botFilters };
     }
 
+    // Para a taxa de conversão real, usamos os valores (somas) em vez de contagens:
+    const sumGerado = (await Purchase.sum('planValue', {
+        where: {
+            pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+            ...(botFilters.length > 0 && !botFilters.includes('All') ? { botName: { [Op.in]: botFilters } } : {})
+        }
+    })) || 0;
+    const sumConvertido = (await Purchase.sum('planValue', {
+        where: {
+            purchasedAt: { [Op.between]: [startDate, endDate] },
+            status: 'paid',
+            ...(botFilters.length > 0 && !botFilters.includes('All') ? { botName: { [Op.in]: botFilters } } : {})
+        }
+    })) || 0;
+    const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+    // Para outras estatísticas (como cards), pode ser interessante manter os números absolutos:
     const totalPurchases = await Purchase.count({ where: purchaseWhere });
     const totalUsers = await User.count({ where: userWhere });
-    const conversionRate = totalUsers > 0 ? (totalPurchases / totalUsers) * 100 : 0;
 
-    const generatedWhere = {
-        pixGeneratedAt: { [Op.between]: [startDate, endDate] },
-        status: { [Op.in]: ['pending', 'paid'] },
-        ...(originCondition ? { originCondition } : {})
-    };
-    const convertedWhere = {
-        purchasedAt: { [Op.between]: [startDate, endDate] },
-        status: 'paid',
-        ...(originCondition ? { originCondition } : {})
-    };
-
-    if (botFilters.length > 0 && !botFilters.includes('All')) {
-        generatedWhere.botName = { [Op.in]: botFilters };
-        convertedWhere.botName = { [Op.in]: botFilters };
-    }
-
-    const sumGerado = (await Purchase.sum('planValue', { where: generatedWhere })) || 0;
-    const sumConvertido = (await Purchase.sum('planValue', { where: convertedWhere })) || 0;
-
+    // Tempo médio de pagamento (para as compras pagas)
     const paidPurchases = await Purchase.findAll({
         where: {
             status: 'paid',
@@ -228,7 +227,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
         },
         attributes: ['pixGeneratedAt', 'purchasedAt']
     });
-
     let sumDiffMs = 0;
     let countPaid = 0;
     for (const p of paidPurchases) {
@@ -305,7 +303,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado (global)
+        // Ranking detalhado (global) – para os pagos
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -317,6 +315,23 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 botName: { [Op.ne]: null },
             },
             group: ['botName'],
+        });
+
+        // Nova consulta: total gerado por bot (incluindo pendentes e pagos)
+        const generatedByBot = await Purchase.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'generatedValue']
+            ],
+            where: {
+                pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null }
+            },
+            group: ['botName']
+        });
+        const generatedMap = {};
+        generatedByBot.forEach(item => {
+            generatedMap[item.botName] = parseFloat(item.getDataValue('generatedValue')) || 0;
         });
 
         const botsWithInteractions = await User.findAll({
@@ -369,12 +384,16 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-            const conversionRateBot = totalUsersBot > 0 ? (totalPurchasesBot / totalUsersBot) * 100 : 0;
+            // Nova lógica: taxa de conversão por bot baseada em valor pago / valor gerado
+            const generatedForBot = generatedMap[bName] || 0;
+            const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
 
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
+                // Aqui você pode optar por recalcular para cada plano se tiver os dados gerados individuais
+                // Neste exemplo, usamos a contagem (opcional)
                 const planConvRate = totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
                 plansArray.push({
                     planName,
@@ -395,7 +414,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         });
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // 7 dias
+        // 7 dias – para cada dia, usamos a lógica da função getDetailedStats (que agora usa a razão sumConvertido/sumGerado)
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
