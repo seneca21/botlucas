@@ -120,7 +120,7 @@ app.get('/login', (req, res) => {
       </script>
     </body>
     </html>
-    `;
+  `;
     res.send(html);
 });
 
@@ -180,12 +180,13 @@ function makeDay(date) {
 }
 
 /*
-  Para o plano principal ("main") a lógica utiliza os dados dos usuários e registros de Purchase com purchasedAt.
-  Para remarketing ("not_purchased") e upsell ("purchased"), os cálculos são feitos exclusivamente com base
-  nos registros de Purchase com o respectivo originCondition, contando os leads de forma distinta.
+  Na função getDetailedStats, para o plano principal (originCondition "main")
+  serão considerados apenas os registros com originCondition igual a "main".
+  Para remarketing ("not_purchased") e upsell ("purchased"), os cálculos são feitos com base no respectivo originCondition.
+  botFilters tem valor padrão de array vazio.
 */
-async function getDetailedStats(startDate, endDate, originCondition, botFilters) {
-    // Define filtro base a partir da data de PIX gerado
+async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
+    // Filtro base: registros cujo pixGeneratedAt está entre startDate e endDate
     const baseWhere = {
         pixGeneratedAt: { [Op.between]: [startDate, endDate] }
     };
@@ -194,30 +195,29 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
     }
 
     if (!originCondition || originCondition === 'main') {
-        // Plano principal
+        // Para o plano principal, forçamos originCondition = 'main'
+        const baseMainWhere = { ...baseWhere, originCondition: 'main' };
         const purchaseWhere = {
-            ...baseWhere,
+            ...baseMainWhere,
             purchasedAt: { [Op.between]: [startDate, endDate] }
         };
-        const userWhere = {
-            lastInteraction: { [Op.between]: [startDate, endDate] }
-        };
-        if (botFilters.length > 0 && !botFilters.includes('All')) {
-            purchaseWhere.botName = { [Op.in]: botFilters };
-            userWhere.botName = { [Op.in]: botFilters };
-        }
+        // Total de leads: usuários distintos que possuem registros com originCondition "main"
+        const totalUsers = await Purchase.count({
+            where: baseMainWhere,
+            distinct: true,
+            col: 'userId'
+        });
         const totalPurchases = await Purchase.count({ where: purchaseWhere });
-        const totalUsers = await User.count({ where: userWhere });
-        const sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
+        const sumGerado = (await Purchase.sum('planValue', { where: baseMainWhere })) || 0;
         const sumConvertido = (await Purchase.sum('planValue', {
-            where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            where: { ...baseMainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
         })) || 0;
         const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
         const paidPurchases = await Purchase.findAll({
             where: {
                 status: 'paid',
                 purchasedAt: { [Op.between]: [startDate, endDate] },
-                ...(botFilters.length > 0 && !botFilters.includes('All') ? { botName: { [Op.in]: botFilters } } : {})
+                ...baseMainWhere
             },
             attributes: ['pixGeneratedAt', 'purchasedAt']
         });
@@ -244,13 +244,11 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters)
     } else {
         // Para remarketing ("not_purchased") e upsell ("purchased")
         const purchaseWhere = { ...baseWhere, originCondition };
-        // Conta leads únicos que receberam a mensagem (distinct userId)
         const totalLeads = await Purchase.count({
             where: { ...baseWhere, originCondition },
             distinct: true,
             col: 'userId'
         });
-        // Conta usuários únicos que efetuaram o pagamento confirmado
         const totalConfirmed = await Purchase.count({
             where: { ...baseWhere, originCondition, status: 'paid' },
             distinct: true,
@@ -310,17 +308,17 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         endDate.setHours(23, 59, 59, 999);
 
         const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
-
-        const yesterday = new Date(startDate);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const startYesterday = makeDay(yesterday);
-        const endYesterday = new Date(startYesterday);
-        endYesterday.setHours(23, 59, 59, 999);
-        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
-
         const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
+
+        // Para "ontem", usamos uma nova data baseada em startDate
+        const yesterdayDate = new Date(startDate.getTime());
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const startYesterday = makeDay(yesterdayDate);
+        const endYesterday = new Date(startYesterday);
+        endYesterday.setHours(23, 59, 59, 999);
+        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
 
         // Ranking simples (global)
         const botRankingRaw = await Purchase.findAll({
@@ -339,7 +337,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado (global) – para os pagos
+        // Ranking detalhado (global) – para os pagamentos confirmados
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -414,14 +412,14 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
+        // Monta os detalhes de cada bot
         const botDetails = [];
-        botsWithPurchases.forEach(bot => {
+        for (const bot of botsWithPurchases) {
             const bName = bot.botName;
             const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
             const totalUsersBot = botUsersMap[bName] || 0;
-            // Para remarketing ("not_purchased") e upsell ("purchased"), 
-            // a taxa de conversão será calculada com base nos valores pagos em relação ao total gerado (obtido de generatedMap)
+            // Para o plano principal, a conversão é calculada com base apenas nos registros "main"
             const conversionRateBot = generatedMap[bName] > 0 ? (totalValueBot / generatedMap[bName]) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
 
@@ -445,10 +443,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 averageValue: averageValueBot,
                 plans: plansArray,
             });
-        });
+        }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // 7 dias – para cada dia, usamos a lógica da função getDetailedStats (que agora usa a razão sumConvertido/sumGerado)
+        // Estatísticas para os últimos 7 dias
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -510,8 +508,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     }
 });
 
-// Função auxiliar (opcional) para identificar se para um bot a estatística deve ser calculada via remarketing/upsell ou não.
-// Neste exemplo, mantemos a lógica do plano principal (retornando null).
+// Função auxiliar (mantida)
 function originConditionForBot(botName, botDetailsArray) {
     return null;
 }
