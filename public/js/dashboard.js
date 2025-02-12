@@ -10,8 +10,8 @@ $(document).ready(function () {
     // Variáveis de estado para paginação e filtro
     // -----------------------------------------------------------
     let currentPage = 1;            // Página atual (inicialmente 1)
-    let currentPerPage = 10;        // Quantas mov. exibir por página
-    let totalMovementsCount = 0;    // Recebemos do back-end
+    let currentPerPage = 10;        // Quantas movimentações exibir por página
+    let totalMovementsCount = 0;    // Valor recebido do back-end
     let totalPages = 1;             // Calculado
 
     // Armazenamos os bots selecionados (array de strings)
@@ -290,7 +290,7 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Estatísticas do Dia
+            // Atualiza as estatísticas gerais
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
@@ -318,12 +318,12 @@ $(document).ready(function () {
                     options: {
                         responsive: true,
                         scales: {
-                            y: { beginAtZero: true },
+                            y: { beginAtZero: true }
                         },
                         plugins: {
-                            chartBackground: {},
-                        },
-                    },
+                            chartBackground: {}
+                        }
+                    }
                 });
             } else {
                 salesChart.data = barData;
@@ -332,7 +332,10 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (7 dias) com dois eixos (dual axis) e offset para centralizar
+            // GRÁFICO DE LINHA (7 dias) com 3 eixos: 
+            // - "Valor Convertido (R$)" (y-axis-convertido, esquerda)
+            // - "Valor Gerado (R$)" (y-axis-gerado, direita)
+            // - "Taxa de Conversão (%)" (y-axis-conversion, direita)
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
@@ -340,6 +343,11 @@ $(document).ready(function () {
             });
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
+            const conversionRates = data.stats7Days.map(item => {
+                return item.totalVendasGeradas > 0
+                    ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
+                    : 0;
+            });
 
             const lineData = {
                 labels: lineLabels,
@@ -365,8 +373,19 @@ $(document).ready(function () {
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
                         yAxisID: 'y-axis-gerado'
+                    },
+                    {
+                        label: 'Taxa de Conversão (%)',
+                        data: conversionRates,
+                        fill: false,
+                        borderColor: 'green',
+                        pointBackgroundColor: 'green',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-conversion'
                     }
-                ],
+                ]
             };
 
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
@@ -392,6 +411,21 @@ $(document).ready(function () {
                                     drawOnChartArea: false
                                 }
                             },
+                            'y-axis-conversion': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                suggestedMax: 100,
+                                grid: {
+                                    drawOnChartArea: false
+                                },
+                                ticks: {
+                                    callback: function (value) {
+                                        return value + '%';
+                                    }
+                                }
+                            },
                             x: {}
                         },
                         plugins: {
@@ -400,7 +434,11 @@ $(document).ready(function () {
                                 callbacks: {
                                     label: function (ctx) {
                                         const value = ctx.parsed.y || 0;
-                                        return `R$ ${value.toFixed(2)}`;
+                                        if (ctx.dataset.label === 'Taxa de Conversão (%)') {
+                                            return `Taxa: ${value.toFixed(2)}%`;
+                                        } else {
+                                            return `R$ ${value.toFixed(2)}`;
+                                        }
                                     },
                                 },
                             },
@@ -532,7 +570,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para "forçar" o refresh
+    // Função para "forçar" o refresh do dashboard
     //------------------------------------------------------------
     function refreshDashboard() {
         const date = $('#datePicker').val();
@@ -540,7 +578,7 @@ $(document).ready(function () {
         updateDashboard(date, movStatus, currentPage, currentPerPage);
     }
 
-    // Removemos o antigo <select id="botFilter"> (se existir) e criamos o container
+    // Removemos o antigo <select id="botFilter"> (se existir) e criamos o container para dropdown custom
     $('#botFilter').remove();
     $('#movStatusFilter').parent().before(`<div id="botFilterContainer" style="position:relative;"></div>`);
 
