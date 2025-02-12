@@ -181,9 +181,9 @@ function makeDay(date) {
 
 /*
   A função getDetailedStats foi reestruturada em três ramos:
-  1. originCondition === 'main': somente registros do plano principal (originCondition "main")
-  2. originCondition não definido (nulo): considera todas as compras (contando apenas os registros de Purchase)
-  3. Para os demais (ex.: remarketing e upsell): filtra pelo originCondition informado.
+  1. Se originCondition === 'main': calcula apenas as estatísticas dos registros com originCondition "main"
+  2. Se originCondition é nulo (ou não informado): considera TODOS os registros (todas as compras)
+  3. Caso contrário (para remarketing ou upsell): utiliza o originCondition informado.
 */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     // Filtro base: registros cujo pixGeneratedAt está entre startDate e endDate
@@ -195,7 +195,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     }
 
     if (originCondition === 'main') {
-        // Plano principal: usa apenas registros com originCondition "main"
+        // Apenas para o plano principal
         const mainWhere = { ...baseWhere, originCondition: 'main' };
         const purchaseWhere = {
             ...mainWhere,
@@ -241,16 +241,19 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             averagePaymentDelayMs
         };
     } else if (!originCondition) {
-        // Todas as compras: considera TODOS os registros de Purchase
+        // Todas as compras: não filtra por originCondition
         const purchaseWhere = {
             ...baseWhere,
             purchasedAt: { [Op.between]: [startDate, endDate] }
         };
-        const totalUsers = await Purchase.count({
-            where: baseWhere,
-            distinct: true,
-            col: 'userId'
-        });
+        const userWhere = {
+            lastInteraction: { [Op.between]: [startDate, endDate] }
+        };
+        if (botFilters.length > 0 && !botFilters.includes('All')) {
+            purchaseWhere.botName = { [Op.in]: botFilters };
+            userWhere.botName = { [Op.in]: botFilters };
+        }
+        const totalUsers = await User.count({ where: userWhere });
         const totalPurchases = await Purchase.count({ where: purchaseWhere });
         const sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
         const sumConvertido = (await Purchase.sum('planValue', {
@@ -357,7 +360,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
 
-        // "Ontem": cria nova data baseada em startDate
+        // "Ontem": cria nova data sem alterar startDate
         const yesterdayDate = new Date(startDate.getTime());
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const startYesterday = makeDay(yesterdayDate);
@@ -457,19 +460,21 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
-        // Detalhes do plano principal: isola somente os registros com originCondition "main"
+        // Monta os detalhes de cada bot para o plano principal:
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
             const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
+            // Aqui, para o plano principal, isolamos os registros com originCondition "main"
             const totalUsersBot = await Purchase.count({
-                where: { ...baseWhere, originCondition: 'main', botName: bName },
+                where: { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: 'main', botName: bName },
                 distinct: true,
                 col: 'userId'
             });
+            // Também soma somente os valores gerados com originCondition "main"
             const generatedForBot = (await Purchase.sum('planValue', {
-                where: { ...baseWhere, originCondition: 'main', botName: bName }
+                where: { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: 'main', botName: bName }
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
