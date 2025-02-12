@@ -9,16 +9,16 @@ $(document).ready(function () {
     // -----------------------------------------------------------
     // Variáveis de estado para paginação e filtro
     // -----------------------------------------------------------
-    let currentPage = 1;
-    let currentPerPage = 10;
-    let totalMovementsCount = 0;
-    let totalPages = 1;
+    let currentPage = 1;            // Página atual (inicialmente 1)
+    let currentPerPage = 10;        // Quantas mov. exibir por página
+    let totalMovementsCount = 0;    // Recebemos do back-end
+    let totalPages = 1;             // Calculado
 
-    // Armazenamos os bots selecionados
-    let selectedBots = []; // ex: ["All"] ou ["@Bot1","@Bot2"]
+    // Armazenamos os bots selecionados (array de strings)
+    let selectedBots = []; // Ex: ["All"] ou ["@Bot1", "@Bot2"]
 
     //------------------------------------------------------------
-    // 1) PLUGIN chartBackground
+    // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -89,7 +89,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // formatDuration(ms) -> "Xm Ys"
+    // Função para formatar uma duração em ms -> "Xm Ys"
     //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
@@ -100,19 +100,18 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // renderPagination
+    // Função para renderizar a paginação (janela de 3 botões + setas)
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
         paginationContainer.empty();
 
-        if (totalPages <= 1) return; // nada
+        if (totalPages <= 1) return;
 
-        // Botões
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
 
-        // << (Volta 10)
+        // Botão: Voltar 10 (<<)
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -124,7 +123,7 @@ $(document).ready(function () {
         }
         group.append(doubleLeft);
 
-        // < (Volta 1)
+        // Botão: Voltar 1 (<)
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -136,10 +135,9 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // janela de 3 páginas
+        // Janela de 3 páginas
         let startPage = page - 1;
         let endPage = page + 1;
-
         if (startPage < 1) {
             startPage = 1;
             endPage = 3;
@@ -149,7 +147,6 @@ $(document).ready(function () {
             startPage = endPage - 2;
             if (startPage < 1) startPage = 1;
         }
-
         for (let p = startPage; p <= endPage; p++) {
             const btn = $(`<button class="btn btn-light">${p}</button>`);
             if (p === page) {
@@ -163,7 +160,7 @@ $(document).ready(function () {
             group.append(btn);
         }
 
-        // > (Avança 1)
+        // Botão: Avançar 1 (>)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -175,7 +172,7 @@ $(document).ready(function () {
         }
         group.append(singleRight);
 
-        // >> (Avança 10)
+        // Botão: Avançar 10 (>>)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -191,7 +188,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Carrega bots e monta o drop-down com checkboxes
+    // Carrega lista de bots e monta o dropdown com checkboxes
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
@@ -202,40 +199,31 @@ $(document).ready(function () {
             .catch(err => console.error('Erro ao carregar bots-list:', err));
     }
 
-    // Renderiza drop-down custom de checkboxes
     function renderBotCheckboxDropdown(botNames) {
-        // Cria o contêiner do drop-down
         const container = $('#botFilterContainer');
         container.empty();
 
-        // Botão que ao clicar, mostra/oculta a lista de checkboxes
         const toggleBtn = $(`
             <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
                 Selecionar Bots
             </button>
         `);
 
-        // Lista de checkboxes
-        const checkList = $('<div class="dropdown-menu p-2" style="max-height:250px; overflow:auto;"></div>');
+        const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
 
         // Checkbox "All"
         const allId = 'bot_all';
         const allItem = $(`
-            <div class="form-check">
+            <div class="form-check pl-2">
                 <input class="form-check-input" type="checkbox" id="${allId}" value="All">
                 <label class="form-check-label" for="${allId}">All</label>
             </div>
         `);
         allItem.find('input').on('change', function () {
             if ($(this).prop('checked')) {
-                // Se "All" é marcado, desmarca todos os outros
                 checkList.find('input[type="checkbox"]').not(`#${allId}`).prop('checked', false);
                 selectedBots = ['All'];
             } else {
-                // Se desmarcou "All", e não marcou mais nada,
-                // selectedBots vira vazio (exibe zero? ou iremos exibir nada?)
-                // Mas do jeito que pediram, se "All" for desmarcado
-                // a pessoa deve escolher manualmente os bots
                 selectedBots = [];
             }
             currentPage = 1;
@@ -243,25 +231,20 @@ $(document).ready(function () {
         });
         checkList.append(allItem);
 
-        // Demais bots
         botNames.forEach(bot => {
             const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
             const item = $(`
-                <div class="form-check">
+                <div class="form-check pl-2">
                     <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
                     <label class="form-check-label" for="${safeId}">${bot}</label>
                 </div>
             `);
             item.find('input').on('change', function () {
                 if ($(this).prop('checked')) {
-                    // se o user marcou esse bot, então desmarca "All" se estiver marcado
                     checkList.find(`#${allId}`).prop('checked', false);
-                    // remove "All" de selectedBots se estiver
                     selectedBots = selectedBots.filter(b => b !== 'All');
-                    // adiciona esse bot
                     selectedBots.push(bot);
                 } else {
-                    // se o user desmarcou esse bot
                     selectedBots = selectedBots.filter(b => b !== bot);
                 }
                 currentPage = 1;
@@ -270,19 +253,14 @@ $(document).ready(function () {
             checkList.append(item);
         });
 
-        // Cria um "dropdown" com Bootstrap 4
-        // -> Precisamos de .dropdown / .show ou usar script bootstrap
-        // Aqui, faremos um menu manual. Ao clicar no toggle, add .show
         const dropDiv = $('<div class="dropdown-multi"></div>');
         dropDiv.append(toggleBtn).append(checkList);
 
-        // Lógica de abrir/fechar no clique
         toggleBtn.on('click', function (e) {
             e.stopPropagation();
             checkList.toggleClass('show');
         });
 
-        // Ao clicar fora, fecha
         $(document).on('click', function (e) {
             if (!dropDiv.is(e.target) && dropDiv.has(e.target).length === 0) {
                 checkList.removeClass('show');
@@ -293,22 +271,14 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função principal: puxa /api/bots-stats
+    // Função principal para atualizar o dashboard
     //------------------------------------------------------------
     async function updateDashboard(date, movStatus, page, perPage) {
         try {
-            // Monta param botFilter
-            // se selectedBots.length=0 => filtra nada
-            // se tem "All" => param=All
-            // else => param="@Bot1,@Bot2" etc
             let botFilterParam = '';
-            if (selectedBots.length === 0) {
-                // se nenhum selecionado => param= (vazio)
-                // mas se quiser default "All", poderia
-            } else {
+            if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-
             let url = `/api/bots-stats?date=${date}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
@@ -327,7 +297,9 @@ $(document).ready(function () {
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // ----- Gráfico de Barras -----
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -339,7 +311,6 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
-
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
@@ -360,7 +331,9 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
-            // ----- Gráfico de Linha (7 dias) -----
+            //--------------------------------------------------
+            // GRÁFICO DE LINHA (7 dias) com dois eixos (dual axis) e offset para centralizar
+            //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[0]}`;
@@ -378,7 +351,9 @@ $(document).ready(function () {
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 6,
-                        tension: 0.4
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-convertido'
                     },
                     {
                         label: 'Valor Gerado (R$)',
@@ -387,10 +362,13 @@ $(document).ready(function () {
                         borderColor: '#36A2EB',
                         pointBackgroundColor: '#36A2EB',
                         pointHoverRadius: 6,
-                        tension: 0.4
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-gerado'
                     }
                 ],
             };
+
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -399,7 +377,22 @@ $(document).ready(function () {
                     options: {
                         responsive: true,
                         scales: {
-                            y: { beginAtZero: false },
+                            'y-axis-convertido': {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                offset: true
+                            },
+                            'y-axis-gerado': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            x: {}
                         },
                         plugins: {
                             chartBackground: {},
@@ -420,10 +413,12 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            // ----- Ranking Simples -----
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
-            if (data.botRanking?.length > 0) {
+            if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
                         <tr>
@@ -434,10 +429,12 @@ $(document).ready(function () {
                 });
             }
 
-            // ----- Ranking Detalhado -----
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
-            if (data.botDetails?.length > 0) {
+            if (data.botDetails && data.botDetails.length > 0) {
                 data.botDetails.forEach(bot => {
                     let plansHtml = '';
                     bot.plans.forEach(plan => {
@@ -456,46 +453,46 @@ $(document).ready(function () {
                 });
             }
 
-            // ----- Stats Detailed (All, Main, etc.)
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS
+            //--------------------------------------------------
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
             $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
             $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
 
-            // main
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
             $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
             $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
 
-            // not_purchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
             $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
             $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            // purchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
             $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            // ----- Últimas Movimentações
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES
+            //--------------------------------------------------
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
             const movementsTbody = $('#lastMovementsBody');
             movementsTbody.empty();
-            if (data.lastMovements?.length > 0) {
+            if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach(mov => {
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
                     let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
                     let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
-
                     let statusHtml = '';
                     if (mov.status === 'paid') {
                         statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
@@ -504,7 +501,6 @@ $(document).ready(function () {
                     } else {
                         statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
                     }
-
                     let payDelayHtml = '—';
                     if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                         const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
@@ -512,7 +508,6 @@ $(document).ready(function () {
                             payDelayHtml = formatDuration(diffMs);
                         }
                     }
-
                     movementsTbody.append(`
                         <tr>
                             <td>${leadId}</td>
@@ -531,30 +526,28 @@ $(document).ready(function () {
                     </tr>
                 `);
             }
-
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    // "refreshDashboard"
+    //------------------------------------------------------------
+    // Função para "forçar" o refresh
+    //------------------------------------------------------------
     function refreshDashboard() {
         const date = $('#datePicker').val();
         const movStatus = $('#movStatusFilter').val() || '';
         updateDashboard(date, movStatus, currentPage, currentPerPage);
     }
 
-    // 1) Cria contêiner p/ drop-down de bots
-    $('#botFilter').remove(); // remove <select id="botFilter"> antigo, se existir
-    // cria um container <div id="botFilterContainer"></div> dentro do mesmo lugar
-    $('#movStatusFilter').parent().before(`
-        <div id="botFilterContainer" style="position:relative;"></div>
-    `);
+    // Removemos o antigo <select id="botFilter"> (se existir) e criamos o container
+    $('#botFilter').remove();
+    $('#movStatusFilter').parent().before(`<div id="botFilterContainer" style="position:relative;"></div>`);
 
-    // 2) Carrega a lista de bots e renderiza checkboxes
+    // Carrega a lista de bots
     loadBotList();
 
-    // 3) Chamamos refreshDashboard() inicial
+    // Atualiza o dashboard inicialmente
     refreshDashboard();
 
     // ===== EVENTOS =====
