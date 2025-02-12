@@ -180,10 +180,10 @@ function makeDay(date) {
 }
 
 /*
-  Na função getDetailedStats, para o plano principal (originCondition "main")
-  serão considerados apenas os registros com originCondition igual a "main".
-  Para remarketing ("not_purchased") e upsell ("purchased"), os cálculos são feitos com base no respectivo originCondition.
-  botFilters tem valor padrão de array vazio.
+  A função getDetailedStats foi reestruturada em três ramos:
+  1. originCondition === 'main': somente registros do plano principal (originCondition "main")
+  2. originCondition não definido (nulo): considera todas as compras (contando apenas os registros de Purchase)
+  3. Para os demais (ex.: remarketing e upsell): filtra pelo originCondition informado.
 */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     // Filtro base: registros cujo pixGeneratedAt está entre startDate e endDate
@@ -194,30 +194,74 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
         baseWhere.botName = { [Op.in]: botFilters };
     }
 
-    if (!originCondition || originCondition === 'main') {
-        // Para o plano principal, forçamos originCondition = 'main'
-        const baseMainWhere = { ...baseWhere, originCondition: 'main' };
+    if (originCondition === 'main') {
+        // Plano principal: usa apenas registros com originCondition "main"
+        const mainWhere = { ...baseWhere, originCondition: 'main' };
         const purchaseWhere = {
-            ...baseMainWhere,
+            ...mainWhere,
             purchasedAt: { [Op.between]: [startDate, endDate] }
         };
-        // Total de leads: usuários distintos que possuem registros com originCondition "main"
         const totalUsers = await Purchase.count({
-            where: baseMainWhere,
+            where: mainWhere,
             distinct: true,
             col: 'userId'
         });
         const totalPurchases = await Purchase.count({ where: purchaseWhere });
-        const sumGerado = (await Purchase.sum('planValue', { where: baseMainWhere })) || 0;
+        const sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
         const sumConvertido = (await Purchase.sum('planValue', {
-            where: { ...baseMainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
         })) || 0;
         const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
         const paidPurchases = await Purchase.findAll({
             where: {
+                ...mainWhere,
                 status: 'paid',
-                purchasedAt: { [Op.between]: [startDate, endDate] },
-                ...baseMainWhere
+                purchasedAt: { [Op.between]: [startDate, endDate] }
+            },
+            attributes: ['pixGeneratedAt', 'purchasedAt']
+        });
+        let sumDiffMs = 0;
+        let countPaid = 0;
+        for (const p of paidPurchases) {
+            if (p.pixGeneratedAt && p.purchasedAt) {
+                const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                if (diff >= 0) {
+                    sumDiffMs += diff;
+                    countPaid++;
+                }
+            }
+        }
+        const averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        return {
+            totalUsers,
+            totalPurchases,
+            conversionRate,
+            totalVendasGeradas: sumGerado,
+            totalVendasConvertidas: sumConvertido,
+            averagePaymentDelayMs
+        };
+    } else if (!originCondition) {
+        // Todas as compras: considera TODOS os registros de Purchase
+        const purchaseWhere = {
+            ...baseWhere,
+            purchasedAt: { [Op.between]: [startDate, endDate] }
+        };
+        const totalUsers = await Purchase.count({
+            where: baseWhere,
+            distinct: true,
+            col: 'userId'
+        });
+        const totalPurchases = await Purchase.count({ where: purchaseWhere });
+        const sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
+        const sumConvertido = (await Purchase.sum('planValue', {
+            where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+        })) || 0;
+        const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+        const paidPurchases = await Purchase.findAll({
+            where: {
+                ...baseWhere,
+                status: 'paid',
+                purchasedAt: { [Op.between]: [startDate, endDate] }
             },
             attributes: ['pixGeneratedAt', 'purchasedAt']
         });
@@ -259,8 +303,9 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
         const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
         const paidPurchases = await Purchase.findAll({
             where: {
-                status: 'paid',
+                ...baseWhere,
                 originCondition,
+                status: 'paid',
                 ...(botFilters.length > 0 && !botFilters.includes('All') ? { botName: { [Op.in]: botFilters } } : {})
             },
             attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -312,7 +357,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
 
-        // Para "ontem", usamos uma nova data baseada em startDate
+        // "Ontem": cria nova data baseada em startDate
         const yesterdayDate = new Date(startDate.getTime());
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const startYesterday = makeDay(yesterdayDate);
@@ -412,15 +457,21 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
-        // Monta os detalhes de cada bot
+        // Detalhes do plano principal: isola somente os registros com originCondition "main"
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
             const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
-            const totalUsersBot = botUsersMap[bName] || 0;
-            // Para o plano principal, a conversão é calculada com base apenas nos registros "main"
-            const conversionRateBot = generatedMap[bName] > 0 ? (totalValueBot / generatedMap[bName]) * 100 : 0;
+            const totalUsersBot = await Purchase.count({
+                where: { ...baseWhere, originCondition: 'main', botName: bName },
+                distinct: true,
+                col: 'userId'
+            });
+            const generatedForBot = (await Purchase.sum('planValue', {
+                where: { ...baseWhere, originCondition: 'main', botName: bName }
+            })) || 0;
+            const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
 
             const plansObj = botPlansMap[bName] || {};
