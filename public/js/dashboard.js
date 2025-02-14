@@ -1,14 +1,24 @@
 // public/js/dashboard.js
 $(document).ready(function () {
     const today = new Date().toISOString().split('T')[0];
-    // A princípio, definimos "hoje" como default do datePicker
-    // Mas iremos configurar um range-picker com a lib daterangepicker
+    $('#datePicker').val(today);
 
     let salesChart;
     let lineComparisonChart;
 
+    // -----------------------------------------------------------
+    // Variáveis de estado para paginação e filtro
+    // -----------------------------------------------------------
+    let currentPage = 1;            // Página atual (inicialmente 1)
+    let currentPerPage = 10;        // Quantas movimentações exibir por página
+    let totalMovementsCount = 0;    // Valor recebido do back-end
+    let totalPages = 1;             // Calculado
+
+    // Armazenamos os bots selecionados (array de strings)
+    let selectedBots = []; // Ex: ["All"] ou ["@Bot1", "@Bot2"]
+
     //------------------------------------------------------------
-    // 1) Plugin para pintar o background do gráfico
+    // 1) PLUGIN para pintar o background do gráfico
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -45,7 +55,6 @@ $(document).ready(function () {
             localStorage.setItem('theme', 'dark');
         }
         updateChartsIfExist();
-        adjustCardTextColor();
     });
 
     function updateChartsIfExist() {
@@ -80,37 +89,200 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Ajusta a cor do texto nos cards (stats-display) dependendo do tema
+    // Função para formatar uma duração em ms -> "Xm Ys"
     //------------------------------------------------------------
-    function adjustCardTextColor() {
-        const isDark = body.hasClass('dark-mode');
-        if (isDark) {
-            $('.stats-display').css('color', '#fff');
-        } else {
-            $('.stats-display').css('color', '#000');
-        }
+    function formatDuration(ms) {
+        if (ms <= 0) return '0s';
+        const totalSec = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSec / 60);
+        const seconds = totalSec % 60;
+        return `${minutes}m ${seconds}s`;
     }
-    adjustCardTextColor();
 
     //------------------------------------------------------------
-    // FUNÇÃO PRINCIPAL: updateDashboard(dates, movStatus, page, perPage, botFilter)
+    // Função para renderizar a paginação (janela de 3 botões + setas)
     //------------------------------------------------------------
-    async function updateDashboard(dateParam, movStatus, page, perPage, botFilterArray) {
+    function renderPagination(total, page, perPage) {
+        totalPages = Math.ceil(total / perPage);
+        const paginationContainer = $('#paginationContainer');
+        paginationContainer.empty();
+
+        if (totalPages <= 1) return;
+
+        const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
+
+        // Botão: Voltar 10 (<<)
+        const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
+        if (page > 10) {
+            doubleLeft.on('click', () => {
+                currentPage = Math.max(1, page - 10);
+                refreshDashboard();
+            });
+        } else {
+            doubleLeft.prop('disabled', true);
+        }
+        group.append(doubleLeft);
+
+        // Botão: Voltar 1 (<)
+        const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
+        if (page > 1) {
+            singleLeft.on('click', () => {
+                currentPage = page - 1;
+                refreshDashboard();
+            });
+        } else {
+            singleLeft.prop('disabled', true);
+        }
+        group.append(singleLeft);
+
+        // Janela de 3 páginas
+        let startPage = page - 1;
+        let endPage = page + 1;
+        if (startPage < 1) {
+            startPage = 1;
+            endPage = 3;
+        }
+        if (endPage > totalPages) {
+            endPage = totalPages;
+            startPage = endPage - 2;
+            if (startPage < 1) startPage = 1;
+        }
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = $(`<button class="btn btn-light">${p}</button>`);
+            if (p === page) {
+                btn.addClass('btn-primary');
+            } else {
+                btn.on('click', () => {
+                    currentPage = p;
+                    refreshDashboard();
+                });
+            }
+            group.append(btn);
+        }
+
+        // Botão: Avançar 1 (>)
+        const singleRight = $('<button class="btn btn-light">&raquo;</button>');
+        if (page < totalPages) {
+            singleRight.on('click', () => {
+                currentPage = page + 1;
+                refreshDashboard();
+            });
+        } else {
+            singleRight.prop('disabled', true);
+        }
+        group.append(singleRight);
+
+        // Botão: Avançar 10 (>>)
+        const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
+        if (page + 10 <= totalPages) {
+            doubleRight.on('click', () => {
+                currentPage = Math.min(totalPages, page + 10);
+                refreshDashboard();
+            });
+        } else {
+            doubleRight.prop('disabled', true);
+        }
+        group.append(doubleRight);
+
+        paginationContainer.append(group);
+    }
+
+    //------------------------------------------------------------
+    // Carrega lista de bots e monta o dropdown com checkboxes
+    //------------------------------------------------------------
+    function loadBotList() {
+        fetch('/api/bots-list')
+            .then(res => res.json())
+            .then(botNames => {
+                renderBotCheckboxDropdown(botNames);
+            })
+            .catch(err => console.error('Erro ao carregar bots-list:', err));
+    }
+
+    function renderBotCheckboxDropdown(botNames) {
+        const container = $('#botFilterContainer');
+        container.empty();
+
+        const toggleBtn = $(`
+            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+                Selecionar Bots
+            </button>
+        `);
+
+        const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
+
+        // Checkbox "All"
+        const allId = 'bot_all';
+        const allItem = $(`
+            <div class="form-check pl-2">
+                <input class="form-check-input" type="checkbox" id="${allId}" value="All">
+                <label class="form-check-label" for="${allId}">All</label>
+            </div>
+        `);
+        allItem.find('input').on('change', function () {
+            if ($(this).prop('checked')) {
+                checkList.find('input[type="checkbox"]').not(`#${allId}`).prop('checked', false);
+                selectedBots = ['All'];
+            } else {
+                selectedBots = [];
+            }
+            currentPage = 1;
+            refreshDashboard();
+        });
+        checkList.append(allItem);
+
+        botNames.forEach(bot => {
+            const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
+            const item = $(`
+                <div class="form-check pl-2">
+                    <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
+                    <label class="form-check-label" for="${safeId}">${bot}</label>
+                </div>
+            `);
+            item.find('input').on('change', function () {
+                if ($(this).prop('checked')) {
+                    checkList.find(`#${allId}`).prop('checked', false);
+                    selectedBots = selectedBots.filter(b => b !== 'All');
+                    selectedBots.push(bot);
+                } else {
+                    selectedBots = selectedBots.filter(b => b !== bot);
+                }
+                currentPage = 1;
+                refreshDashboard();
+            });
+            checkList.append(item);
+        });
+
+        const dropDiv = $('<div class="dropdown-multi"></div>');
+        dropDiv.append(toggleBtn).append(checkList);
+
+        toggleBtn.on('click', function (e) {
+            e.stopPropagation();
+            checkList.toggleClass('show');
+        });
+
+        $(document).on('click', function (e) {
+            if (!dropDiv.is(e.target) && dropDiv.has(e.target).length === 0) {
+                checkList.removeClass('show');
+            }
+        });
+
+        container.append(dropDiv);
+    }
+
+    //------------------------------------------------------------
+    // Função principal para atualizar o dashboard
+    //------------------------------------------------------------
+    async function updateDashboard(date, movStatus, page, perPage) {
         try {
-            let url = `/api/bots-stats?date=${encodeURIComponent(dateParam)}`;
-            if (movStatus) {
-                url += `&movStatus=${movStatus}`;
+            let botFilterParam = '';
+            if (selectedBots.length > 0) {
+                botFilterParam = selectedBots.join(',');
             }
-            if (page) {
-                url += `&page=${page}`;
-            }
-            if (perPage) {
-                url += `&perPage=${perPage}`;
-            }
-            if (botFilterArray && botFilterArray.length > 0) {
-                const joined = botFilterArray.join(',');
-                url += `&botFilter=${encodeURIComponent(joined)}`;
-            }
+            let url = `/api/bots-stats?date=${date}`;
+            if (movStatus) url += `&movStatus=${movStatus}`;
+            if (botFilterParam) url += `&botFilter=${botFilterParam}`;
+            url += `&page=${page}&perPage=${perPage}`;
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -118,24 +290,26 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Preencher estatísticas do Dia (parte superior)
+            // Atualiza as estatísticas gerais
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // GRÁFICO DE BARRAS: [Usuários, Compras]
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
-                datasets: [{
-                    label: 'Quantidade',
-                    data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                    backgroundColor: ['#36A2EB', '#FF0000']
-                }],
+                datasets: [
+                    {
+                        label: 'Quantidade',
+                        data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
+                        backgroundColor: ['#36A2EB', '#FF0000']
+                    },
+                ],
             };
-            // Define o yMax de forma dinâmica
-            const yMax = Math.max(data.statsAll.totalUsers, data.statsAll.totalPurchases) * 1.2;
             const barCtx = document.getElementById('salesChart').getContext('2d');
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
@@ -143,35 +317,38 @@ $(document).ready(function () {
                     data: barData,
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false, // Garante que a altura definida via CSS seja mantida
                         scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: yMax
-                            },
-                            x: {}
+                            y: { beginAtZero: true }
                         },
                         plugins: {
-                            chartBackground: {},
-                        },
-                    },
+                            chartBackground: {}
+                        }
+                    }
                 });
             } else {
                 salesChart.data = barData;
-                salesChart.options.scales.y.max = yMax;
             }
             applyChartOptions(salesChart);
             salesChart.update();
 
-            // GRÁFICO DE LINHA (7 dias)
+            //--------------------------------------------------
+            // GRÁFICO DE LINHA (7 dias) com 3 eixos: 
+            // - "Valor Convertido (R$)" (y-axis-convertido, esquerda)
+            // - "Valor Gerado (R$)" (y-axis-gerado, direita)
+            // - "Taxa de Conversão (%)" (y-axis-conversion, direita)
+            //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
-                const day = parts[2];
-                const year = parts[0];
-                return day + '/' + year;
+                return `${parts[2]}/${parts[0]}`;
             });
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
+            const conversionRates = data.stats7Days.map(item => {
+                return item.totalVendasGeradas > 0
+                    ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
+                    : 0;
+            });
+
             const lineData = {
                 labels: lineLabels,
                 datasets: [
@@ -183,7 +360,8 @@ $(document).ready(function () {
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 6,
                         tension: 0.4,
-                        cubicInterpolationMode: 'monotone'
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-convertido'
                     },
                     {
                         label: 'Valor Gerado (R$)',
@@ -193,10 +371,23 @@ $(document).ready(function () {
                         pointBackgroundColor: '#36A2EB',
                         pointHoverRadius: 6,
                         tension: 0.4,
-                        cubicInterpolationMode: 'monotone'
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-gerado'
+                    },
+                    {
+                        label: 'Taxa de Conversão (%)',
+                        data: conversionRates,
+                        fill: false,
+                        borderColor: 'green',
+                        pointBackgroundColor: 'green',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-conversion'
                     }
-                ],
+                ]
             };
+
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -204,18 +395,50 @@ $(document).ready(function () {
                     data: lineData,
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
                         scales: {
-                            y: { beginAtZero: false },
+                            'y-axis-convertido': {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                offset: true
+                            },
+                            'y-axis-gerado': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            'y-axis-conversion': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                suggestedMax: 100,
+                                grid: {
+                                    drawOnChartArea: false
+                                },
+                                ticks: {
+                                    callback: function (value) {
+                                        return value + '%';
+                                    }
+                                }
+                            },
                             x: {}
                         },
                         plugins: {
                             chartBackground: {},
                             tooltip: {
                                 callbacks: {
-                                    label: function (context) {
-                                        const value = context.parsed.y || 0;
-                                        return `R$ ${value.toFixed(2)}`;
+                                    label: function (ctx) {
+                                        const value = ctx.parsed.y || 0;
+                                        if (ctx.dataset.label === 'Taxa de Conversão (%)') {
+                                            return `Taxa: ${value.toFixed(2)}%`;
+                                        } else {
+                                            return `R$ ${value.toFixed(2)}`;
+                                        }
                                     },
                                 },
                             },
@@ -228,63 +451,25 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            // Preencher Tabela de Movimentações
-            const movementsTbody = $('#lastMovementsBody');
-            movementsTbody.empty();
-            if (data.lastMovements && data.lastMovements.length > 0) {
-                data.lastMovements.forEach(mov => {
-                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
-                    let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
-                    let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
-                    let statusHtml = '';
-                    if (mov.status === 'paid') {
-                        statusHtml = '<span style="font-weight:bold; color:green;">Paid</span>';
-                    } else if (mov.status === 'pending') {
-                        statusHtml = '<span style="font-weight:bold; color:#ff9900;">Pending</span>';
-                    } else {
-                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
-                    }
-                    let payDelayHtml = '—';
-                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
-                        const diffMs = new Date(mov.purchasedAt).getTime() - new Date(mov.pixGeneratedAt).getTime();
-                        if (diffMs >= 0) {
-                            payDelayHtml = formatDuration(diffMs);
-                        }
-                    }
-                    movementsTbody.append(`
-                        <tr>
-                          <td>${leadId}</td>
-                          <td>R$ ${mov.planValue.toFixed(2)}</td>
-                          <td>${dtGen}</td>
-                          <td>${dtPaid}</td>
-                          <td>${statusHtml}</td>
-                          <td>${payDelayHtml}</td>
-                        </tr>
-                    `);
-                });
-            } else {
-                movementsTbody.append('<tr><td colspan="6">Nenhuma movimentação encontrada</td></tr>');
-            }
-
-            // Paginação
-            const totalMovements = data.totalMovements || 0;
-            buildPagination(totalMovements, page, perPage);
-
-            // Ranking simples
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
                         <tr>
-                          <td>${bot.botName || 'N/A'}</td>
-                          <td>${bot.vendas}</td>
+                            <td>${bot.botName || 'N/A'}</td>
+                            <td>${bot.vendas}</td>
                         </tr>
                     `);
                 });
             }
 
-            // Dashboard Detalhado
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -295,256 +480,132 @@ $(document).ready(function () {
                     });
                     detailsTbody.append(`
                         <tr>
-                          <td>${bot.botName}</td>
-                          <td>R$${bot.valorGerado.toFixed(2)}</td>
-                          <td>${bot.totalPurchases}</td>
-                          <td>${plansHtml}</td>
-                          <td>${bot.conversionRate.toFixed(2)}%</td>
-                          <td>R$${bot.averageValue.toFixed(2)}</td>
+                            <td>${bot.botName}</td>
+                            <td>R$${bot.valorGerado.toFixed(2)}</td>
+                            <td>${bot.totalPurchases}</td>
+                            <td>${plansHtml}</td>
+                            <td>${bot.conversionRate.toFixed(2)}%</td>
+                            <td>R$${bot.averageValue.toFixed(2)}</td>
                         </tr>
                     `);
                 });
             }
 
-            // Preenche cards de "TODA" / "MAIN" / "NOT_PURCHASED" / "PURCHASED"
-            if (data.statsAll) {
-                $('#cardAllLeads').text(data.statsAll.totalUsers);
-                $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-                $('#cardAllConversionRateDetailed').text(data.statsAll.conversionRate.toFixed(2) + '%');
-                $('#cardAllTotalVolume').text('R$ ' + data.statsAll.totalVendasGeradas.toFixed(2));
-                $('#cardAllTotalPaidVolume').text('R$ ' + data.statsAll.totalVendasConvertidas.toFixed(2));
-            }
-            if (data.statsMain) {
-                $('#cardMainLeads').text(data.statsMain.totalUsers);
-                $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-                $('#cardMainConversionRateDetailed').text(data.statsMain.conversionRate.toFixed(2) + '%');
-                $('#cardMainTotalVolume').text('R$ ' + data.statsMain.totalVendasGeradas.toFixed(2));
-                $('#cardMainTotalPaidVolume').text('R$ ' + data.statsMain.totalVendasConvertidas.toFixed(2));
-            }
-            if (data.statsNotPurchased) {
-                $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-                $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
-                $('#cardNotPurchasedConversionRateDetailed').text(data.statsNotPurchased.conversionRate.toFixed(2) + '%');
-                $('#cardNotPurchasedTotalVolume').text('R$ ' + data.statsNotPurchased.totalVendasGeradas.toFixed(2));
-                $('#cardNotPurchasedTotalPaidVolume').text('R$ ' + data.statsNotPurchased.totalVendasConvertidas.toFixed(2));
-            }
-            if (data.statsPurchased) {
-                $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-                $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
-                $('#cardPurchasedConversionRateDetailed').text(data.statsPurchased.conversionRate.toFixed(2) + '%');
-                $('#cardPurchasedTotalVolume').text('R$ ' + data.statsPurchased.totalVendasGeradas.toFixed(2));
-                $('#cardPurchasedTotalPaidVolume').text('R$ ' + data.statsPurchased.totalVendasConvertidas.toFixed(2));
-            }
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS
+            //--------------------------------------------------
+            $('#cardAllLeads').text(data.statsAll.totalUsers);
+            $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
+            $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
+            $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
+            $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
 
+            $('#cardMainLeads').text(data.statsMain.totalUsers);
+            $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
+            $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
+            $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
+            $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
+
+            $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
+            $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
+            $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+            $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
+            $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
+            $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES
+            //--------------------------------------------------
+            totalMovementsCount = data.totalMovements || 0;
+            renderPagination(totalMovementsCount, page, perPage);
+
+            const movementsTbody = $('#lastMovementsBody');
+            movementsTbody.empty();
+            if (data.lastMovements && data.lastMovements.length > 0) {
+                data.lastMovements.forEach(mov => {
+                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
+                    let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
+                    let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
+                    let statusHtml = '';
+                    if (mov.status === 'paid') {
+                        statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
+                    } else if (mov.status === 'pending') {
+                        statusHtml = `<span style="color:#ff9900;font-weight:bold;">Pending</span>`;
+                    } else {
+                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+                    }
+                    let payDelayHtml = '—';
+                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                        const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
+                        if (diffMs >= 0) {
+                            payDelayHtml = formatDuration(diffMs);
+                        }
+                    }
+                    movementsTbody.append(`
+                        <tr>
+                            <td>${leadId}</td>
+                            <td>R$ ${mov.planValue.toFixed(2)}</td>
+                            <td>${dtGen}</td>
+                            <td>${dtPaid}</td>
+                            <td>${statusHtml}</td>
+                            <td>${payDelayHtml}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                movementsTbody.append(`
+                    <tr>
+                        <td colspan="6">Nenhuma movimentação encontrada</td>
+                    </tr>
+                `);
+            }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
     //------------------------------------------------------------
-    // buildPagination
+    // Função para "forçar" o refresh do dashboard
     //------------------------------------------------------------
-    function buildPagination(total, currentPage, perPage) {
-        const container = $('#paginationContainer');
-        container.empty();
-        if (total <= perPage) return;
-        const totalPages = Math.ceil(total / perPage);
-
-        let html = `<nav aria-label="Movements pagination"><ul class="pagination pagination-sm">`;
-        for (let p = 1; p <= totalPages; p++) {
-            html += `<li class="page-item ${p === currentPage ? 'active' : ''}">
-                        <a class="page-link mov-page-link" href="#" data-page="${p}">${p}</a>
-                     </li>`;
-        }
-        html += `</ul></nav>`;
-        container.html(html);
+    function refreshDashboard() {
+        const date = $('#datePicker').val();
+        const movStatus = $('#movStatusFilter').val() || '';
+        updateDashboard(date, movStatus, currentPage, currentPerPage);
     }
 
-    // Evento de clique na paginação
-    $('#paginationContainer').on('click', '.mov-page-link', function (e) {
-        e.preventDefault();
-        const newPage = parseInt($(this).data('page'), 10);
-        const dateParam = dateParamGlobal;
-        const movStatus = $('#movStatusFilter').val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParam, movStatus, newPage, parseInt($('#movPerPage').val()), botArr);
+    // Removemos o antigo <select id="botFilter"> (se existir) e criamos o container para dropdown custom
+    $('#botFilter').remove();
+    $('#movStatusFilter').parent().before(`<div id="botFilterContainer" style="position:relative;"></div>`);
+
+    // Carrega a lista de bots
+    loadBotList();
+
+    // Atualiza o dashboard inicialmente
+    refreshDashboard();
+
+    // ===== EVENTOS =====
+    $('#datePicker').on('change', function () {
+        currentPage = 1;
+        refreshDashboard();
     });
 
-    //------------------------------------------------------------
-    // formatDuration (ms -> "Xm Ys")
-    //------------------------------------------------------------
-    function formatDuration(ms) {
-        if (ms <= 0) return '0s';
-        const totalSec = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSec / 60);
-        const seconds = totalSec % 60;
-        return `${minutes}m ${seconds}s`;
-    }
-
-    //------------------------------------------------------------
-    // BOT FILTER
-    //------------------------------------------------------------
-    let allBots = [];
-    function buildBotFilterDropdown() {
-        const container = $('#botFilterContainer');
-        container.empty();
-
-        const dropdown = $(`
-            <div class="dropdown-multi">
-                <button class="btn btn-sm dropdown-toggle" type="button" id="botFilterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Selecionar Bots
-                </button>
-                <div class="dropdown-menu" aria-labelledby="botFilterDropdown"></div>
-            </div>
-        `);
-        const menu = dropdown.find('.dropdown-menu');
-
-        const allItem = $(`
-            <div class="form-check">
-                <input class="form-check-input bot-check" type="checkbox" value="All" id="botCheckAll">
-                <label class="form-check-label" for="botCheckAll">Todos</label>
-            </div>
-        `);
-        menu.append(allItem);
-        allBots.forEach(botName => {
-            const idSafe = 'botCheck_' + botName.replace(/[^a-zA-Z0-9]/g, '');
-            const item = $(`
-                <div class="form-check">
-                    <input class="form-check-input bot-check" type="checkbox" value="${botName}" id="${idSafe}">
-                    <label class="form-check-label" for="${idSafe}">${botName}</label>
-                </div>
-            `);
-            menu.append(item);
-        });
-        container.append(dropdown);
-
-        dropdown.find('.dropdown-toggle').on('click', function (e) {
-            e.preventDefault();
-            menu.toggleClass('show');
-        });
-        $('#botCheckAll').on('change', function () {
-            if ($(this).is(':checked')) {
-                $('.bot-check').not(this).prop('checked', false);
-            }
-        });
-        $('.bot-check').not('#botCheckAll').on('change', function () {
-            if ($(this).is(':checked')) {
-                $('#botCheckAll').prop('checked', false);
-            }
-        });
-    }
-
-    function getSelectedBots() {
-        const checked = $('.bot-check:checked');
-        return checked.map((i, el) => $(el).val()).get();
-    }
-
-    //------------------------------------------------------------
-    // Carrega a lista de bots / buildBotFilter
-    //------------------------------------------------------------
-    async function loadBotsList() {
-        try {
-            const resp = await fetch('/api/bots-list');
-            if (!resp.ok) return;
-            allBots = await resp.json();
-            buildBotFilterDropdown();
-        } catch (err) {
-            console.error('Erro ao carregar bots-list:', err);
-        }
-    }
-    loadBotsList();
-
-    //------------------------------------------------------------
-    // datePicker com DateRangePicker
-    //------------------------------------------------------------
-    let dateParamGlobal = today;
-    $('#datePicker').daterangepicker({
-        singleDatePicker: false,
-        showDropdowns: true,
-        autoUpdateInput: false,
-        locale: {
-            format: 'DD/MM/YYYY',
-            applyLabel: 'Aplicar',
-            cancelLabel: 'Cancelar',
-            customRangeLabel: 'Personalizar Datas',
-        },
-        ranges: {
-            'Hoje': [moment(), moment()],
-            'Ontem': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-            'Últimos 7 dias': [moment().subtract(6, 'days'), moment()],
-            'Este Mês': [moment().startOf('month'), moment().endOf('month')],
-            'Mês Passado': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
-        }
-    }, function (start, end, label) {
-        if (label === 'Personalizar Datas') {
-            const startStr = start.format('DD/MM/YYYY');
-            const endStr = end.format('DD/MM/YYYY');
-            if (startStr === endStr) {
-                const singleDay = start.format('YYYY-MM-DD');
-                dateParamGlobal = singleDay;
-                $('#datePicker').val(singleDay);
-            } else {
-                dateParamGlobal = `${startStr} - ${endStr}`;
-                $('#datePicker').val(dateParamGlobal);
-            }
-        } else {
-            const sDay = start.format('YYYY-MM-DD');
-            const eDay = end.format('YYYY-MM-DD');
-            if (sDay === eDay) {
-                dateParamGlobal = sDay;
-                $('#datePicker').val(dateParamGlobal);
-            } else {
-                const st = start.format('DD/MM/YYYY');
-                const en = end.format('DD/MM/YYYY');
-                dateParamGlobal = `${st} - ${en}`;
-                $('#datePicker').val(dateParamGlobal);
-            }
-        }
-        const movStatus = $('#movStatusFilter').val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParamGlobal, movStatus, 1, parseInt($('#movPerPage').val()), botArr);
-    });
-
-    $('#datePicker').on('cancel.daterangepicker', function () {
-        $(this).val('');
-        dateParamGlobal = today;
-        const movStatus = $('#movStatusFilter').val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParamGlobal, movStatus, 1, parseInt($('#movPerPage').val()), botArr);
-    });
-
-    $('#datePicker').val(moment().format('YYYY-MM-DD'));
-    dateParamGlobal = moment().format('YYYY-MM-DD');
-
-    //------------------------------------------------------------
-    // movStatus e perPage
-    //------------------------------------------------------------
     $('#movStatusFilter').on('change', function () {
-        const movStatus = $(this).val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParamGlobal, movStatus, 1, parseInt($('#movPerPage').val()), botArr);
+        currentPage = 1;
+        refreshDashboard();
     });
+
     $('#movPerPage').on('change', function () {
-        const movStatus = $('#movStatusFilter').val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParamGlobal, movStatus, 1, parseInt($('#movPerPage').val()), botArr);
+        currentPerPage = parseInt($(this).val(), 10);
+        currentPage = 1;
+        refreshDashboard();
     });
 
-    $(document).on('click', function (e) {
-        const dropdown = $('.dropdown-multi');
-        if (!dropdown.is(e.target) && dropdown.has(e.target).length === 0) {
-            dropdown.find('.dropdown-menu').removeClass('show');
-        }
-    });
-    $(document).on('change', '.bot-check', function () {
-        const movStatus = $('#movStatusFilter').val() || '';
-        const botArr = getSelectedBots();
-        updateDashboard(dateParamGlobal, movStatus, 1, parseInt($('#movPerPage').val()), botArr);
-    });
-
-    //------------------------------------------------------------
-    // Toggle Seções no sidebar
-    //------------------------------------------------------------
+    // Sidebar toggle
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -559,16 +620,8 @@ $(document).ready(function () {
         $(`#${targetSection}`).removeClass('d-none');
     });
 
-    //------------------------------------------------------------
-    // Botão hamburguer
-    //------------------------------------------------------------
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
+        $('main[role="main"]').toggleClass('expanded');
     });
-
-    //------------------------------------------------------------
-    // Carregar inicial
-    const initialStatus = $('#movStatusFilter').val() || '';
-    const botArr = getSelectedBots();
-    updateDashboard(dateParamGlobal, initialStatus, 1, parseInt($('#movPerPage').val()), botArr);
 });
