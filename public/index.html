@@ -108,6 +108,35 @@
                     <input type="date" id="datePicker" class="form-control" value="" />
                 </div>
 
+                <!-- 
+                  NOVO: Filtro de Intervalo 
+                  - Esse seletor permite escolher "Hoje", "Ontem", etc.
+                  - Quando "Personalizado" é escolhido, mostra dois inputs de data (início/fim).
+                -->
+                <div class="form-group">
+                    <label for="dateRangeSelector">Filtrar por intervalo:</label>
+                    <select id="dateRangeSelector" class="form-control">
+                        <option value="today">Hoje</option>
+                        <option value="yesterday">Ontem</option>
+                        <option value="last7">Últimos 7 dias</option>
+                        <option value="last30">Últimos 30 dias</option>
+                        <option value="lastMonth">Mês Anterior</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+
+                <div id="customDateRangeContainer" style="display:none; margin-bottom:1rem;">
+                    <div class="form-group">
+                        <label for="startDateInput">Data Início:</label>
+                        <input type="date" id="startDateInput" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label for="endDateInput">Data Fim:</label>
+                        <input type="date" id="endDateInput" class="form-control" />
+                    </div>
+                </div>
+                <!-- Fim do bloco NOVO -->
+
                 <!-- SEÇÃO 1: Estatísticas do Dia -->
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>

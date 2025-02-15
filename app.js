@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js
+// app.js (atualizado)
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -52,7 +52,6 @@ db.sequelize
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
-    // Página de login sofisticada, com fundo cinza, formulário centralizado e "olho" para mostrar/esconder senha
     const html = `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -110,7 +109,6 @@ app.get('/login', (req, res) => {
         </form>
       </div>
       <script>
-        // Alterna a visibilidade da senha
         document.getElementById('togglePassword').addEventListener('click', function () {
           const passwordInput = document.getElementById('password');
           const currentType = passwordInput.getAttribute('type');
@@ -179,142 +177,146 @@ function makeDay(date) {
     return d;
 }
 
-/*
-  A função getDetailedStats foi reestruturada em três ramos:
-  1. Se originCondition === 'main': calcula apenas as estatísticas dos registros com originCondition "main"
-  2. Se originCondition é nulo (ou não informado): considera TODOS os registros (todas as compras)
-  3. Caso contrário (para remarketing ou upsell): utiliza o originCondition informado.
-*/
+/**
+ * Calcula as estatísticas para um determinado intervalo e condição.
+ * Assegure-se de SEMPRE retornar um objeto com as chaves esperadas:
+ * { totalUsers, totalPurchases, conversionRate, totalVendasGeradas, totalVendasConvertidas, averagePaymentDelayMs }
+ */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // Filtro base: registros cujo pixGeneratedAt está entre startDate e endDate
+    // Exemplo adaptado do que você já tinha; não tire nada que já existia.
+    // Ajuste para sempre retornar o objeto mesmo se houver erro ou sem dados.
+
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
     }
 
-    if (originCondition === 'main') {
-        // Apenas para o plano principal
-        const mainWhere = { ...baseWhere, originCondition: 'main' };
-        const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-        const totalUsers = await Purchase.count({
-            where: mainWhere,
-            distinct: true,
-            col: 'userId'
-        });
-        const totalPurchases = await Purchase.count({ where: purchaseWhere });
-        const sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
-        const sumConvertido = (await Purchase.sum('planValue', {
-            where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
-        })) || 0;
-        const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-        const paidPurchases = await Purchase.findAll({
-            where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
-            attributes: ['pixGeneratedAt', 'purchasedAt']
-        });
-        let sumDiffMs = 0;
-        let countPaid = 0;
-        for (const p of paidPurchases) {
-            if (p.pixGeneratedAt && p.purchasedAt) {
-                const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                if (diff >= 0) {
-                    sumDiffMs += diff;
-                    countPaid++;
+    let totalUsers = 0;
+    let totalPurchases = 0;
+    let sumGerado = 0;
+    let sumConvertido = 0;
+    let averagePaymentDelayMs = 0;
+    let conversionRate = 0;
+
+    try {
+        if (originCondition === 'main') {
+            // Filtra originCondition=main
+            const mainWhere = { ...baseWhere, originCondition: 'main' };
+            const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: mainWhere,
+                distinct: true,
+                col: 'userId'
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
-        }
-        const averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        return {
-            totalUsers,
-            totalPurchases,
-            conversionRate,
-            totalVendasGeradas: sumGerado,
-            totalVendasConvertidas: sumConvertido,
-            averagePaymentDelayMs
-        };
-    } else if (!originCondition) {
-        // Todas as compras: não filtra por originCondition
-        const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-        const userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
-        if (botFilters.length > 0 && !botFilters.includes('All')) {
-            purchaseWhere.botName = { [Op.in]: botFilters };
-            userWhere.botName = { [Op.in]: botFilters };
-        }
-        const totalUsers = await User.count({ where: userWhere });
-        const totalPurchases = await Purchase.count({ where: purchaseWhere });
-        const sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
-        const sumConvertido = (await Purchase.sum('planValue', {
-            where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
-        })) || 0;
-        const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-        const paidPurchases = await Purchase.findAll({
-            where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
-            attributes: ['pixGeneratedAt', 'purchasedAt']
-        });
-        let sumDiffMs = 0;
-        let countPaid = 0;
-        for (const p of paidPurchases) {
-            if (p.pixGeneratedAt && p.purchasedAt) {
-                const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                if (diff >= 0) {
-                    sumDiffMs += diff;
-                    countPaid++;
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else if (!originCondition) {
+            // Todas as compras
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                purchaseWhere.botName = { [Op.in]: botFilters };
+                userWhere.botName = { [Op.in]: botFilters };
+            }
+            totalUsers = await User.count({ where: userWhere });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
-        }
-        const averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        return {
-            totalUsers,
-            totalPurchases,
-            conversionRate,
-            totalVendasGeradas: sumGerado,
-            totalVendasConvertidas: sumConvertido,
-            averagePaymentDelayMs
-        };
-    } else {
-        // Para remarketing ("not_purchased") e upsell ("purchased")
-        const purchaseWhere = { ...baseWhere, originCondition };
-        const totalLeads = await Purchase.count({
-            where: { ...baseWhere, originCondition },
-            distinct: true,
-            col: 'userId'
-        });
-        const totalConfirmed = await Purchase.count({
-            where: { ...baseWhere, originCondition, status: 'paid' },
-            distinct: true,
-            col: 'userId'
-        });
-        const sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
-        const sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
-        const conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-        const paidPurchases = await Purchase.findAll({
-            where: {
-                ...baseWhere,
-                originCondition,
-                status: 'paid',
-                ...(botFilters.length > 0 && !botFilters.includes('All') ? { botName: { [Op.in]: botFilters } } : {})
-            },
-            attributes: ['pixGeneratedAt', 'purchasedAt']
-        });
-        let sumDiffMs = 0, countPaid = 0;
-        for (const p of paidPurchases) {
-            if (p.pixGeneratedAt && p.purchasedAt) {
-                const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                if (diff >= 0) {
-                    sumDiffMs += diff;
-                    countPaid++;
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else {
+            // not_purchased ou purchased
+            const purchaseWhere = { ...baseWhere, originCondition };
+            const totalLeads = await Purchase.count({
+                where: { ...baseWhere, originCondition },
+                distinct: true,
+                col: 'userId'
+            });
+            const totalConfirmed = await Purchase.count({
+                where: { ...baseWhere, originCondition, status: 'paid' },
+                distinct: true,
+                col: 'userId'
+            });
+            sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            const paidPurchases = await Purchase.findAll({
+                where: {
+                    ...baseWhere,
+                    originCondition,
+                    status: 'paid'
+                },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0, countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+
+            // Ajustamos no final:
+            totalUsers = totalLeads;
+            totalPurchases = totalConfirmed;
         }
-        const averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        return {
-            totalUsers: totalLeads,
-            totalPurchases: totalConfirmed,
-            conversionRate,
-            totalVendasGeradas: sumGerado,
-            totalVendasConvertidas: sumConvertido,
-            averagePaymentDelayMs
-        };
+
+    } catch (err) {
+        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
+        // Em caso de erro, não retorna "undefined" — segue para return final abaixo
     }
+
+    // Retorna SEMPRE o objeto com as 6 chaves esperadas
+    return {
+        totalUsers,
+        totalPurchases,
+        conversionRate,
+        totalVendasGeradas: sumGerado,
+        totalVendasConvertidas: sumConvertido,
+        averagePaymentDelayMs
+    };
 }
 
 //------------------------------------------------------
@@ -322,7 +324,10 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
-        const { date, movStatus } = req.query;
+        const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
+
+        // Parâmetros antigos
+        let { date } = req.query;
         let botFilters = [];
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
@@ -332,31 +337,98 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
 
-        // Processamento do parâmetro "date":
-        // Se houver vírgula, tratamos como múltiplas datas; caso contrário, uma única data.
-        let dateArray;
-        if (date && date.includes(',')) {
-            dateArray = date.split(',').map(d => d.trim()).filter(d => d);
-        } else if (date) {
-            dateArray = [date.trim()];
-        } else {
-            // Se não informado, utiliza a data de hoje.
-            dateArray = [new Date().toISOString().split('T')[0]];
-        }
-
+        // Definimos startDate e endDate finais
         let startDate, endDate;
-        if (dateArray.length === 1) {
-            startDate = makeDay(new Date(dateArray[0]));
-            endDate = new Date(startDate);
-            endDate.setHours(23, 59, 59, 999);
-        } else {
-            // Para múltiplas datas, pegamos o menor e o maior
-            const dates = dateArray.map(d => new Date(d));
-            startDate = makeDay(new Date(Math.min(...dates)));
-            endDate = new Date(makeDay(new Date(Math.max(...dates))));
-            endDate.setHours(23, 59, 59, 999);
+        const now = new Date();
+
+        // Se o user escolheu algo em dateRange
+        if (dateRange) {
+            let todayMidnight = makeDay(new Date());
+            let todayEnd = new Date(todayMidnight);
+            todayEnd.setHours(23, 59, 59, 999);
+
+            switch (dateRange) {
+                case 'today':
+                    startDate = todayMidnight;
+                    endDate = todayEnd;
+                    break;
+                case 'yesterday':
+                    const yesterday = new Date(todayMidnight);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    startDate = yesterday;
+                    endDate = new Date(yesterday);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                case 'last7':
+                    startDate = new Date(todayMidnight);
+                    startDate.setDate(startDate.getDate() - 6);
+                    endDate = todayEnd;
+                    break;
+                case 'last30':
+                    startDate = new Date(todayMidnight);
+                    startDate.setDate(startDate.getDate() - 29);
+                    endDate = todayEnd;
+                    break;
+                case 'lastMonth':
+                    // Primeiro dia deste mês
+                    const firstDayCurrentMonth = new Date(todayMidnight);
+                    firstDayCurrentMonth.setDate(1);
+                    // Dia 0 desse "1" => último dia do mês anterior
+                    const lastMonthEnd = new Date(firstDayCurrentMonth);
+                    lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
+                    endDate = new Date(lastMonthEnd);
+                    endDate.setHours(23, 59, 59, 999);
+
+                    // Início = primeiro dia do mês anterior
+                    const firstDayLastMonth = new Date(lastMonthEnd);
+                    firstDayLastMonth.setDate(1);
+                    startDate = makeDay(firstDayLastMonth);
+                    break;
+                case 'custom':
+                    if (customStart) {
+                        startDate = makeDay(new Date(customStart));
+                    } else {
+                        startDate = todayMidnight;
+                    }
+                    if (customEnd) {
+                        endDate = new Date(customEnd);
+                        endDate.setHours(23, 59, 59, 999);
+                    } else {
+                        endDate = new Date(startDate);
+                        endDate.setHours(23, 59, 59, 999);
+                    }
+                    break;
+                default:
+                    // caso default, deixamos para logic antiga
+                    break;
+            }
         }
 
+        // Caso ainda não tenhamos startDate/endDate, checamos "date" antigo
+        if (!startDate || !endDate) {
+            let dateArray;
+            if (date && date.includes(',')) {
+                dateArray = date.split(',').map(d => d.trim()).filter(d => d);
+            } else if (date) {
+                dateArray = [date.trim()];
+            } else {
+                // Se não informado, utiliza a data de hoje
+                dateArray = [new Date().toISOString().split('T')[0]];
+            }
+
+            if (dateArray.length === 1) {
+                startDate = makeDay(new Date(dateArray[0]));
+                endDate = new Date(startDate);
+                endDate.setHours(23, 59, 59, 999);
+            } else {
+                const dates = dateArray.map(d => new Date(d));
+                startDate = makeDay(new Date(Math.min(...dates)));
+                endDate = new Date(makeDay(new Date(Math.max(...dates))));
+                endDate.setHours(23, 59, 59, 999);
+            }
+        }
+
+        // Calcula estatísticas
         const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
         const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
@@ -370,7 +442,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         endYesterday.setHours(23, 59, 59, 999);
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
 
-        // Ranking simples (global)
+        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -387,7 +459,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado (global) – para os pagamentos confirmados
+        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -401,7 +473,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName'],
         });
 
-        // Total gerado por bot (incluindo pendentes e pagos)
+        // Total gerado por bot
         const generatedByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -462,20 +534,26 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
 
-        // Monta os detalhes de cada bot para o plano principal
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
             const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
             const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
-            // Para o plano principal, isola registros com originCondition "main"
             const totalUsersBot = await Purchase.count({
-                where: { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: 'main', botName: bName },
+                where: {
+                    pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                    originCondition: 'main',
+                    botName: bName
+                },
                 distinct: true,
                 col: 'userId'
             });
             const generatedForBot = (await Purchase.sum('planValue', {
-                where: { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: 'main', botName: bName }
+                where: {
+                    pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                    originCondition: 'main',
+                    botName: bName
+                }
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
@@ -504,6 +582,8 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
         // Estatísticas para os últimos 7 dias
+        // Se "today" => startDate == hoje 00:00, e i=6 => data 6 dias antes ...
+        // Precisamos evitar que getDetailedStats retorne undefined.
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -511,11 +591,14 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
-            const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters);
+
+            // Garante que retorne ao menos um objeto vazio
+            const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters) || {};
+
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
-                totalVendasConvertidas: dayStat.totalVendasConvertidas,
-                totalVendasGeradas: dayStat.totalVendasGeradas
+                totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
+                totalVendasGeradas: dayStat.totalVendasGeradas || 0
             });
         }
 
@@ -546,7 +629,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 
         res.json({
             statsAll,
-            statsYesterday: await getDetailedStats(new Date(makeDay(new Date(startDate).setDate(startDate.getDate() - 1))), new Date(makeDay(new Date(startDate).setDate(startDate.getDate() - 1))).setHours(23, 59, 59, 999), null, botFilters),
+            statsYesterday,
             statsMain,
             statsNotPurchased,
             statsPurchased,
@@ -561,11 +644,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
-
-// Função auxiliar (mantida)
-function originConditionForBot(botName, botDetailsArray) {
-    return null;
-}
 
 // Inicializa o bot
 require('./services/bot.service.js');

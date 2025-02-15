@@ -13,5 +13,3 @@ Este projeto implementa um bot de Telegram que permite aos usuários adquirir co
 - Node.js v16 ou superior
 - Conta no [Mercado Pago](https://www.mercadopago.com.br) com um Access Token
 - Token do bot do Telegram, que pode ser obtido através do [BotFather](https://core.telegram.org/bots#botfather)
-
-

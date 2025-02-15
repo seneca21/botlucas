@@ -271,18 +271,62 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
+    // NOVO: Função para obter startDate e endDate com base no seletor
+    //------------------------------------------------------------
+    function getDateRangeParams() {
+        const rangeValue = $('#dateRangeSelector').val();
+        // Se "custom", pegamos do input #startDateInput e #endDateInput
+        if (rangeValue === 'custom') {
+            const sDate = $('#startDateInput').val();
+            const eDate = $('#endDateInput').val();
+            return {
+                dateRange: 'custom',
+                startDate: sDate,
+                endDate: eDate
+            };
+        } else {
+            // Retornamos somente dateRange, sem start/end
+            return {
+                dateRange: rangeValue
+            };
+        }
+    }
+
+    //------------------------------------------------------------
     // Função principal para atualizar o dashboard
     //------------------------------------------------------------
     async function updateDashboard(date, movStatus, page, perPage) {
         try {
+            // NOVO: Obter range
+            const dr = getDateRangeParams();
+            // Monta query param
             let botFilterParam = '';
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-            let url = `/api/bots-stats?date=${date}`;
+
+            // Construímos a URL de acordo com range
+            let url = `/api/bots-stats?`;
+            url += `page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
-            url += `&page=${page}&perPage=${perPage}`;
+
+            // Se o dateRangeSelector estiver em "custom", passamos startDate e endDate
+            if (dr.dateRange === 'custom') {
+                url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
+            } else {
+                // Caso contrário, passamos dateRange
+                url += `&dateRange=${dr.dateRange}`;
+            }
+
+            // Antigo fallback — caso queira usar #datePicker isoladamente
+            // (sem mexer no seletor). Só pra não perder funcionalidade:
+            // se for "custom" sem datas, ou user deixou a dataRange blank,
+            // a gente ainda usa datePicker (apenas para não quebrar).
+            // Mas se preferir, pode ignorar esse date no back-end.
+            if (!dr.dateRange) {
+                url += `&date=${date}`;
+            }
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -332,10 +376,7 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (7 dias) com 3 eixos: 
-            // - "Valor Convertido (R$)" (y-axis-convertido, esquerda)
-            // - "Valor Gerado (R$)" (y-axis-gerado, direita)
-            // - "Taxa de Conversão (%)" (y-axis-conversion, direita)
+            // GRÁFICO DE LINHA (7 dias) com 3 eixos
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
@@ -603,6 +644,27 @@ $(document).ready(function () {
         currentPerPage = parseInt($(this).val(), 10);
         currentPage = 1;
         refreshDashboard();
+    });
+
+    // NOVO: Se mudar o seletor do intervalo
+    $('#dateRangeSelector').on('change', function () {
+        const val = $(this).val();
+        if (val === 'custom') {
+            $('#customDateRangeContainer').show();
+        } else {
+            $('#customDateRangeContainer').hide();
+            // Assim que trocar para algo não custom, já atualizamos
+            currentPage = 1;
+            refreshDashboard();
+        }
+    });
+
+    // Se alterar as datas do custom, dá refresh
+    $('#startDateInput, #endDateInput').on('change', function () {
+        if ($('#dateRangeSelector').val() === 'custom') {
+            currentPage = 1;
+            refreshDashboard();
+        }
     });
 
     // Sidebar toggle
