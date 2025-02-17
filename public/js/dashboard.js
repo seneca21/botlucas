@@ -1,8 +1,5 @@
 // public/js/dashboard.js
 $(document).ready(function () {
-    const today = new Date().toISOString().split('T')[0];
-    $('#datePicker').val(today);
-
     let salesChart;
     let lineComparisonChart;
 
@@ -272,10 +269,10 @@ $(document).ready(function () {
 
     //------------------------------------------------------------
     // NOVO: Função para obter startDate e endDate com base no seletor
+    // agora sem #datePicker, sem #customDateRangeContainer
     //------------------------------------------------------------
     function getDateRangeParams() {
         const rangeValue = $('#dateRangeSelector').val();
-        // Se "custom", pegamos do input #startDateInput e #endDateInput
         if (rangeValue === 'custom') {
             const sDate = $('#startDateInput').val();
             const eDate = $('#endDateInput').val();
@@ -285,7 +282,6 @@ $(document).ready(function () {
                 endDate: eDate
             };
         } else {
-            // Retornamos somente dateRange, sem start/end
             return {
                 dateRange: rangeValue
             };
@@ -295,37 +291,23 @@ $(document).ready(function () {
     //------------------------------------------------------------
     // Função principal para atualizar o dashboard
     //------------------------------------------------------------
-    async function updateDashboard(date, movStatus, page, perPage) {
+    async function updateDashboard(movStatus, page, perPage) {
         try {
-            // NOVO: Obter range
             const dr = getDateRangeParams();
-            // Monta query param
             let botFilterParam = '';
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
 
-            // Construímos a URL de acordo com range
             let url = `/api/bots-stats?`;
             url += `page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
 
-            // Se o dateRangeSelector estiver em "custom", passamos startDate e endDate
             if (dr.dateRange === 'custom') {
                 url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
             } else {
-                // Caso contrário, passamos dateRange
                 url += `&dateRange=${dr.dateRange}`;
-            }
-
-            // Antigo fallback — caso queira usar #datePicker isoladamente
-            // (sem mexer no seletor). Só pra não perder funcionalidade:
-            // se for "custom" sem datas, ou user deixou a dataRange blank,
-            // a gente ainda usa datePicker (apenas para não quebrar).
-            // Mas se preferir, pode ignorar esse date no back-end.
-            if (!dr.dateRange) {
-                url += `&date=${date}`;
             }
 
             const response = await fetch(url);
@@ -376,7 +358,7 @@ $(document).ready(function () {
             salesChart.update();
 
             //--------------------------------------------------
-            // GRÁFICO DE LINHA (7 dias) com 3 eixos
+            // GRÁFICO DE LINHA (7 dias)
             //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
@@ -614,14 +596,9 @@ $(document).ready(function () {
     // Função para "forçar" o refresh do dashboard
     //------------------------------------------------------------
     function refreshDashboard() {
-        const date = $('#datePicker').val();
         const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard(date, movStatus, currentPage, currentPerPage);
+        updateDashboard(movStatus, currentPage, currentPerPage);
     }
-
-    // Removemos o antigo <select id="botFilter"> (se existir) e criamos o container para dropdown custom
-    $('#botFilter').remove();
-    $('#movStatusFilter').parent().before(`<div id="botFilterContainer" style="position:relative;"></div>`);
 
     // Carrega a lista de bots
     loadBotList();
@@ -630,11 +607,6 @@ $(document).ready(function () {
     refreshDashboard();
 
     // ===== EVENTOS =====
-    $('#datePicker').on('change', function () {
-        currentPage = 1;
-        refreshDashboard();
-    });
-
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
@@ -646,25 +618,26 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // NOVO: Se mudar o seletor do intervalo
+    // Quando mudar o seletor de intervalo
     $('#dateRangeSelector').on('change', function () {
         const val = $(this).val();
         if (val === 'custom') {
-            $('#customDateRangeContainer').show();
+            // Abre o modal
+            $('#customDateModal').modal('show');
         } else {
-            $('#customDateRangeContainer').hide();
-            // Assim que trocar para algo não custom, já atualizamos
             currentPage = 1;
             refreshDashboard();
         }
     });
 
-    // Se alterar as datas do custom, dá refresh
-    $('#startDateInput, #endDateInput').on('change', function () {
-        if ($('#dateRangeSelector').val() === 'custom') {
-            currentPage = 1;
-            refreshDashboard();
-        }
+    // Quando clicar em "Aplicar" no modal
+    $('#applyCustomDateBtn').on('click', function () {
+        // Fecha o modal
+        $('#customDateModal').modal('hide');
+        // Reinicia a paginação
+        currentPage = 1;
+        // Atualiza
+        refreshDashboard();
     });
 
     // Sidebar toggle

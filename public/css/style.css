@@ -185,3 +185,38 @@ body.dark-mode .card .card-title {
 body.dark-mode .card .card-text {
     color: #40a8ff !important;
 }
+
+/* Adicione no seu style.css, ao final, para modal dark-mode */
+
+body.dark-mode .modal-content {
+    background-color: #1e1e1e !important;
+    color: #fff !important;
+    border: 1px solid #444 !important;
+}
+
+body.dark-mode .modal-header,
+body.dark-mode .modal-footer {
+    background-color: #1e1e1e !important;
+    color: #fff !important;
+    border-bottom: 1px solid #444 !important;
+    border-top: none !important;
+}
+
+body.dark-mode .modal-header .close span {
+    color: #fff !important;
+}
+
+body.dark-mode .modal-body .form-control {
+    background-color: #2a2a2a;
+    color: #fff;
+    border-color: #555;
+}
+
+/* Se quiser ajustar a cor do backdrop (fundo do modal),
+   descomente abaixo e altere conforme desejado:
+
+body.dark-mode .modal-backdrop {
+  background-color: #000 !important;
+  opacity: 0.6 !important;
+}
+*/
