@@ -56,6 +56,7 @@
             <div id="sidebarContent">
                 <ul class="nav flex-column" id="sidebarNav">
                     <li class="nav-item">
+                        <!-- Primeiro item: Estatísticas do Dia (já ativo) -->
                         <a class="nav-link active" href="#" data-section="statsSection">
                             Estatísticas do Dia
                         </a>
@@ -71,6 +72,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <!-- Quarto item: Estatísticas do Dia -->
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             Estatísticas do Dia
                         </a>
@@ -81,7 +83,7 @@
 
         <!-- MAIN CONTENT -->
         <div id="mainContent">
-            <!-- Top bar (Hamburger + Lua/Sol) -->
+            <!-- Top bar (Hamburger + Tema) -->
             <div class="d-flex justify-content-between align-items-center pt-3 pb-3">
                 <button class="btn border-0" id="toggleSidebarBtn" style="background: none;"
                     aria-label="Toggle sidebar">
@@ -103,12 +105,12 @@
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
                 <!-- 
-                  NOVO: Removemos o "Selecione a Data:" 
-                  e mantivemos só este seletor de intervalo
+                  Filtro de DATA (sempre visível) + Filtro de BOTS (oculto exceto 
+                  quando a aba for statsSection ou statsDetailedSection).
                 -->
-                <div class="form-group">
-                    <label for="dateRangeSelector">Filtrar por intervalo:</label>
-                    <select id="dateRangeSelector" class="form-control">
+                <div class="d-flex mb-3" style="gap:1rem; align-items:center; flex-wrap:wrap;">
+                    <!-- Data Range -->
+                    <select id="dateRangeSelector" class="form-control form-control-sm" style="width:auto;">
                         <option value="today">Hoje</option>
                         <option value="yesterday">Ontem</option>
                         <option value="last7">Últimos 7 dias</option>
@@ -116,13 +118,16 @@
                         <option value="lastMonth">Mês Anterior</option>
                         <option value="custom">Personalizado</option>
                     </select>
+
+                    <!-- Filtro de bots (inicialmente hidden, mostrado só nas abas de estatísticas) -->
+                    <div id="botFilterContainer" style="display:none;"></div>
                 </div>
 
-                <!-- SEÇÃO 1: Estatísticas do Dia -->
+                <!-- SEÇÃO 1: Estatísticas do Dia (PRIMEIRA) -->
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
 
-                    <!-- Nova row com 4 colunas (cards) lado a lado -->
+                    <!-- 4 cards -->
                     <div class="row text-center">
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm">
@@ -158,27 +163,22 @@
                         </div>
                     </div>
 
-                    <!-- 2 colunas: gráfico de barras e gráfico de linha -->
+                    <!-- gráficos -->
                     <div class="row">
                         <div class="col-md-6">
                             <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
-
                         <div class="col-md-6">
                             <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
                         </div>
                     </div>
 
-                    <!-- Filtros -->
                     <div class="d-flex mt-4 align-items-center" style="gap:1rem; flex-wrap: wrap;">
-                        <!-- Bot Filter: container para dropdown custom -->
-                        <div id="botFilterContainer"></div>
-
                         <!-- MovStatus Filter -->
                         <div class="d-flex align-items-center">
-                            <label style="margin-right:0.5rem; margin-left:1rem;">Status:</label>
+                            <label style="margin-right:0.5rem;">Status:</label>
                             <select id="movStatusFilter" class="form-control form-control-sm">
                                 <option value="">Todos</option>
                                 <option value="pending">Pendentes</option>
@@ -187,7 +187,7 @@
                         </div>
 
                         <!-- PerPage Filter -->
-                        <div class="d-flex align-items-center" style="margin-left:1rem;">
+                        <div class="d-flex align-items-center">
                             <label style="margin-bottom:0; margin-right:0.5rem;">Exibir por página:</label>
                             <select id="movPerPage" class="form-control form-control-sm">
                                 <option value="10" selected>10</option>
@@ -198,7 +198,7 @@
                         </div>
                     </div>
 
-                    <!-- Tabela de Últimas Movimentações -->
+                    <!-- tabela e paginação -->
                     <table class="table table-bordered table-striped mt-2" id="lastMovementsTable">
                         <thead>
                             <tr>
@@ -212,8 +212,6 @@
                         </thead>
                         <tbody id="lastMovementsBody"></tbody>
                     </table>
-
-                    <!-- Container de paginação -->
                     <div id="paginationContainer" class="mt-2"></div>
                 </section>
 
@@ -249,7 +247,7 @@
                     </table>
                 </section>
 
-                <!-- SEÇÃO 4: Estatísticas do Dia -->
+                <!-- SEÇÃO 4: Estatísticas do Dia (SEGUNDA) -->
                 <section id="statsDetailedSection" class="d-none">
                     <h3>Estatísticas do Dia</h3>
                     <div class="row">
@@ -258,7 +256,6 @@
                             <h5 class="text-center">TODAS AS COMPRAS</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
-                                    <!-- Alterado: Total de Leads que deram start -->
                                     <h5 class="card-title">Total de Leads que deram start</h5>
                                     <p class="card-text" id="cardAllLeads">0</p>
                                 </div>
@@ -294,7 +291,6 @@
                             <h5 class="text-center">PLANO PRINCIPAL</h5>
                             <div class="card text-center shadow-sm mb-3">
                                 <div class="card-body">
-                                    <!-- Alterado: Total de Leads que geraram pix -->
                                     <h5 class="card-title">Total de Leads que geraram pix</h5>
                                     <p class="card-text" id="cardMainLeads">0</p>
                                 </div>
@@ -401,7 +397,7 @@
         </div>
     </div>
 
-    <!-- NOVO: Modal para datas personalizadas -->
+    <!-- Modal para datas personalizadas -->
     <div class="modal fade" id="customDateModal" tabindex="-1" role="dialog" aria-labelledby="customDateModalLabel"
         aria-hidden="true">
         <div class="modal-dialog" role="document">

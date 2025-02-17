@@ -3,19 +3,16 @@ $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
 
-    // -----------------------------------------------------------
-    // Variáveis de estado para paginação e filtro
-    // -----------------------------------------------------------
-    let currentPage = 1;            // Página atual (inicialmente 1)
-    let currentPerPage = 10;        // Quantas movimentações exibir por página
-    let totalMovementsCount = 0;    // Valor recebido do back-end
-    let totalPages = 1;             // Calculado
+    let currentPage = 1;
+    let currentPerPage = 10;
+    let totalMovementsCount = 0;
+    let totalPages = 1;
 
-    // Armazenamos os bots selecionados (array de strings)
-    let selectedBots = []; // Ex: ["All"] ou ["@Bot1", "@Bot2"]
+    // Armazenamos os bots selecionados
+    let selectedBots = [];
 
     //------------------------------------------------------------
-    // 1) PLUGIN para pintar o background do gráfico
+    // 1) PLUGIN: Background
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -66,7 +63,7 @@ $(document).ready(function () {
     }
 
     function getChartConfigs() {
-        const isDark = $('body').hasClass('dark-mode');
+        const isDark = body.hasClass('dark-mode');
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
@@ -86,7 +83,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para formatar uma duração em ms -> "Xm Ys"
+    // formatDuration
     //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
@@ -97,7 +94,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para renderizar a paginação (janela de 3 botões + setas)
+    // RENDER PAGINATION
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
@@ -108,7 +105,7 @@ $(document).ready(function () {
 
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
 
-        // Botão: Voltar 10 (<<)
+        // << (back 10)
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -120,7 +117,7 @@ $(document).ready(function () {
         }
         group.append(doubleLeft);
 
-        // Botão: Voltar 1 (<)
+        // < (back 1)
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -132,7 +129,7 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // Janela de 3 páginas
+        // 3 pages window
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -157,7 +154,7 @@ $(document).ready(function () {
             group.append(btn);
         }
 
-        // Botão: Avançar 1 (>)
+        // > (forward 1)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -169,7 +166,7 @@ $(document).ready(function () {
         }
         group.append(singleRight);
 
-        // Botão: Avançar 10 (>>)
+        // >> (forward 10)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -185,7 +182,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Carrega lista de bots e monta o dropdown com checkboxes
+    // LOAD BOTS
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
@@ -202,13 +199,13 @@ $(document).ready(function () {
 
         const toggleBtn = $(`
             <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
-                Selecionar Bots
+                Bots
             </button>
         `);
 
         const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
 
-        // Checkbox "All"
+        // All
         const allId = 'bot_all';
         const allItem = $(`
             <div class="form-check pl-2">
@@ -257,7 +254,6 @@ $(document).ready(function () {
             e.stopPropagation();
             checkList.toggleClass('show');
         });
-
         $(document).on('click', function (e) {
             if (!dropDiv.is(e.target) && dropDiv.has(e.target).length === 0) {
                 checkList.removeClass('show');
@@ -268,8 +264,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // NOVO: Função para obter startDate e endDate com base no seletor
-    // agora sem #datePicker, sem #customDateRangeContainer
+    // GET DATE RANGE
     //------------------------------------------------------------
     function getDateRangeParams() {
         const rangeValue = $('#dateRangeSelector').val();
@@ -281,15 +276,12 @@ $(document).ready(function () {
                 startDate: sDate,
                 endDate: eDate
             };
-        } else {
-            return {
-                dateRange: rangeValue
-            };
         }
+        return { dateRange: rangeValue };
     }
 
     //------------------------------------------------------------
-    // Função principal para atualizar o dashboard
+    // UPDATE DASHBOARD
     //------------------------------------------------------------
     async function updateDashboard(movStatus, page, perPage) {
         try {
@@ -299,8 +291,7 @@ $(document).ready(function () {
                 botFilterParam = selectedBots.join(',');
             }
 
-            let url = `/api/bots-stats?`;
-            url += `page=${page}&perPage=${perPage}`;
+            let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
 
@@ -316,7 +307,7 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Atualiza as estatísticas gerais
+            // Estatísticas
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
@@ -593,68 +584,85 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função para "forçar" o refresh do dashboard
+    // REFRESH
     //------------------------------------------------------------
     function refreshDashboard() {
         const movStatus = $('#movStatusFilter').val() || '';
         updateDashboard(movStatus, currentPage, currentPerPage);
     }
 
-    // Carrega a lista de bots
-    loadBotList();
+    //------------------------------------------------------------
+    // INICIAL
+    //------------------------------------------------------------
+    loadBotList();          // Carrega bots
+    refreshDashboard();     // Carrega dados
 
-    // Atualiza o dashboard inicialmente
-    refreshDashboard();
+    // A primeira aba, por padrão, é statsSection (já tem .active)
+    // Então, exibimos o filtro de bots desde o início:
+    const defaultSection = $('#sidebarNav .nav-link.active').data('section');
+    if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
+        $('#botFilterContainer').show();
+    } else {
+        $('#botFilterContainer').hide();
+    }
 
-    // ===== EVENTOS =====
+    //------------------------------------------------------------
+    // EVENTOS
+    //------------------------------------------------------------
+    // MovStatus e perPage
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
     });
-
     $('#movPerPage').on('change', function () {
         currentPerPage = parseInt($(this).val(), 10);
         currentPage = 1;
         refreshDashboard();
     });
 
-    // Quando mudar o seletor de intervalo
+    // Seletor de data
     $('#dateRangeSelector').on('change', function () {
-        const val = $(this).val();
-        if (val === 'custom') {
-            // Abre o modal
+        if ($(this).val() === 'custom') {
             $('#customDateModal').modal('show');
         } else {
             currentPage = 1;
             refreshDashboard();
         }
     });
-
-    // Quando clicar em "Aplicar" no modal
     $('#applyCustomDateBtn').on('click', function () {
-        // Fecha o modal
         $('#customDateModal').modal('hide');
-        // Reinicia a paginação
         currentPage = 1;
-        // Atualiza
         refreshDashboard();
     });
 
-    // Sidebar toggle
+    // Sidebar nav
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
 
+        // Esconde seções
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
 
+        // Mostra a clicada
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
+
+        // Se for statsSection ou statsDetailedSection => mostra #botFilterContainer
+        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
+            $('#botFilterContainer').show();
+        } else {
+            $('#botFilterContainer').hide();
+        }
+
+        currentPage = 1;
+        refreshDashboard();
     });
 
+    // Toggle sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
