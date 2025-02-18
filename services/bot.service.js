@@ -10,6 +10,7 @@ const db = require('./index'); // importa index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
 const BotModel = db.BotModel; // Importa o modelo BotModel
+
 const logger = require('./logger');
 
 const config = ConfigService.loadConfig();
@@ -320,10 +321,9 @@ function initializeBot(botConfig) {
           Expires: 60
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
-        // Remover porta se existir
         const urlObj = new URL(presignedUrl);
-        urlObj.port = "";
-        videoSource = urlObj.toString();
+        // Constrói a URL sem porta
+        videoSource = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
       }
 
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
@@ -388,8 +388,8 @@ function initializeBot(botConfig) {
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
         const urlObj = new URL(presignedUrl);
-        urlObj.port = "";
-        videoSource = urlObj.toString();
+        // Constrói a URL sem porta
+        videoSource = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
       }
 
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
@@ -577,11 +577,12 @@ function initializeBot(botConfig) {
       logger.error('❌ Erro ao verificar pagamento:', error);
       if (error.response && error.response.error_code === 403) {
         logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
-        delete userSessions[chatId];
+        delete userSessions[chat.id];
       } else {
         await ctx.reply('⚠️ Erro ao verificar pagamento.');
       }
     }
+    await ctx.answerCbQuery();
   });
 
   bot.action(/check_payment_(.+)/, async (ctx) => {
