@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js
+// app.js (com horário de Brasília)
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -7,42 +7,37 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
 
-// Para upload de arquivos via S3 (Bucketeer)
-const { S3Client } = require('@aws-sdk/client-s3');
-const multerS3 = require('multer-s3-v3');
-const multer = require('multer');
-const fs = require('fs');
-
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // IMPORTANTE: use o modelo BotModel exportado pelo index.js
+const BotModel = db.BotModel; // Modelo dos bots, conforme cadastro no gerenciar bots
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
-const config = ConfigService.loadConfig(); // carrega config.json
-
-// Importa funções para inicializar/editar bots
-const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
+const config = ConfigService.loadConfig(); // carrega config.json (para outras configurações)
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Sessão
+// SESSÃO
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
+// MIDDLEWARE: Checa se usuário está logado
 function checkAuth(req, res, next) {
-    if (req.session.loggedIn) next();
-    else res.redirect('/login');
+    if (req.session.loggedIn) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
 }
 
 //------------------------------------------------------
-// Conexão com o Banco de Dados
+// Conecta DB
 //------------------------------------------------------
 db.sequelize
     .authenticate()
@@ -51,38 +46,11 @@ db.sequelize
 
 db.sequelize
     .sync({ alter: true })
-    .then(async () => {
-        logger.info('✅ Modelos sincronizados (alter).');
-        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
-        await reloadBotsFromDB();
-    })
+    .then(() => logger.info('✅ Modelos sincronizados (alter).'))
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// Configuração do Multer para uploads de vídeo via S3 (Bucketeer)
-//------------------------------------------------------
-// Usando AWS SDK v3:
-const s3Client = new S3Client({
-    region: process.env.BUCKETEER_AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY,
-    }
-});
-const upload = multer({
-    storage: multerS3({
-        s3: s3Client,
-        bucket: process.env.BUCKETEER_BUCKET_NAME,
-        // Removida a propriedade "acl" pois o bucket não permite ACLs.
-        key: function (req, file, cb) {
-            const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
-            cb(null, uniqueSuffix);
-        }
-    })
-});
-
-//------------------------------------------------------
-// Rotas de LOGIN/LOGOUT
+// Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
@@ -189,12 +157,12 @@ app.get('/', checkAuth, (req, res) => {
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// Rotas de ESTATÍSTICAS & BOT LIST
+// ROTA: /api/bots-list => retorna array de nomes de bots do DB
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
-        const botRows = await BotModel.findAll();
-        const botNames = botRows.map(b => b.name);
+        const bots = await BotModel.findAll({ attributes: ['name'] });
+        const botNames = bots.map(b => b.name);
         res.json(botNames);
     } catch (err) {
         logger.error('Erro ao retornar lista de bots:', err);
@@ -202,224 +170,461 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
     }
 });
 
-// Função makeDay
-function makeDay(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
+//------------------------------------------------------
+// FUNÇÃO Auxiliar -> converte data para "meia-noite" em Brasília
+//------------------------------------------------------
+function makeDayBrasilia(rawDate) {
+    const dateStringBr = new Date(rawDate).toLocaleString("en-US", {
+        timeZone: "America/Sao_Paulo"
+    });
+    const localBrDate = new Date(dateStringBr);
+    localBrDate.setHours(0, 0, 0, 0);
+    return localBrDate;
 }
 
-// Função para obter estatísticas detalhadas
+//------------------------------------------------------
+// getDetailedStats (mantido conforme versão anterior)
+//------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // ... sua implementação atual ...
+    let totalUsers = 0;
+    let totalPurchases = 0;
+    let sumGerado = 0;
+    let sumConvertido = 0;
+    let averagePaymentDelayMs = 0;
+    let conversionRate = 0;
+
+    try {
+        if (originCondition === 'main') {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const mainWhere = { ...baseWhere, originCondition: 'main' };
+            const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: mainWhere,
+                distinct: true,
+                col: 'userId'
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else if (!originCondition) {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                purchaseWhere.botName = { [Op.in]: botFilters };
+                userWhere.botName = { [Op.in]: botFilters };
+            }
+            totalUsers = await User.count({ where: userWhere });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const totalLeads = await Purchase.count({
+                where: { ...baseWhere, originCondition },
+                distinct: true,
+                col: 'userId'
+            });
+            const totalConfirmed = await Purchase.count({
+                where: { ...baseWhere, originCondition, status: 'paid' },
+                distinct: true,
+                col: 'userId'
+            });
+            sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: {
+                    ...baseWhere,
+                    originCondition,
+                    status: 'paid'
+                },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0, countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+            totalUsers = totalLeads;
+            totalPurchases = totalConfirmed;
+        }
+    } catch (err) {
+        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
+    }
+
+    return {
+        totalUsers,
+        totalPurchases,
+        conversionRate,
+        totalVendasGeradas: sumGerado,
+        totalVendasConvertidas: sumConvertido,
+        averagePaymentDelayMs
+    };
 }
 
-// Rota /api/bots-stats
+//------------------------------------------------------
+// ROTA: /api/bots-stats => retorna estatísticas e rankings
+//------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
-    // ... sua implementação atual ...
-});
-
-//------------------------------------------------------
-// Rotas de Gerenciar Bots
-//------------------------------------------------------
-
-// [POST] Criar Novo Bot (com upload de vídeo opcional)
-app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
-        const payload = req.body;
-        const {
-            name,
-            token,
-            description,
-            buttonName1,
-            buttonValue1,
-            buttonName2,
-            buttonValue2,
-            buttonName3,
-            buttonValue3,
-            remarketingJson
-        } = payload;
+        const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
+        let { date } = req.query; // compatibilidade com 'date' antigo
+        let botFilters = [];
+        if (req.query.botFilter) {
+            botFilters = req.query.botFilter.split(',');
+        }
 
-        // Monta array de botões
-        const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+        const page = parseInt(req.query.page) || 1;
+        const perPage = parseInt(req.query.perPage) || 10;
+        const offset = (page - 1) * perPage;
+
+        let startDate, endDate;
+        if (dateRange) {
+            switch (dateRange) {
+                case 'today': {
+                    const todayStartBr = makeDayBrasilia(new Date());
+                    startDate = todayStartBr;
+                    endDate = new Date(todayStartBr);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                }
+                case 'yesterday': {
+                    const todayStartBr = makeDayBrasilia(new Date());
+                    const yesterdayStartBr = new Date(todayStartBr);
+                    yesterdayStartBr.setDate(yesterdayStartBr.getDate() - 1);
+                    startDate = yesterdayStartBr;
+                    endDate = new Date(yesterdayStartBr);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                }
+                case 'last7': {
+                    const todayStartBr = makeDayBrasilia(new Date());
+                    const last7Start = new Date(todayStartBr);
+                    last7Start.setDate(last7Start.getDate() - 6);
+                    startDate = last7Start;
+                    endDate = new Date(todayStartBr);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                }
+                case 'last30': {
+                    const todayStartBr = makeDayBrasilia(new Date());
+                    const last30Start = new Date(todayStartBr);
+                    last30Start.setDate(last30Start.getDate() - 29);
+                    startDate = last30Start;
+                    endDate = new Date(todayStartBr);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                }
+                case 'lastMonth': {
+                    const todayStartBr = makeDayBrasilia(new Date());
+                    const firstDayThisMonth = new Date(todayStartBr);
+                    firstDayThisMonth.setDate(1);
+                    const lastDayLastMonth = new Date(firstDayThisMonth);
+                    lastDayLastMonth.setDate(lastDayLastMonth.getDate() - 1);
+                    lastDayLastMonth.setHours(23, 59, 59, 999);
+                    const firstDayLastMonth = makeDayBrasilia(lastDayLastMonth);
+                    firstDayLastMonth.setDate(1);
+                    startDate = firstDayLastMonth;
+                    endDate = lastDayLastMonth;
+                    break;
+                }
+                case 'custom': {
+                    startDate = customStart ? makeDayBrasilia(new Date(customStart)) : makeDayBrasilia(new Date());
+                    if (customEnd) {
+                        const endBr = makeDayBrasilia(new Date(customEnd));
+                        endDate = new Date(endBr);
+                        endDate.setHours(23, 59, 59, 999);
+                    } else {
+                        endDate = new Date(startDate);
+                        endDate.setHours(23, 59, 59, 999);
+                    }
+                    break;
+                }
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
-        const buttonsJson = JSON.stringify(buttons);
-
-        const safeRemarketingJson = remarketingJson || '';
-
-        let videoFilename = '';
-        if (req.file) {
-            // Aqui, req.file.location é o URL do arquivo no S3.
-            videoFilename = req.file.location;
+        if (!startDate || !endDate) {
+            if (date) {
+                const dateArray = date.includes(',') ? date.split(',').map(d => d.trim()).filter(d => d) : [date.trim()];
+                if (dateArray.length === 1) {
+                    startDate = makeDayBrasilia(new Date(dateArray[0]));
+                    endDate = new Date(startDate);
+                    endDate.setHours(23, 59, 59, 999);
+                } else if (dateArray.length > 1) {
+                    const dateObjs = dateArray.map(d => new Date(d));
+                    startDate = makeDayBrasilia(new Date(Math.min(...dateObjs)));
+                    endDate = makeDayBrasilia(new Date(Math.max(...dateObjs)));
+                    endDate.setHours(23, 59, 59, 999);
+                }
+            } else {
+                const brToday = makeDayBrasilia(new Date());
+                startDate = brToday;
+                endDate = new Date(brToday);
+                endDate.setHours(23, 59, 59, 999);
+            }
         }
 
-        const newBot = await BotModel.create({
-            name,
-            token,
-            description,
-            video: videoFilename,
-            buttonsJson,
-            remarketingJson: safeRemarketingJson
+        // Carrega estatísticas gerais
+        const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
+        const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
+        const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
+        const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
+
+        // Estatísticas de ontem
+        const yesterdayDate = new Date(startDate);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const startYesterday = makeDayBrasilia(yesterdayDate);
+        const endYesterday = new Date(startYesterday);
+        endYesterday.setHours(23, 59, 59, 999);
+        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
+
+        // Ranking simples
+        const botRankingRaw = await Purchase.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
+            ],
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+            },
+            group: ['botName'],
+            order: [[Sequelize.literal('"vendas"'), 'DESC']],
         });
-        logger.info(`✅ Bot ${name} inserido no BD.`);
+        const botRanking = botRankingRaw.map(item => ({
+            botName: item.botName,
+            vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
+        }));
 
-        const bc = {
-            name: newBot.name,
-            token: newBot.token,
-            description: newBot.description,
-            video: newBot.video,
-            buttons: buttons,
-            remarketing: {}
-        };
-        if (safeRemarketingJson) {
-            try {
-                let trimmed = safeRemarketingJson.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    bc.remarketing = JSON.parse(trimmed);
-                } else {
-                    bc.remarketing = {};
-                    logger.warn(`Remarketing JSON para o bot ${newBot.name} não é válido. Usando objeto vazio.`);
+        // Ranking detalhado
+        const botsWithPurchases = await Purchase.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
+            ],
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
+            group: ['botName'],
+        });
+        const generatedByBot = await Purchase.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'generatedValue']
+            ],
+            where: {
+                pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null }
+            },
+            group: ['botName']
+        });
+        const generatedMap = {};
+        generatedByBot.forEach(item => {
+            generatedMap[item.botName] = parseFloat(item.getDataValue('generatedValue')) || 0;
+        });
+        const botsWithInteractions = await User.findAll({
+            attributes: [
+                'botName',
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
+            ],
+            where: {
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
+            group: ['botName'],
+        });
+        const botUsersMap = {};
+        botsWithInteractions.forEach(item => {
+            botUsersMap[item.botName] = parseInt(item.getDataValue('totalUsers'), 10) || 0;
+        });
+        const planSalesByBot = await Purchase.findAll({
+            attributes: [
+                'botName',
+                'planName',
+                [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue'],
+            ],
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+                planName: { [Op.ne]: null },
+                botName: { [Op.ne]: null },
+            },
+            group: ['botName', 'planName'],
+            order: [[Sequelize.literal('"salesCount"'), 'DESC']],
+        });
+        const botPlansMap = {};
+        planSalesByBot.forEach(row => {
+            const bName = row.botName;
+            const pName = row.planName;
+            const sCount = parseInt(row.getDataValue('salesCount'), 10) || 0;
+            if (!botPlansMap[bName]) botPlansMap[bName] = {};
+            botPlansMap[bName][pName] = { salesCount: sCount };
+        });
+        const botDetails = [];
+        for (const bot of botsWithPurchases) {
+            const bName = bot.botName;
+            const totalPurchasesBot = parseInt(bot.getDataValue('totalPurchases'), 10) || 0;
+            const totalValueBot = parseFloat(bot.getDataValue('totalValue')) || 0;
+            const totalUsersBot = await Purchase.count({
+                where: {
+                    pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                    originCondition: 'main',
+                    botName: bName
+                },
+                distinct: true,
+                col: 'userId'
+            });
+            const generatedForBot = (await Purchase.sum('planValue', {
+                where: {
+                    pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                    originCondition: 'main',
+                    botName: bName
                 }
-            } catch (e) {
-                logger.warn(`Remarketing JSON inválido para o bot ${newBot.name}.`, e);
-                bc.remarketing = {};
+            })) || 0;
+            const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
+            const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+            const plansObj = botPlansMap[bName] || {};
+            const plansArray = [];
+            for (const [planName, info] of Object.entries(plansObj)) {
+                const planConvRate = totalUsersBot > 0 ? (info.salesCount / totalUsersBot) * 100 : 0;
+                plansArray.push({
+                    planName,
+                    salesCount: info.salesCount,
+                    conversionRate: planConvRate,
+                });
             }
+            botDetails.push({
+                botName: bName,
+                valorGerado: totalValueBot,
+                totalPurchases: totalPurchasesBot,
+                totalUsers: totalUsersBot,
+                conversionRate: conversionRateBot,
+                averageValue: averageValueBot,
+                plans: plansArray,
+            });
         }
+        botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        initializeBot(bc);
-        res.send(`
-            <div class="alert alert-success">
-              Bot <strong>${name}</strong> cadastrado e iniciado com sucesso!
-            </div>
-        `);
-    } catch (err) {
-        logger.error('Erro ao criar bot:', err);
-        res.status(500).send('Erro ao criar bot: ' + err.message);
-    }
-});
-
-// [GET] Lista de bots (JSON)
-app.get('/admin/bots/list', checkAuth, async (req, res) => {
-    try {
-        const bots = await BotModel.findAll();
-        res.json(bots);
-    } catch (err) {
-        logger.error('Erro ao listar bots:', err);
-        res.status(500).json({ error: 'Erro ao listar bots' });
-    }
-});
-
-// [GET] Retorna 1 bot (para edição) em JSON
-app.get('/admin/bots/:id', checkAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const bot = await BotModel.findByPk(id);
-        if (!bot) {
-            return res.status(404).json({ error: 'Bot não encontrado' });
+        // Estatísticas dos últimos 7 dias – utilizando Promise.all para paralelizar
+        const stats7DaysPromises = [];
+        for (let i = 6; i >= 0; i--) {
+            const tempDate = new Date(startDate);
+            tempDate.setDate(tempDate.getDate() - i);
+            const dayStart = makeDayBrasilia(tempDate);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setHours(23, 59, 59, 999);
+            stats7DaysPromises.push(
+                getDetailedStats(dayStart, dayEnd, null, botFilters).then(dayStat => ({
+                    date: dayStart.toISOString().split('T')[0],
+                    totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
+                    totalVendasGeradas: dayStat.totalVendasGeradas || 0
+                }))
+            );
         }
-        res.json(bot);
-    } catch (err) {
-        logger.error('Erro ao obter bot:', err);
-        res.status(500).json({ error: 'Erro ao obter bot' });
-    }
-});
+        const stats7Days = await Promise.all(stats7DaysPromises);
 
-// [POST] Editar bot existente (com upload de vídeo opcional)
-app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const bot = await BotModel.findByPk(id);
-        if (!bot) {
-            return res.status(404).send('Bot não encontrado');
-        }
-
-        const {
-            name,
-            token,
-            description,
-            buttonName1,
-            buttonValue1,
-            buttonName2,
-            buttonValue2,
-            buttonName3,
-            buttonValue3,
-            remarketingJson
-        } = req.body;
-
-        const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
-            }
-        }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
-        const buttonsJson = JSON.stringify(buttons);
-
-        let videoFilename = bot.video;
-        if (req.file) {
-            videoFilename = req.file.location;
-        }
-
-        const safeRemarketingJson = remarketingJson || '';
-
-        bot.name = name;
-        bot.token = token;
-        bot.description = description;
-        bot.video = videoFilename;
-        bot.buttonsJson = buttonsJson;
-        bot.remarketingJson = safeRemarketingJson;
-        await bot.save();
-        logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
-
-        const bc = {
-            name: bot.name,
-            token: bot.token,
-            description: bot.description,
-            video: bot.video,
-            buttons: buttons,
-            remarketing: {}
+        // Movimentações e paginação
+        const lastMovementsWhere = {
+            pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
-        if (safeRemarketingJson) {
-            try {
-                let trimmed = safeRemarketingJson.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    bc.remarketing = JSON.parse(trimmed);
-                } else {
-                    bc.remarketing = {};
-                    logger.warn(`Remarketing JSON para o bot ${bot.name} não é válido. Usando objeto vazio.`);
-                }
-            } catch (e) {
-                logger.warn(`Remarketing JSON inválido para o bot ${bot.name}.`, e);
-                bc.remarketing = {};
-            }
+        if (movStatus === 'pending') {
+            lastMovementsWhere.status = 'pending';
+        } else if (movStatus === 'paid') {
+            lastMovementsWhere.status = 'paid';
         }
+        if (botFilters.length > 0 && !botFilters.includes('All')) {
+            lastMovementsWhere.botName = { [Op.in]: botFilters };
+        }
+        const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
+            attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
+            where: lastMovementsWhere,
+            order: [['pixGeneratedAt', 'DESC']],
+            limit: perPage,
+            offset: offset,
+            include: [{
+                model: User,
+                attributes: ['telegramId']
+            }]
+        });
 
-        // Atualiza a instância em memória
-        updateBotInMemory(id, bc);
-
-        res.send(`
-            <div class="alert alert-success">
-              Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
-            </div>
-        `);
-    } catch (err) {
-        logger.error('Erro ao editar bot:', err);
-        res.status(500).send('Erro ao editar bot: ' + err.message);
+        res.json({
+            statsAll,
+            statsYesterday,
+            statsMain,
+            statsNotPurchased,
+            statsPurchased,
+            botRanking,
+            botDetails,
+            stats7Days,
+            lastMovements,
+            totalMovements
+        });
+    } catch (error) {
+        logger.error('❌ Erro ao obter estatísticas:', error);
+        res.status(500).json({ error: 'Erro ao obter estatísticas' });
     }
 });
 
 //------------------------------------------------------
+// Inicializa o bot (mesmo como antes)
+//------------------------------------------------------
+require('./services/bot.service.js');
+
 // Sobe servidor
-//------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
