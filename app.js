@@ -14,7 +14,7 @@ const fs = require('fs');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-// IMPORTANTE: Utilize a propriedade exportada "BotModel" (conforme seu index.js)
+// ATENÇÃO: Use o modelo exportado como BotModel (não db.Bot)
 const BotModel = db.BotModel;
 
 const logger = require('./services/logger');
@@ -35,7 +35,6 @@ app.use(session({
     saveUninitialized: false
 }));
 
-// Middleware de autenticação
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) next();
     else res.redirect('/login');
@@ -59,7 +58,7 @@ db.sequelize
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// Configuração do Multer para Upload de Vídeo
+// Configuração do Multer para uploads de vídeo
 //------------------------------------------------------
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -79,7 +78,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 //------------------------------------------------------
-// Rotas de LOGIN / LOGOUT
+// Rotas de LOGIN/LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
@@ -206,7 +205,7 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas (conforme seu código original)
+// Função para obter estatísticas detalhadas
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
@@ -377,7 +376,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
                     endDate = new Date(lastMonthEnd);
                     endDate.setHours(23, 59, 59, 999);
-
                     const firstDayLastMonth = new Date(lastMonthEnd);
                     firstDayLastMonth.setDate(1);
                     startDate = makeDay(firstDayLastMonth);
@@ -611,7 +609,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 
         res.json({
             statsAll,
-            statsYesterday,
+            statsYesterday: stats7Days[stats7Days.length - 1] || {},
             statsMain,
             statsNotPurchased,
             statsPurchased,
@@ -660,10 +658,8 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
-        // Para remarketing, se não preenchido, define como string vazia
         const safeRemarketingJson = remarketingJson || '';
 
-        // Se o multer capturou um arquivo de vídeo
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.filename;
@@ -679,7 +675,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
 
-        // Monta configuração para iniciar o bot
         const bc = {
             name: newBot.name,
             token: newBot.token,
@@ -690,7 +685,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         };
         if (safeRemarketingJson) {
             try {
-                // Apenas tenta fazer o parse se o conteúdo começar com "{" ou "["
                 let trimmed = safeRemarketingJson.trim();
                 if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
                     bc.remarketing = JSON.parse(trimmed);
@@ -764,7 +758,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             remarketingJson
         } = req.body;
 
-        // Monta array de botões
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -776,11 +769,9 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
-        // Se veio novo arquivo de vídeo
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.filename;
-            // Se desejar, remova o vídeo antigo com fs.unlinkSync(...)
         }
 
         const safeRemarketingJson = remarketingJson || '';
@@ -794,7 +785,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
 
-        // Atualiza a instância em memória
         const bc = {
             name: bot.name,
             token: bot.token,
