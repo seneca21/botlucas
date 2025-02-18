@@ -16,8 +16,10 @@ const logger = require('./logger');
 const config = ConfigService.loadConfig();
 const dbConfig = ConfigService.getDbConfig();
 
-const bots = [];
-const userSessions = {};
+const bots = []; // Array para armazenar instâncias dos bots
+
+// Objeto global para evitar instâncias duplicadas (chave: token)
+global.botInstances = global.botInstances || {};
 
 // =====================================
 // Rate Limiting para Verificações de Pagamento
@@ -247,6 +249,12 @@ function booleanParaTexto(value, verdadeiro, falso) {
 // Função para inicializar um bot
 // =====================================
 function initializeBot(botConfig) {
+  // Se já existir uma instância para este token, para-a antes de iniciar nova
+  if (global.botInstances[botConfig.token]) {
+    logger.info(`Interrompendo instância anterior para o bot ${botConfig.name}`);
+    global.botInstances[botConfig.token].stop();
+  }
+
   const bot = new Telegraf(botConfig.token);
   logger.info(`🚀 Bot ${botConfig.name} em execução.`);
 
@@ -321,9 +329,10 @@ function initializeBot(botConfig) {
           Expires: 60
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
+        // Remove a porta do URL
         const urlObj = new URL(presignedUrl);
-        // Constrói a URL sem porta
-        videoSource = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+        urlObj.port = '';
+        videoSource = urlObj.toString();
       }
 
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
@@ -387,9 +396,10 @@ function initializeBot(botConfig) {
           Expires: 60
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
+        // Remove a porta do URL
         const urlObj = new URL(presignedUrl);
-        // Constrói a URL sem porta
-        videoSource = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+        urlObj.port = '';
+        videoSource = urlObj.toString();
       }
 
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
@@ -439,12 +449,7 @@ function initializeBot(botConfig) {
       await user.save();
     }
     const telegramId = ctx.chat.id.toString();
-    const canSelect = canAttemptSelectPlan(telegramId, plan.name);
-    if (!canSelect) {
-      await ctx.answerCbQuery();
-      handleUserBlock(telegramId);
-      return;
-    }
+    // Aqui você pode inserir lógica de rate limit para a seleção do plano, se desejar.
     if (!userSessions[ctx.chat.id]) userSessions[ctx.chat.id] = {};
     userSessions[ctx.chat.id].originCondition = 'main';
     userSessions[ctx.chat.id].selectedPlan = plan;
@@ -511,6 +516,7 @@ function initializeBot(botConfig) {
 
     const blockData = userBlockStatus.get(telegramId);
     if (blockData && (blockData.isBlocked || blockData.isBanned)) {
+      await ctx.reply('⚠️ Você está bloqueado para esta operação.');
       return;
     }
 
@@ -742,9 +748,12 @@ function initializeBot(botConfig) {
       logger.error(`🔥 Erro ao iniciar bot ${botConfig.name}:`, error);
     });
 
+  // Armazena a instância no objeto global para evitar duplicidade
+  global.botInstances[botConfig.token] = bot;
+  bots.push(bot);
+
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
-  bots.push(bot);
 }
 
 function updateBotInMemory(id, newConfig) {
