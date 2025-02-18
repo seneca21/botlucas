@@ -16,6 +16,42 @@ const logger = require('./logger');
 const config = ConfigService.loadConfig();
 const dbConfig = ConfigService.getDbConfig();
 
+// ================================
+// Configuração do AWS S3 Client (Bucketeer)
+// ================================
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+
+const s3Client = new S3Client({
+  region: process.env.BUCKETEER_AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY
+  }
+});
+
+/**
+ * Obtém o stream do vídeo a partir do Bucketeer (S3) utilizando a URL.
+ * Extrai a key (nome do arquivo) a partir da URL.
+ * @param {string} videoUrl URL completa do vídeo
+ * @returns {Promise<Stream>}
+ */
+async function getS3VideoStream(videoUrl) {
+  try {
+    const urlObj = new URL(videoUrl);
+    // O pathname contém a key com a barra inicial, então removemos o primeiro caractere.
+    const key = urlObj.pathname.substring(1);
+    const command = new GetObjectCommand({
+      Bucket: process.env.BUCKETEER_BUCKET_NAME,
+      Key: key
+    });
+    const response = await s3Client.send(command);
+    return response.Body; // stream do vídeo
+  } catch (err) {
+    logger.error('Erro ao obter stream do S3:', err);
+    throw err;
+  }
+}
+
 const bots = [];
 const userSessions = {};
 
@@ -408,12 +444,11 @@ function initializeBot(botConfig) {
         return;
       }
 
-      // Determina a fonte do vídeo: se for URL (vindo do S3) ou local
+      // Determina a fonte do vídeo: se for URL (do S3) ou local
       let videoInput;
       if (messageConfig.video && messageConfig.video.startsWith('http')) {
-        // Obtém stream do vídeo via axios
-        const response = await axios.get(messageConfig.video, { responseType: 'stream' });
-        videoInput = { source: response.data };
+        // Usa a função getS3VideoStream para obter o stream do S3
+        videoInput = { source: await getS3VideoStream(messageConfig.video) };
       } else {
         let videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
         if (!fs.existsSync(videoPath)) {
@@ -447,7 +482,7 @@ function initializeBot(botConfig) {
     }
   });
 
-  // Rota /start com envio do vídeo corrigido
+  // Rota /start com envio do vídeo atualizado
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -471,9 +506,8 @@ function initializeBot(botConfig) {
 
       let videoInput;
       if (botConfig.video && botConfig.video.startsWith('http')) {
-        // Se o vídeo já estiver armazenado no S3 (URL), obtém o stream via axios
-        const response = await axios.get(botConfig.video, { responseType: 'stream' });
-        videoInput = { source: response.data };
+        // Se o vídeo for do S3, utiliza a função getS3VideoStream
+        videoInput = { source: await getS3VideoStream(botConfig.video) };
       } else {
         const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
         if (!fs.existsSync(videoPath)) {
