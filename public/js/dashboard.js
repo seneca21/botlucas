@@ -1,4 +1,5 @@
 // public/js/dashboard.js
+
 $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
@@ -8,12 +9,8 @@ $(document).ready(function () {
     let totalMovementsCount = 0;
     let totalPages = 1;
 
-    // Armazenamos os bots selecionados
     let selectedBots = [];
 
-    //------------------------------------------------------------
-    // PLUGIN: Background chart
-    //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
         beforeDraw(chart, args, options) {
@@ -26,12 +23,8 @@ $(document).ready(function () {
     };
     Chart.register(chartBackgroundPlugin);
 
-    //------------------------------------------------------------
-    // DARK MODE
-    //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
-
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
@@ -82,9 +75,6 @@ $(document).ready(function () {
         }
     }
 
-    //------------------------------------------------------------
-    // formatDuration
-    //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
         const totalSec = Math.floor(ms / 1000);
@@ -93,9 +83,6 @@ $(document).ready(function () {
         return `${minutes}m ${seconds}s`;
     }
 
-    //------------------------------------------------------------
-    // RENDER PAGINATION
-    //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
@@ -105,7 +92,6 @@ $(document).ready(function () {
 
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
 
-        // << (back 10)
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -117,7 +103,6 @@ $(document).ready(function () {
         }
         group.append(doubleLeft);
 
-        // < (back 1)
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -129,7 +114,6 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // 3 pages window
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -154,7 +138,6 @@ $(document).ready(function () {
             group.append(btn);
         }
 
-        // > (forward 1)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -166,7 +149,6 @@ $(document).ready(function () {
         }
         group.append(singleRight);
 
-        // >> (forward 10)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -181,9 +163,6 @@ $(document).ready(function () {
         paginationContainer.append(group);
     }
 
-    //------------------------------------------------------------
-    // LOAD BOTS (para o dropdown)
-    //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
             .then(res => res.json())
@@ -198,21 +177,20 @@ $(document).ready(function () {
         container.empty();
 
         const toggleBtn = $(`
-            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
-                Bots
-            </button>
-        `);
+      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+        Bots
+      </button>
+    `);
 
         const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
 
-        // All
         const allId = 'bot_all';
         const allItem = $(`
-            <div class="form-check pl-2">
-                <input class="form-check-input" type="checkbox" id="${allId}" value="All">
-                <label class="form-check-label" for="${allId}">All</label>
-            </div>
-        `);
+      <div class="form-check pl-2">
+        <input class="form-check-input" type="checkbox" id="${allId}" value="All">
+        <label class="form-check-label" for="${allId}">All</label>
+      </div>
+    `);
         allItem.find('input').on('change', function () {
             if ($(this).prop('checked')) {
                 checkList.find('input[type="checkbox"]').not(`#${allId}`).prop('checked', false);
@@ -228,11 +206,11 @@ $(document).ready(function () {
         botNames.forEach(bot => {
             const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
             const item = $(`
-                <div class="form-check pl-2">
-                    <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
-                    <label class="form-check-label" for="${safeId}">${bot}</label>
-                </div>
-            `);
+        <div class="form-check pl-2">
+          <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
+          <label class="form-check-label" for="${safeId}">${bot}</label>
+        </div>
+      `);
             item.find('input').on('change', function () {
                 if ($(this).prop('checked')) {
                     checkList.find(`#${allId}`).prop('checked', false);
@@ -263,9 +241,6 @@ $(document).ready(function () {
         container.append(dropDiv);
     }
 
-    //------------------------------------------------------------
-    // GET DATE RANGE
-    //------------------------------------------------------------
     function getDateRangeParams() {
         const rangeValue = $('#dateRangeSelector').val();
         if (rangeValue === 'custom') {
@@ -280,9 +255,6 @@ $(document).ready(function () {
         return { dateRange: rangeValue };
     }
 
-    //------------------------------------------------------------
-    // UPDATE DASHBOARD
-    //------------------------------------------------------------
     async function updateDashboard(movStatus, page, perPage) {
         try {
             const dr = getDateRangeParams();
@@ -307,16 +279,12 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Estatísticas
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            //--------------------------------------------------
-            // GRÁFICO DE BARRAS
-            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -348,9 +316,6 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
-            //--------------------------------------------------
-            // GRÁFICO DE LINHA (7 dias)
-            //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[0]}`;
@@ -465,27 +430,19 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            //--------------------------------------------------
-            // RANKING SIMPLES
-            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
-                        <tr>
-                            <td>${bot.botName || 'N/A'}</td>
-                            <td>${bot.vendas}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName || 'N/A'}</td>
+              <td>${bot.vendas}</td>
+            </tr>
+          `);
                 });
-            } else {
-                botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
 
-            //--------------------------------------------------
-            // RANKING DETALHADO
-            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -495,23 +452,18 @@ $(document).ready(function () {
                         plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                     });
                     detailsTbody.append(`
-                        <tr>
-                            <td>${bot.botName}</td>
-                            <td>R$${bot.valorGerado.toFixed(2)}</td>
-                            <td>${bot.totalPurchases}</td>
-                            <td>${plansHtml}</td>
-                            <td>${bot.conversionRate.toFixed(2)}%</td>
-                            <td>R$${bot.averageValue.toFixed(2)}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName}</td>
+              <td>R$${bot.valorGerado.toFixed(2)}</td>
+              <td>${bot.totalPurchases}</td>
+              <td>${plansHtml}</td>
+              <td>${bot.conversionRate.toFixed(2)}%</td>
+              <td>R$${bot.averageValue.toFixed(2)}</td>
+            </tr>
+          `);
                 });
-            } else {
-                detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
 
-            //--------------------------------------------------
-            // ESTATÍSTICAS DETALHADAS
-            //--------------------------------------------------
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
@@ -536,9 +488,6 @@ $(document).ready(function () {
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            //--------------------------------------------------
-            // ÚLTIMAS MOVIMENTAÇÕES
-            //--------------------------------------------------
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
@@ -565,43 +514,36 @@ $(document).ready(function () {
                         }
                     }
                     movementsTbody.append(`
-                        <tr>
-                            <td>${leadId}</td>
-                            <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td>${dtGen}</td>
-                            <td>${dtPaid}</td>
-                            <td>${statusHtml}</td>
-                            <td>${payDelayHtml}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${leadId}</td>
+              <td>R$ ${mov.planValue.toFixed(2)}</td>
+              <td>${dtGen}</td>
+              <td>${dtPaid}</td>
+              <td>${statusHtml}</td>
+              <td>${payDelayHtml}</td>
+            </tr>
+          `);
                 });
             } else {
                 movementsTbody.append(`
-                    <tr>
-                        <td colspan="6">Nenhuma movimentação encontrada</td>
-                    </tr>
-                `);
+          <tr>
+            <td colspan="6">Nenhuma movimentação encontrada</td>
+          </tr>
+        `);
             }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    //------------------------------------------------------------
-    // REFRESH
-    //------------------------------------------------------------
     function refreshDashboard() {
         const movStatus = $('#movStatusFilter').val() || '';
         updateDashboard(movStatus, currentPage, currentPerPage);
     }
 
-    //------------------------------------------------------------
-    // Inicial
-    //------------------------------------------------------------
     loadBotList();
     refreshDashboard();
 
-    // Checa a aba default
     const defaultSection = $('#sidebarNav .nav-link.active').data('section');
     if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
         $('#botFilterContainer').show();
@@ -609,9 +551,6 @@ $(document).ready(function () {
         $('#botFilterContainer').hide();
     }
 
-    //------------------------------------------------------------
-    // EVENTOS
-    //------------------------------------------------------------
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
@@ -636,7 +575,6 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // Sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -646,20 +584,16 @@ $(document).ready(function () {
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
-        $('#manageBotsSection').addClass('d-none');
 
         const targetSection = $(this).data('section');
-        $(`#${targetSection}`).removeClass('d-none');
+        if (targetSection) {
+            $(`#${targetSection}`).removeClass('d-none');
+        }
 
-        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
-            targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
+        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
             $('#botFilterContainer').show();
         } else {
             $('#botFilterContainer').hide();
-            // Se for manageBots, carregamos a lista
-            if (targetSection === 'manageBotsSection') {
-                loadExistingBots();
-            }
         }
 
         currentPage = 1;
@@ -669,196 +603,5 @@ $(document).ready(function () {
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
-    });
-
-    //------------------------------------------------------------
-    // [1] Form Criar Novo Bot
-    //------------------------------------------------------------
-    $('#addBotForm').on('submit', function (e) {
-        e.preventDefault();
-
-        const formData = new FormData();
-        formData.append('name', $('#botNameInput').val().trim());
-        formData.append('token', $('#botTokenInput').val().trim());
-        formData.append('description', $('#botDescriptionInput').val().trim());
-        formData.append('buttonName1', $('#buttonName1').val().trim());
-        formData.append('buttonValue1', $('#buttonValue1').val().trim());
-        formData.append('buttonName2', $('#buttonName2').val().trim());
-        formData.append('buttonValue2', $('#buttonValue2').val().trim());
-        formData.append('buttonName3', $('#buttonName3').val().trim());
-        formData.append('buttonValue3', $('#buttonValue3').val().trim());
-        formData.append('remarketingJson', $('#remarketingInput').val().trim());
-
-        const videoFile = $('#botVideoFile')[0].files[0];
-        if (videoFile) {
-            formData.append('videoFile', videoFile);
-        }
-
-        fetch('/admin/bots', {
-            method: 'POST',
-            body: formData
-        })
-            .then(async (res) => {
-                if (!res.ok) {
-                    const textErr = await res.text();
-                    throw new Error(textErr);
-                }
-                return res.text();
-            })
-            .then(htmlResponse => {
-                $('#addBotResponse').html(htmlResponse);
-                // Recarrega a lista de bots
-                loadBotList();
-                loadExistingBots();
-                // Limpa
-                $('#addBotForm')[0].reset();
-            })
-            .catch(err => {
-                $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
-            });
-    });
-
-    //------------------------------------------------------------
-    // [2] Lista de Bots Existentes
-    //------------------------------------------------------------
-    function loadExistingBots() {
-        $('#existingBotsBody').html(`<tr><td colspan="4">Carregando...</td></tr>`);
-        fetch('/admin/bots/list')
-            .then(res => res.json())
-            .then(list => {
-                const tbody = $('#existingBotsBody');
-                tbody.empty();
-                if (!list || list.length === 0) {
-                    tbody.html(`<tr><td colspan="4">Nenhum bot cadastrado</td></tr>`);
-                    return;
-                }
-                list.forEach(bot => {
-                    let videoLabel = bot.video ? bot.video : '—';
-                    tbody.append(`
-                    <tr>
-                        <td>${bot.id}</td>
-                        <td>${bot.name}</td>
-                        <td>${videoLabel}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
-                        </td>
-                    </tr>
-                `);
-                });
-            })
-            .catch(err => {
-                console.error('Erro ao carregar bots:', err);
-                $('#existingBotsBody').html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
-            });
-    }
-
-    // Ao clicar em "Editar"
-    $(document).on('click', '[data-edit-bot]', function () {
-        const botId = $(this).attr('data-edit-bot');
-        editBot(botId);
-    });
-
-    function editBot(botId) {
-        // Limpa e abre form
-        $('#editBotForm')[0].reset();
-        $('#editBotResponse').empty();
-        $('#editBotId').val(botId);
-
-        // Carrega
-        fetch(`/admin/bots/${botId}`)
-            .then(res => {
-                if (!res.ok) throw new Error('Bot não encontrado');
-                return res.json();
-            })
-            .then(bot => {
-                $('#editBotName').val(bot.name);
-                $('#editBotToken').val(bot.token);
-                $('#editBotDescription').val(bot.description || '');
-                // parse buttons
-                let bjson = [];
-                try {
-                    bjson = JSON.parse(bot.buttonsJson || '[]');
-                } catch (e) { }
-                if (bjson[0]) {
-                    $('#editButtonName1').val(bjson[0].name);
-                    $('#editButtonValue1').val(bjson[0].value);
-                } else {
-                    $('#editButtonName1').val('');
-                    $('#editButtonValue1').val('');
-                }
-                if (bjson[1]) {
-                    $('#editButtonName2').val(bjson[1].name);
-                    $('#editButtonValue2').val(bjson[1].value);
-                } else {
-                    $('#editButtonName2').val('');
-                    $('#editButtonValue2').val('');
-                }
-                if (bjson[2]) {
-                    $('#editButtonName3').val(bjson[2].name);
-                    $('#editButtonValue3').val(bjson[2].value);
-                } else {
-                    $('#editButtonName3').val('');
-                    $('#editButtonValue3').val('');
-                }
-
-                $('#editRemarketingJson').val(bot.remarketingJson || '');
-                // exibe
-                $('#editBotContainer').show();
-            })
-            .catch(err => {
-                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
-            });
-    }
-
-    // Cancelar
-    $('#cancelEditBotBtn').on('click', function () {
-        $('#editBotContainer').hide();
-    });
-
-    // [POST] Salvar Edição
-    $('#editBotForm').on('submit', function (e) {
-        e.preventDefault();
-        const botId = $('#editBotId').val();
-        if (!botId) {
-            $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`);
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('name', $('#editBotName').val().trim());
-        formData.append('token', $('#editBotToken').val().trim());
-        formData.append('description', $('#editBotDescription').val().trim());
-        formData.append('buttonName1', $('#editButtonName1').val().trim());
-        formData.append('buttonValue1', $('#editButtonValue1').val().trim());
-        formData.append('buttonName2', $('#editButtonName2').val().trim());
-        formData.append('buttonValue2', $('#editButtonValue2').val().trim());
-        formData.append('buttonName3', $('#editButtonName3').val().trim());
-        formData.append('buttonValue3', $('#editButtonValue3').val().trim());
-        formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
-
-        const videoFile = $('#editVideoFile')[0].files[0];
-        if (videoFile) {
-            formData.append('videoFile', videoFile);
-        }
-
-        fetch(`/admin/bots/edit/${botId}`, {
-            method: 'POST',
-            body: formData
-        })
-            .then(async (res) => {
-                if (!res.ok) {
-                    const textErr = await res.text();
-                    throw new Error(textErr);
-                }
-                return res.text();
-            })
-            .then(htmlResp => {
-                $('#editBotResponse').html(htmlResp);
-                loadExistingBots();
-                loadBotList();
-            })
-            .catch(err => {
-                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
-            });
     });
 });

@@ -1,13 +1,13 @@
 // services/index.js
 
 const { Sequelize } = require('sequelize');
-const logger = require('./logger'); // caso precise de logger
+const logger = require('./logger');
 
-// Conexão manual com Postgres
+// Conexão:
 const sequelize = new Sequelize(
-  'd36d4dkqgtr6ut',          // Nome do DB
-  'ud4gfju6bdnki2',          // Usuário
-  'p2dfc875746ebbd4c8f65e63ecbb29426db19f49b15c9ec1d3a8941553abef74c', // Senha
+  'd36d4dkqgtr6ut',
+  'ud4gfju6bdnki2',
+  'p2dfc875746ebbd4c8f65e63ecbb29426db19f49b15c9ec1d3a8941553abef74c',
   {
     host: 'cbdhrtd93854d5.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
     port: 5432,
@@ -22,19 +22,19 @@ const sequelize = new Sequelize(
   }
 );
 
-// Importamos os models
+// Import models
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
-const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes); // <-- Novo Model Bot
+const Bot = require('../models/Bot')(sequelize, Sequelize.DataTypes);
 
-// Relações
+// Relations
 User.hasMany(Purchase, { foreignKey: 'userId' });
 Purchase.belongsTo(User, { foreignKey: 'userId' });
 
-// Exporta todos
+// Export
 module.exports = {
   sequelize,
   User,
   Purchase,
-  BotModel
+  Bot
 };
