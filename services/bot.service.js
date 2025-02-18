@@ -393,7 +393,7 @@ function initializeBot(botConfig) {
         logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
-      // O vídeo agora está armazenado no bucket S3 (Bucketeer)
+      // O vídeo agora está armazenado no S3 (Bucketeer) e sua key está em botConfig.video
       const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${botConfig.video}`;
       if (!botConfig.video) {
         logger.error(`❌ Nenhum vídeo configurado para o bot ${botConfig.name}`);
@@ -716,7 +716,7 @@ function initializeBot(botConfig) {
     }
   }, 60 * 60 * 1000);
 
-  // Removendo webhook ativo para evitar conflito e depois lançando o bot
+  // Remove o webhook ativo para evitar conflito e lança o bot
   bot.telegram.deleteWebhook().then(() => {
     bot.launch()
       .then(() => {

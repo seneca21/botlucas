@@ -15,19 +15,21 @@ const AWS = require('aws-sdk');
 
 // Configuração do AWS SDK (Bucketeer)
 AWS.config.update({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION
+    accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY,
+    region: process.env.BUCKETEER_AWS_REGION
 });
 const s3 = new AWS.S3();
 
-// Configure o multer para enviar para o bucket S3
+// Verifica se a variável BUCKETEER_BUCKET_NAME está definida
 if (!process.env.BUCKETEER_BUCKET_NAME) {
-    throw new Error("A variável de ambiente T não está definida.");
+    throw new Error("A variável de ambiente BUCKETEER_BUCKET_NAME não está definida.");
 }
+
+// Configure o multer para enviar arquivos para o bucket S3
 const storage = multerS3({
     s3: s3,
-    bucket: process.env.BUCKETEER_BUCKET_NAME, // Nome do bucket fornecido pelo Bucketeer
+    bucket: process.env.BUCKETEER_BUCKET_NAME, // usa BUCKETEER_BUCKET_NAME
     acl: 'public-read',
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
@@ -77,6 +79,7 @@ db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
+        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
@@ -201,7 +204,6 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
     }
 });
 
-// Função makeDay
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -775,7 +777,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
-        // Atualiza a instância em memória
         updateBotInMemory(id, bc);
         res.send(`
             <div class="alert alert-success">
