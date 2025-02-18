@@ -8,14 +8,36 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
 
-// Para upload de arquivos (multer):
+// Para upload de arquivos usando S3 via multer-s3:
 const multer = require('multer');
-const fs = require('fs');
+const multerS3 = require('multer-s3');
+const AWS = require('aws-sdk');
+
+// Configuração do AWS SDK (Bucketeer)
+AWS.config.update({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION
+});
+const s3 = new AWS.S3();
+
+// Configure o multer para enviar para o bucket S3
+const storage = multerS3({
+    s3: s3,
+    bucket: process.env.BUCKETEER_BUCKET, // Nome do bucket fornecido pelo Bucketeer
+    acl: 'public-read',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: function (req, file, cb) {
+        // Cria uma chave única
+        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
+        cb(null, uniqueSuffix);
+    }
+});
+const upload = multer({ storage });
 
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-// IMPORTANTE: use o modelo BotModel exportado pelo index.js
 const BotModel = db.BotModel;
 
 const logger = require('./services/logger');
@@ -57,26 +79,6 @@ db.sequelize
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
-
-//------------------------------------------------------
-// Configuração do Multer para uploads de vídeo
-//------------------------------------------------------
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // Cria a pasta se não existir (public/videos)
-        const uploadPath = path.join(__dirname, 'public', 'videos');
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        // Exemplo: Date.now() + '-' + nomeOriginal (sem espaços)
-        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
-        cb(null, uniqueSuffix);
-    }
-});
-const upload = multer({ storage });
 
 //------------------------------------------------------
 // Rotas de LOGIN/LOGOUT
@@ -205,7 +207,7 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas
+// Função para obter estatísticas detalhadas (mantida conforme seu código)
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
@@ -607,7 +609,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 // Rotas de Gerenciar Bots
 //------------------------------------------------------
 
-// [POST] Criar Novo Bot (com upload de vídeo opcional)
+// [POST] Criar Novo Bot (com upload de vídeo opcional via S3)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -634,9 +636,10 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
+        // Aqui, req.file vem do multer-s3, e req.file.location contém a URL pública do arquivo
         let videoFilename = '';
         if (req.file) {
-            videoFilename = req.file.filename;
+            videoFilename = req.file.key; // Salva o 'key' do S3 (nome do arquivo no bucket)
         }
         const newBot = await BotModel.create({
             name,
@@ -707,7 +710,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     }
 });
 
-// [POST] Editar bot existente (com upload de vídeo opcional)
+// [POST] Editar bot existente (com upload de vídeo opcional via S3)
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -739,7 +742,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         const buttonsJson = JSON.stringify(buttons);
         let videoFilename = bot.video;
         if (req.file) {
-            videoFilename = req.file.filename;
+            videoFilename = req.file.key;
         }
         const safeRemarketingJson = remarketingJson || '';
         bot.name = name;

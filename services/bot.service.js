@@ -32,7 +32,6 @@ const VERIFICATION_CYCLE_RESET_MS = 48 * 60 * 60 * 1000;
 function canAttemptVerification(telegramId) {
   const now = Date.now();
   let userData = verificationLimits.get(telegramId);
-
   if (!userData) {
     verificationLimits.set(telegramId, {
       attempts: 1,
@@ -43,12 +42,10 @@ function canAttemptVerification(telegramId) {
     logger.info(`Verificação: ${telegramId} - Primeira tentativa permitida.`);
     return { allowed: true };
   }
-
   if (now < userData.blockUntil) {
     logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
   }
-
   if (now - userData.lastAttempt > VERIFICATION_CYCLE_RESET_MS) {
     verificationLimits.set(telegramId, {
       attempts: 1,
@@ -59,7 +56,6 @@ function canAttemptVerification(telegramId) {
     logger.info(`Verificação: ${telegramId} - Ciclo resetado. Primeira tentativa permitida.`);
     return { allowed: true };
   }
-
   if (userData.attempts < MAX_VERIFICATION_ATTEMPTS) {
     userData.attempts += 1;
     userData.lastAttempt = now;
@@ -69,7 +65,6 @@ function canAttemptVerification(telegramId) {
   } else {
     userData.violations += 1;
     userData.attempts = 0;
-
     if (userData.violations === 1) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       verificationLimits.set(telegramId, userData);
@@ -86,7 +81,6 @@ function canAttemptVerification(telegramId) {
       logger.info(`Verificação: ${telegramId} - Bloqueado por 24 horas.`);
       return { allowed: false, message: `🚫 Bloqueado por 24 horas.` };
     }
-
     verificationLimits.set(telegramId, userData);
     logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
     return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.` };
@@ -104,7 +98,6 @@ const START_WAIT_SECOND_MS = 24 * 60 * 60 * 1000;
 function canAttemptStart(telegramId) {
   const now = Date.now();
   let userData = startLimits.get(telegramId);
-
   if (!userData) {
     startLimits.set(telegramId, {
       startCount: 1,
@@ -113,12 +106,10 @@ function canAttemptStart(telegramId) {
     logger.info(`/start: ${telegramId} - Primeiro start permitido.`);
     return true;
   }
-
   if (now < userData.nextAllowedStartTime) {
     logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
     return false;
   }
-
   if (userData.startCount < MAX_STARTS) {
     userData.startCount++;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS;
@@ -144,7 +135,6 @@ const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
 function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
   let userData = selectPlanLimits.get(telegramId);
-
   if (!userData) {
     selectPlanLimits.set(telegramId, {
       selectedPlans: new Set([planId]),
@@ -154,19 +144,16 @@ function canAttemptSelectPlan(telegramId, planId) {
     logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) sel.`);
     return true;
   }
-
   if (now < userData.blockUntil) {
     logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return false;
   }
-
   if (userData.selectedPlans.has(planId)) {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
     logger.info(`Seleção de Plano: ${telegramId} - Repetida do plano (${planId}). Bloqueado 24h.`);
     return false;
   }
-
   if (userData.selectedPlans.size < MAX_SELECT_PLAN_ATTEMPTS) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
@@ -192,7 +179,6 @@ const START_FLOOD_PAUSE_MS = 8 * 60 * 1000;
 function checkStartFlood(botName) {
   const now = Date.now();
   let floodData = startFloodProtection.get(botName);
-
   if (!floodData) {
     startFloodProtection.set(botName, {
       startTimestamps: [now],
@@ -201,7 +187,6 @@ function checkStartFlood(botName) {
     });
     return false;
   }
-
   if (floodData.isPaused) {
     if (now >= floodData.pauseUntil) {
       floodData.isPaused = false;
@@ -212,10 +197,8 @@ function checkStartFlood(botName) {
       return true;
     }
   }
-
   floodData.startTimestamps = floodData.startTimestamps.filter(ts => now - ts <= START_FLOOD_WINDOW_MS);
   floodData.startTimestamps.push(now);
-
   if (floodData.startTimestamps.length >= START_FLOOD_LIMIT) {
     floodData.isPaused = true;
     floodData.pauseUntil = now + START_FLOOD_PAUSE_MS;
@@ -223,7 +206,6 @@ function checkStartFlood(botName) {
     logger.warn(`Proteção Flood: ${botName} - Pausando /start por 8min, ${floodData.startTimestamps.length} starts em 3min.`);
     return true;
   }
-
   startFloodProtection.set(botName, floodData);
   return false;
 }
@@ -247,11 +229,9 @@ function handleUserBlock(telegramId) {
     isBanned: false,
     banExpiresAt: 0
   };
-
   if (blockData.isBanned) {
     return;
   }
-
   blockData.blockCount += 1;
   if (blockData.blockCount === BLOCK_COUNT_THRESHOLD) {
     setTimeout(() => {
@@ -402,16 +382,17 @@ function initializeBot(botConfig) {
         logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
-      // Atualizado para buscar vídeo na pasta src/videos
-      const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
-      if (!fs.existsSync(videoPath)) {
-        logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
+      // Usa o vídeo armazenado no bucket (vídeos foram enviados para S3 via Bucketeer)
+      const videoUrl = `https://${process.env.BUCKETEER_BUCKET}.s3.amazonaws.com/${botConfig.video}`;
+      // Verifica se o vídeo tem um URL válido (não verifica existência local)
+      if (!botConfig.video) {
+        logger.error(`❌ Nenhum nome de vídeo configurado para o bot ${botConfig.name}`);
         return;
       }
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
-      await bot.telegram.sendVideo(user.telegramId, { source: videoPath }, {
+      await bot.telegram.sendVideo(user.telegramId, videoUrl, {
         caption: messageConfig.text,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
@@ -503,52 +484,6 @@ function initializeBot(botConfig) {
       }
     }
     await ctx.answerCbQuery();
-  });
-
-  bot.start(async (ctx) => {
-    try {
-      const telegramId = ctx.from.id.toString();
-      const botName = botConfig.name;
-      const isBotPaused = checkStartFlood(botName);
-      if (isBotPaused) return;
-      const blockData = userBlockStatus.get(telegramId);
-      if (blockData && (blockData.isBlocked || blockData.isBanned)) {
-        return;
-      }
-      const canStartNow = canAttemptStart(telegramId);
-      if (!canStartNow) {
-        handleUserBlock(telegramId);
-        return;
-      }
-      logger.info('📩 /start recebido');
-      await registerUser(ctx);
-      // Usar a pasta src/videos (vídeo enviado via dashboard)
-      const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
-      if (!fs.existsSync(videoPath)) {
-        logger.error(`❌ Vídeo não achado: ${videoPath}`);
-        await ctx.reply('⚠️ Erro ao carregar vídeo.');
-        return;
-      }
-      const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
-        Markup.button.callback(btn.name, `select_plan_${idx}`)
-      );
-      await ctx.replyWithVideo(
-        { source: videoPath },
-        {
-          caption: botConfig.description || 'Sem descrição',
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
-        }
-      );
-      logger.info(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
-    } catch (error) {
-      logger.error('❌ Erro /start:', error);
-      if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
-      } else {
-        await ctx.reply('⚠️ Erro ao processar /start.');
-      }
-    }
   });
 
   bot.command('status_pagamento', async (ctx) => {
