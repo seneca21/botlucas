@@ -188,7 +188,7 @@ function canAttemptSelectPlan(telegramId, planId) {
       blockUntil: 0,
       lastAttempt: now
     });
-    logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) sel.`);
+    logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) selecionado.`);
     return true;
   }
 
@@ -200,7 +200,7 @@ function canAttemptSelectPlan(telegramId, planId) {
   if (userData.selectedPlans.has(planId)) {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Repetida do plano (${planId}). Bloqueado 24h.`);
+    logger.info(`Seleção de Plano: ${telegramId} - Repetição do plano (${planId}). Bloqueado por 24h.`);
     return false;
   }
 
@@ -208,12 +208,12 @@ function canAttemptSelectPlan(telegramId, planId) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Plano (${planId}) sel. Tamanho: ${userData.selectedPlans.size}.`);
+    logger.info(`Seleção de Plano: ${telegramId} - Plano (${planId}) selecionado. Total: ${userData.selectedPlans.size}.`);
     return true;
   } else {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Excedeu seleções. Bloqueado 24h.`);
+    logger.info(`Seleção de Plano: ${telegramId} - Excedeu seleções. Bloqueado por 24h.`);
     return false;
   }
 }
@@ -447,7 +447,6 @@ function initializeBot(botConfig) {
       // Determina a fonte do vídeo: se for URL (do S3) ou local
       let videoInput;
       if (messageConfig.video && messageConfig.video.startsWith('http')) {
-        // Usa a função getS3VideoStream para obter o stream do S3
         videoInput = { source: await getS3VideoStream(messageConfig.video) };
       } else {
         let videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
@@ -506,7 +505,6 @@ function initializeBot(botConfig) {
 
       let videoInput;
       if (botConfig.video && botConfig.video.startsWith('http')) {
-        // Se o vídeo for do S3, utiliza a função getS3VideoStream
         videoInput = { source: await getS3VideoStream(botConfig.video) };
       } else {
         const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
@@ -518,6 +516,7 @@ function initializeBot(botConfig) {
         videoInput = { source: fs.createReadStream(videoPath) };
       }
 
+      // Gera os botões principais com callback data "select_plan_<índice>"
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
         Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
@@ -541,6 +540,7 @@ function initializeBot(botConfig) {
     }
   });
 
+  // Handler para botões de remarketing (prefixo remarketing_select_plan_)
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const planValue = parseFloat(ctx.match[1]);
@@ -578,7 +578,7 @@ function initializeBot(botConfig) {
     userSessions[ctx.chat.id].selectedPlan = plan;
     userSessions[ctx.chat.id].paymentCheckCount = 0;
 
-    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (remarketing) enviado.`);
 
     try {
       const chargeData = {
@@ -625,6 +625,86 @@ function initializeBot(botConfig) {
 
     await ctx.answerCbQuery();
   });
+
+  // --- NOVO HANDLER PARA BOTÕES PRINCIPAIS (select_plan_) ---
+  bot.action(/^select_plan_(\d+)$/, async (ctx) => {
+    const chatId = ctx.chat.id;
+    const index = parseInt(ctx.match[1]);
+    const plan = (botConfig.buttons || [])[index];
+    if (!plan) {
+      logger.error(`❌ Plano não encontrado para o índice ${index} no bot ${botConfig.name}.`);
+      await ctx.answerCbQuery("Plano não encontrado.");
+      return;
+    }
+
+    const user = await User.findOne({ where: { telegramId: chatId.toString() } });
+    if (user) {
+      user.lastInteraction = new Date();
+      user.botName = botConfig.name;
+      await user.save();
+    }
+
+    const telegramId = chatId.toString();
+    const canSelect = canAttemptSelectPlan(telegramId, plan.name);
+    if (!canSelect) {
+      await ctx.answerCbQuery();
+      handleUserBlock(telegramId);
+      return;
+    }
+
+    if (!userSessions[chatId]) userSessions[chatId] = {};
+    userSessions[chatId].originCondition = 'main';
+    userSessions[chatId].selectedPlan = plan;
+    userSessions[chatId].paymentCheckCount = 0;
+
+    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+
+    try {
+      const chargeData = {
+        value: plan.value * 100,
+        webhook_url: null,
+      };
+      const chargeResult = await createCharge(chargeData);
+      const chargeId = chargeResult.id;
+      const emv = chargeResult.qr_code;
+
+      const newPurchase = await Purchase.create({
+        userId: user ? user.id : null,
+        planName: plan.name,
+        planValue: plan.value,
+        botName: botConfig.name,
+        originCondition: 'main',
+        pixGeneratedAt: new Date(),
+        status: 'pending',
+        purchasedAt: null
+      });
+
+      userSessions[chatId].chargeId = chargeId;
+      userSessions[chatId].purchaseId = newPurchase.id;
+
+      await ctx.reply(
+        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
+        { parse_mode: 'Markdown' }
+      );
+      await ctx.reply(
+        '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
+        Markup.inlineKeyboard([
+          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
+        ])
+      );
+    } catch (error) {
+      logger.error('❌ Erro ao criar cobrança:', error);
+      if (error.response && error.response.error_code === 403) {
+        logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
+        delete userSessions[chatId];
+      } else {
+        await ctx.reply('⚠️ Erro ao criar cobrança.');
+      }
+    }
+
+    await ctx.answerCbQuery();
+  });
+  // --- FIM DO HANDLER select_plan_ ---
 
   bot.command('status_pagamento', async (ctx) => {
     const chatId = ctx.chat.id;
