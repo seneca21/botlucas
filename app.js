@@ -1,43 +1,15 @@
 // app.js
-//------------------------------------------------------
-// app.js
-//------------------------------------------------------
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
 
-// Para upload de arquivos usando S3 via multer-s3:
+// Importação dos módulos para AWS SDK v3 e multer-s3-v3
+const { S3Client } = require('@aws-sdk/client-s3');
+const multerS3 = require('multer-s3-v3');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
-const AWS = require('aws-sdk');
-
-// Configuração do AWS SDK (Bucketeer)
-AWS.config.update({
-    accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY,
-    region: process.env.BUCKETEER_AWS_REGION
-});
-const s3 = new AWS.S3();
-
-// Verifica se a variável BUCKETEER_BUCKET_NAME está definida
-if (!process.env.BUCKETEER_BUCKET_NAME) {
-    throw new Error("A variável de ambiente BUCKETEER_BUCKET_NAME não está definida.");
-}
-
-// Configure o multer para enviar arquivos para o bucket S3
-const storage = multerS3({
-    s3: s3,
-    bucket: process.env.BUCKETEER_BUCKET_NAME, // usa BUCKETEER_BUCKET_NAME
-    acl: 'public-read',
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
-        cb(null, uniqueSuffix);
-    }
-});
-const upload = multer({ storage });
+const fs = require('fs');
 
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
@@ -46,16 +18,16 @@ const BotModel = db.BotModel;
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
-const config = ConfigService.loadConfig(); // carrega config.json
+const config = ConfigService.loadConfig();
 
-// Importa funções para inicializar/editar bots
+// Importa as funções para gerenciar bots (no bot.service.js)
 const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Sessão
+// Sessão (atenção: MemoryStore não é recomendado para produção)
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
@@ -67,9 +39,37 @@ function checkAuth(req, res, next) {
     else res.redirect('/login');
 }
 
-//------------------------------------------------------
-// Conexão com o Banco de Dados
-//------------------------------------------------------
+// ------------------------------------------------------
+// Configuração do S3 para Bucketeer usando AWS SDK v3
+// ------------------------------------------------------
+if (!process.env.BUCKETEER_BUCKET_NAME) {
+    throw new Error("A variável de ambiente BUCKETEER_BUCKET_NAME não está definida.");
+}
+
+const s3Client = new S3Client({
+    region: process.env.BUCKETEER_AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY
+    }
+});
+
+const storage = multerS3({
+    s3: s3Client,
+    bucket: process.env.BUCKETEER_BUCKET_NAME,
+    acl: 'public-read',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
+        cb(null, uniqueSuffix);
+    }
+});
+
+const upload = multer({ storage });
+
+// ------------------------------------------------------
+// Conexão com o Banco de Dados e sincronização dos modelos
+// ------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
@@ -79,14 +79,14 @@ db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
-        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
+        // Recarrega os bots cadastrados no BD e os inicia
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
-//------------------------------------------------------
+// ------------------------------------------------------
 // Rotas de LOGIN/LOGOUT
-//------------------------------------------------------
+// ------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
     <!DOCTYPE html>
@@ -162,6 +162,7 @@ app.post('/login', (req, res) => {
     const { username, password } = req.body;
     const ADMIN_USER = 'perufe';
     const ADMIN_PASS = 'oppushin1234';
+
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         req.session.loggedIn = true;
         logger.info(`✅ Usuário ${username} logou com sucesso.`);
@@ -180,19 +181,19 @@ app.get('/logout', (req, res) => {
     });
 });
 
-//------------------------------------------------------
+// ------------------------------------------------------
 // Rota principal -> index.html
-//------------------------------------------------------
+// ------------------------------------------------------
 app.get('/', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Servimos a pasta public
+// Servindo arquivos estáticos da pasta public
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
-//------------------------------------------------------
-// Rotas de ESTATÍSTICAS & BOT LIST
-//------------------------------------------------------
+// ------------------------------------------------------
+// Rotas de Estatísticas & Lista de Bots
+// ------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -210,46 +211,31 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas (conforme seu código)
+// Função para obter estatísticas detalhadas (conforme seu código original)
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
     }
-    let totalUsers = 0;
-    let totalPurchases = 0;
-    let sumGerado = 0;
-    let sumConvertido = 0;
-    let averagePaymentDelayMs = 0;
-    let conversionRate = 0;
+    let totalUsers = 0, totalPurchases = 0, sumGerado = 0, sumConvertido = 0, averagePaymentDelayMs = 0, conversionRate = 0;
     try {
         if (originCondition === 'main') {
             const mainWhere = { ...baseWhere, originCondition: 'main' };
             const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({
-                where: mainWhere,
-                distinct: true,
-                col: 'userId'
-            });
+            totalUsers = await Purchase.count({ where: mainWhere, distinct: true, col: 'userId' });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
-            sumConvertido = (await Purchase.sum('planValue', {
-                where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
-            })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', { where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
             const paidPurchases = await Purchase.findAll({
                 where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0;
-            let countPaid = 0;
+            let sumDiffMs = 0, countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
+                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
@@ -263,38 +249,24 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             totalUsers = await db.User.count({ where: userWhere });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
-            sumConvertido = (await Purchase.sum('planValue', {
-                where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
-            })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0;
-            let countPaid = 0;
+            let sumDiffMs = 0, countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
+                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
         } else {
             const purchaseWhere = { ...baseWhere, originCondition };
-            const totalLeads = await Purchase.count({
-                where: { ...baseWhere, originCondition },
-                distinct: true,
-                col: 'userId'
-            });
-            const totalConfirmed = await Purchase.count({
-                where: { ...baseWhere, originCondition, status: 'paid' },
-                distinct: true,
-                col: 'userId'
-            });
+            const totalLeads = await Purchase.count({ where: { ...baseWhere, originCondition }, distinct: true, col: 'userId' });
+            const totalConfirmed = await Purchase.count({ where: { ...baseWhere, originCondition, status: 'paid' }, distinct: true, col: 'userId' });
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
@@ -306,10 +278,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
+                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
@@ -380,18 +349,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     startDate = makeDay(firstDayLastMonth);
                     break;
                 case 'custom':
-                    if (customStart) {
-                        startDate = makeDay(new Date(customStart));
-                    } else {
-                        startDate = todayMidnight;
-                    }
-                    if (customEnd) {
-                        endDate = new Date(customEnd);
-                        endDate.setHours(23, 59, 59, 999);
-                    } else {
-                        endDate = new Date(startDate);
-                        endDate.setHours(23, 59, 59, 999);
-                    }
+                    startDate = customStart ? makeDay(new Date(customStart)) : todayMidnight;
+                    endDate = customEnd ? new Date(customEnd) : new Date(startDate);
+                    endDate.setHours(23, 59, 59, 999);
                     break;
                 default:
                     break;
@@ -426,17 +386,15 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const startYesterday = makeDay(yesterdayDate);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
-        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
+        const statsYesterday = await getDetailedStats(startYesterday, endDate, null, botFilters);
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
             ],
-            where: {
-                purchasedAt: { [Op.between]: [startDate, endDate] },
-            },
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
             group: ['botName'],
-            order: [[Sequelize.literal('"vendas"'), 'DESC']],
+            order: [[Sequelize.literal('"vendas"'), 'DESC']]
         });
         const botRanking = botRankingRaw.map(item => ({
             botName: item.botName,
@@ -446,13 +404,13 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             attributes: [
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue']
             ],
             where: {
                 purchasedAt: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
-            group: ['botName'],
+            group: ['botName']
         });
         const generatedByBot = await Purchase.findAll({
             attributes: [
@@ -472,13 +430,13 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
-                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
+                [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers']
             ],
             where: {
                 lastInteraction: { [Op.between]: [startDate, endDate] },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
-            group: ['botName'],
+            group: ['botName']
         });
         const botUsersMap = {};
         botsWithInteractions.forEach(item => {
@@ -491,15 +449,15 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 'botName',
                 'planName',
                 [Sequelize.fn('COUNT', Sequelize.col('planName')), 'salesCount'],
-                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue'],
+                [Sequelize.fn('SUM', Sequelize.col('planValue')), 'sumValue']
             ],
             where: {
                 purchasedAt: { [Op.between]: [startDate, endDate] },
                 planName: { [Op.ne]: null },
-                botName: { [Op.ne]: null },
+                botName: { [Op.ne]: null }
             },
             group: ['botName', 'planName'],
-            order: [[Sequelize.literal('"salesCount"'), 'DESC']],
+            order: [[Sequelize.literal('"salesCount"'), 'DESC']]
         });
         const botPlansMap = {};
         planSalesByBot.forEach(row => {
@@ -540,7 +498,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 plansArray.push({
                     planName,
                     salesCount: info.salesCount,
-                    conversionRate: planConvRate,
+                    conversionRate: planConvRate
                 });
             }
             botDetails.push({
@@ -550,7 +508,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 totalUsers: totalUsersBot,
                 conversionRate: conversionRateBot,
                 averageValue: averageValueBot,
-                plans: plansArray,
+                plans: plansArray
             });
         }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
@@ -608,11 +566,11 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     }
 });
 
-//------------------------------------------------------
+// ------------------------------------------------------
 // Rotas de Gerenciar Bots
-//------------------------------------------------------
+// ------------------------------------------------------
 
-// [POST] Criar Novo Bot (com upload de vídeo opcional via S3)
+// [POST] Criar Novo Bot (upload de vídeo para S3 via Bucketeer)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -641,7 +599,8 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         const safeRemarketingJson = remarketingJson || '';
         let videoFilename = '';
         if (req.file) {
-            videoFilename = req.file.key; // a key gerada pelo S3
+            // O multer-s3-v3 retorna a propriedade "key" que é o nome do arquivo no S3
+            videoFilename = req.file.key;
         }
         const newBot = await BotModel.create({
             name,
@@ -652,6 +611,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             remarketingJson: safeRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
+        // Monta a configuração para iniciar o bot. Note que, ao enviar vídeo, o bot utilizará a URL pública:
         const bc = {
             name: newBot.name,
             token: newBot.token,
@@ -686,7 +646,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
     }
 });
 
-// [GET] Lista de bots (JSON)
+// [GET] Lista de Bots (JSON)
 app.get('/admin/bots/list', checkAuth, async (req, res) => {
     try {
         const bots = await BotModel.findAll();
@@ -697,14 +657,12 @@ app.get('/admin/bots/list', checkAuth, async (req, res) => {
     }
 });
 
-// [GET] Retorna 1 bot (para edição) em JSON
+// [GET] Retorna um Bot (para edição) em JSON
 app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const bot = await BotModel.findByPk(id);
-        if (!bot) {
-            return res.status(404).json({ error: 'Bot não encontrado' });
-        }
+        if (!bot) return res.status(404).json({ error: 'Bot não encontrado' });
         res.json(bot);
     } catch (err) {
         logger.error('Erro ao obter bot:', err);
@@ -712,14 +670,12 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     }
 });
 
-// [POST] Editar bot existente (com upload de vídeo opcional via S3)
+// [POST] Editar Bot existente (upload de vídeo para S3 via Bucketeer)
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
         const bot = await BotModel.findByPk(id);
-        if (!bot) {
-            return res.status(404).send('Bot não encontrado');
-        }
+        if (!bot) return res.status(404).send('Bot não encontrado');
         const {
             name,
             token,
@@ -777,7 +733,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
-        // Atualiza a instância em memória
         updateBotInMemory(id, bc);
         res.send(`
             <div class="alert alert-success">
@@ -790,9 +745,9 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
     }
 });
 
-//------------------------------------------------------
+// ------------------------------------------------------
 // Sobe servidor
-//------------------------------------------------------
+// ------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
