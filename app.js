@@ -61,8 +61,8 @@ db.sequelize
 //------------------------------------------------------
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Cria a pasta se não existir (public/videos)
-        const uploadPath = path.join(__dirname, 'public', 'videos');
+        // Cria a pasta se não existir (src/videos)
+        const uploadPath = path.join(__dirname, 'src', 'videos');
         if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
         }

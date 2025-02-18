@@ -407,8 +407,8 @@ function initializeBot(botConfig) {
         return;
       }
 
-      // Atualizado: busca o vídeo em public/videos (não mais em src/videos)
-      const videoPath = path.resolve(__dirname, `../public/videos/${messageConfig.video}`);
+      // Busca o vídeo na pasta src/videos (conforme solicitado)
+      const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
       if (!fs.existsSync(videoPath)) {
         logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
         return;
@@ -459,8 +459,8 @@ function initializeBot(botConfig) {
       logger.info('📩 /start recebido');
       await registerUser(ctx);
 
-      // Atualizado: busca o vídeo em public/videos
-      const videoPath = path.resolve(__dirname, `../public/videos/${botConfig.video}`);
+      // Busca o vídeo na pasta src/videos
+      const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
       if (!fs.existsSync(videoPath)) {
         logger.error(`❌ Vídeo não achado: ${videoPath}`);
         await ctx.reply('⚠️ Erro ao carregar vídeo.');
@@ -515,7 +515,6 @@ function initializeBot(botConfig) {
     }
 
     const telegramId = ctx.chat.id.toString();
-    // Usamos plan.name diretamente
     const canSelect = canAttemptSelectPlan(telegramId, plan.name);
     if (!canSelect) {
       await ctx.answerCbQuery();
