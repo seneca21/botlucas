@@ -22,13 +22,15 @@ AWS.config.update({
 const s3 = new AWS.S3();
 
 // Configure o multer para enviar para o bucket S3
+if (!process.env.BUCKETEER_BUCKET) {
+    throw new Error("A variável de ambiente BUCKETEER_BUCKET não está definida.");
+}
 const storage = multerS3({
     s3: s3,
     bucket: process.env.BUCKETEER_BUCKET, // Nome do bucket fornecido pelo Bucketeer
     acl: 'public-read',
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
-        // Cria uma chave única
         const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
         cb(null, uniqueSuffix);
     }
@@ -75,7 +77,6 @@ db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
-        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
@@ -207,7 +208,7 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas (mantida conforme seu código)
+// Função para obter estatísticas detalhadas (conforme seu código)
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
@@ -636,10 +637,9 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
-        // Aqui, req.file vem do multer-s3, e req.file.location contém a URL pública do arquivo
         let videoFilename = '';
         if (req.file) {
-            videoFilename = req.file.key; // Salva o 'key' do S3 (nome do arquivo no bucket)
+            videoFilename = req.file.key; // key gerado pelo S3
         }
         const newBot = await BotModel.create({
             name,
@@ -775,7 +775,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
-        // Atualiza a instância em memória (evita duplicação)
+        // Atualiza a instância em memória
         updateBotInMemory(id, bc);
         res.send(`
             <div class="alert alert-success">
