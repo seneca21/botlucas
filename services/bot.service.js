@@ -32,7 +32,6 @@ const VERIFICATION_CYCLE_RESET_MS = 48 * 60 * 60 * 1000;
 function canAttemptVerification(telegramId) {
   const now = Date.now();
   let userData = verificationLimits.get(telegramId);
-
   if (!userData) {
     verificationLimits.set(telegramId, {
       attempts: 1,
@@ -43,12 +42,10 @@ function canAttemptVerification(telegramId) {
     logger.info(`Verificação: ${telegramId} - Primeira tentativa permitida.`);
     return { allowed: true };
   }
-
   if (now < userData.blockUntil) {
     logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
   }
-
   if (now - userData.lastAttempt > VERIFICATION_CYCLE_RESET_MS) {
     verificationLimits.set(telegramId, {
       attempts: 1,
@@ -59,7 +56,6 @@ function canAttemptVerification(telegramId) {
     logger.info(`Verificação: ${telegramId} - Ciclo resetado. Primeira tentativa permitida.`);
     return { allowed: true };
   }
-
   if (userData.attempts < MAX_VERIFICATION_ATTEMPTS) {
     userData.attempts += 1;
     userData.lastAttempt = now;
@@ -69,7 +65,6 @@ function canAttemptVerification(telegramId) {
   } else {
     userData.violations += 1;
     userData.attempts = 0;
-
     if (userData.violations === 1) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       verificationLimits.set(telegramId, userData);
@@ -86,7 +81,6 @@ function canAttemptVerification(telegramId) {
       logger.info(`Verificação: ${telegramId} - Bloqueado por 24 horas.`);
       return { allowed: false, message: `🚫 Bloqueado por 24 horas.` };
     }
-
     verificationLimits.set(telegramId, userData);
     logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
     return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.` };
@@ -104,7 +98,6 @@ const START_WAIT_SECOND_MS = 24 * 60 * 60 * 1000;
 function canAttemptStart(telegramId) {
   const now = Date.now();
   let userData = startLimits.get(telegramId);
-
   if (!userData) {
     startLimits.set(telegramId, {
       startCount: 1,
@@ -113,12 +106,10 @@ function canAttemptStart(telegramId) {
     logger.info(`/start: ${telegramId} - Primeiro start permitido.`);
     return true;
   }
-
   if (now < userData.nextAllowedStartTime) {
     logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
     return false;
   }
-
   if (userData.startCount < MAX_STARTS) {
     userData.startCount++;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS;
@@ -144,7 +135,6 @@ const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
 function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
   let userData = selectPlanLimits.get(telegramId);
-
   if (!userData) {
     selectPlanLimits.set(telegramId, {
       selectedPlans: new Set([planId]),
@@ -154,19 +144,16 @@ function canAttemptSelectPlan(telegramId, planId) {
     logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) sel.`);
     return true;
   }
-
   if (now < userData.blockUntil) {
     logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return false;
   }
-
   if (userData.selectedPlans.has(planId)) {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
     logger.info(`Seleção de Plano: ${telegramId} - Repetida do plano (${planId}). Bloqueado 24h.`);
     return false;
   }
-
   if (userData.selectedPlans.size < MAX_SELECT_PLAN_ATTEMPTS) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
@@ -393,12 +380,12 @@ function initializeBot(botConfig) {
         logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
-      // O vídeo agora está armazenado no S3 (Bucketeer) e sua key está em botConfig.video
-      const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${botConfig.video}`;
+      // Usa a URL do S3 (Bucketeer) para o vídeo
       if (!botConfig.video) {
         logger.error(`❌ Nenhum vídeo configurado para o bot ${botConfig.name}`);
         return;
       }
+      const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${botConfig.video}`;
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
@@ -665,19 +652,15 @@ function initializeBot(botConfig) {
       }
     }
   }
-
   setInterval(() => {
     cleanRateLimitMap(startLimits, (ud, now) => now > ud.nextAllowedStartTime + START_WAIT_SECOND_MS, 'startLimits');
   }, 60 * 60 * 1000);
-
   setInterval(() => {
     cleanRateLimitMap(selectPlanLimits, (ud, now) => now > ud.blockUntil, 'selectPlanLimits');
   }, 60 * 60 * 1000);
-
   setInterval(() => {
     cleanRateLimitMap(verificationLimits, (ud, now) => now > ud.blockUntil + VERIFICATION_CYCLE_RESET_MS, 'verificationLimits');
   }, 60 * 60 * 1000);
-
   setInterval(() => {
     const now = Date.now();
     for (const [botName, floodData] of startFloodProtection) {
@@ -691,7 +674,6 @@ function initializeBot(botConfig) {
       startFloodProtection.set(botName, floodData);
     }
   }, 60 * 1000);
-
   setInterval(() => {
     const now = Date.now();
     for (const [telegramId, blockData] of userBlockStatus) {

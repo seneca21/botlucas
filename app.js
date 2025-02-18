@@ -641,7 +641,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         const safeRemarketingJson = remarketingJson || '';
         let videoFilename = '';
         if (req.file) {
-            videoFilename = req.file.key; // key gerado pelo S3
+            videoFilename = req.file.key; // a key gerada pelo S3
         }
         const newBot = await BotModel.create({
             name,
@@ -777,6 +777,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
+        // Atualiza a instância em memória
         updateBotInMemory(id, bc);
         res.send(`
             <div class="alert alert-success">
