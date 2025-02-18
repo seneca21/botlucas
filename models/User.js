@@ -41,12 +41,10 @@ module.exports = (sequelize) => {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
         },
-        // BotName (nome do bot)
         botName: {
             type: DataTypes.STRING,
             allowNull: true,
         },
-        // planName e planValue
         planName: {
             type: DataTypes.STRING,
             allowNull: true,

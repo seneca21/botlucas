@@ -10,32 +10,27 @@ const { Op, Sequelize } = require('sequelize');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Importado para criar/ler bots do BD
-
-const { initializeBot, reloadBotsFromDB } = require('./services/bot.service'); // Para iniciar/recarregar bots
+const BotModel = db.BotModel; // Importado se precisar
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
+const { initializeBot, reloadBotsFromDB } = require('./services/bot.service');
+
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Sessão
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
-// Middleware de autenticação
 function checkAuth(req, res, next) {
-    if (req.session.loggedIn) {
-        next();
-    } else {
-        res.redirect('/login');
-    }
+    if (req.session.loggedIn) next();
+    else res.redirect('/login');
 }
 
 //------------------------------------------------------
@@ -47,15 +42,18 @@ db.sequelize
     .catch((err) => logger.error('❌ Erro ao conectar DB:', err));
 
 db.sequelize
-    .sync({ alter: true })
-    .then(() => logger.info('✅ Modelos sincronizados (alter).'))
+    .sync({ alter: true }) // <--- CRIAR/ALTERAR TABELAS AQUI
+    .then(async () => {
+        logger.info('✅ Modelos sincronizados (alter).');
+        // Depois de sync, recarrega e inicializa Bots do BD
+        await reloadBotsFromDB();
+    })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
-    // Página de login sofisticada
     const html = `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -164,7 +162,7 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
-        // Agora retorna do BD
+        // Lê do BD
         const botRows = await BotModel.findAll();
         const botNames = botRows.map(b => b.name);
         res.json(botNames);
@@ -175,7 +173,7 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS AUXILIARES
+// FUNÇÕES DE ESTATÍSTICAS (conforme seu código original)
 //------------------------------------------------------
 function makeDay(date) {
     const d = new Date(date);
@@ -183,23 +181,17 @@ function makeDay(date) {
     return d;
 }
 
-/**
- * Calcula as estatísticas para um determinado intervalo e condição.
- * Retorna obj com { totalUsers, totalPurchases, conversionRate, totalVendasGeradas, totalVendasConvertidas, averagePaymentDelayMs }
- */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
     }
-
     let totalUsers = 0;
     let totalPurchases = 0;
     let sumGerado = 0;
     let sumConvertido = 0;
     let averagePaymentDelayMs = 0;
     let conversionRate = 0;
-
     try {
         if (originCondition === 'main') {
             const mainWhere = { ...baseWhere, originCondition: 'main' };
@@ -277,13 +269,8 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-
             const paidPurchases = await Purchase.findAll({
-                where: {
-                    ...baseWhere,
-                    originCondition,
-                    status: 'paid'
-                },
+                where: { ...baseWhere, originCondition, status: 'paid' },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
             let sumDiffMs = 0, countPaid = 0;
@@ -325,7 +312,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
         }
-
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
@@ -425,7 +411,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         endYesterday.setHours(23, 59, 59, 999);
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
 
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -442,7 +427,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -456,7 +440,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName'],
         });
 
-        // Total gerado por bot
         const generatedByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -506,7 +489,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
-
         const botPlansMap = {};
         planSalesByBot.forEach(row => {
             const bName = row.botName;
@@ -623,7 +605,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Rotas para Gerenciar Bots (Criar via Form)
+// Rotas para gerenciar Bots (exemplo, se precisar)
 //------------------------------------------------------
 app.get('/admin/bots', checkAuth, (req, res) => {
     const html = `
@@ -652,7 +634,6 @@ app.get('/admin/bots', checkAuth, (req, res) => {
 app.post('/admin/bots', checkAuth, async (req, res) => {
     try {
         const { name, token, description, video, buttonsJson, remarketingJson } = req.body;
-
         const newBot = await BotModel.create({
             name,
             token,
@@ -663,7 +644,7 @@ app.post('/admin/bots', checkAuth, async (req, res) => {
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
 
-        // Monta config e inicia
+        // Monta config e inicia imediatamente
         const botConfig = {
             name: newBot.name,
             token: newBot.token,
@@ -690,13 +671,6 @@ app.post('/admin/bots', checkAuth, async (req, res) => {
         res.status(500).send('Erro ao criar bot: ' + err.message);
     }
 });
-
-//------------------------------------------------------
-// Inicializa todos os bots do BD ao subir
-//------------------------------------------------------
-(async () => {
-    await reloadBotsFromDB();
-})();
 
 //------------------------------------------------------
 // Sobe servidor

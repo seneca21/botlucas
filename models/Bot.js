@@ -30,8 +30,8 @@ module.exports = (sequelize, DataTypes) => {
             }
         },
         {
-            tableName: 'Bots',  // o nome da tabela
-            timestamps: false   // caso não queira createdAt/updatedAt
+            tableName: 'Bots',  // Tabela "Bots"
+            timestamps: false   // Se quiser createdAt/updatedAt, remova esta linha
         }
     );
 
