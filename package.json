@@ -7,6 +7,7 @@
     "start": "node app.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
     "aws-sdk": "^2.1360.0",
     "axios": "^1.4.0",
     "body-parser": "^1.20.2",

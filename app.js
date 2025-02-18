@@ -8,7 +8,7 @@ const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
 
 // Para upload de arquivos via S3 (Bucketeer)
-const AWS = require('aws-sdk');
+const { S3Client } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3-v3');
 const multer = require('multer');
 const fs = require('fs');
@@ -61,17 +61,19 @@ db.sequelize
 //------------------------------------------------------
 // Configuração do Multer para uploads de vídeo via S3 (Bucketeer)
 //------------------------------------------------------
-AWS.config.update({
-    accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY,
-    region: process.env.BUCKETEER_AWS_REGION
+// Usando AWS SDK v3:
+const s3Client = new S3Client({
+    region: process.env.BUCKETEER_AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.BUCKETEER_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY,
+    }
 });
-const s3 = new AWS.S3();
 const upload = multer({
     storage: multerS3({
-        s3: s3,
+        s3: s3Client,
         bucket: process.env.BUCKETEER_BUCKET_NAME,
-        acl: 'public-read', // para acesso público
+        acl: 'public-read', // Vídeo ficará acessível publicamente
         key: function (req, file, cb) {
             const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
             cb(null, uniqueSuffix);
@@ -207,14 +209,14 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas (omita ou mantenha conforme seu código atual)
+// Função para obter estatísticas detalhadas (mantém sua implementação original)
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // ... implementação original ...
+    // ... sua implementação atual ...
 }
 
-// Rota /api/bots-stats (mantenha sua implementação atual)
+// Rota /api/bots-stats (mantém sua implementação atual)
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
-    // ... implementação original ...
+    // ... sua implementação atual ...
 });
 
 //------------------------------------------------------
