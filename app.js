@@ -14,7 +14,7 @@ const fs = require('fs');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Model da tabela "Bots"
+const BotModel = db.BotModel; // Modelo da tabela "Bots"
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -40,7 +40,7 @@ function checkAuth(req, res, next) {
 }
 
 //------------------------------------------------------
-// Conexão DB
+// Conexão com o DB
 //------------------------------------------------------
 db.sequelize
     .authenticate()
@@ -51,7 +51,7 @@ db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
-        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
+        // Recarrega todos os bots do BD
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
@@ -61,7 +61,6 @@ db.sequelize
 //------------------------------------------------------
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Cria a pasta se não existir (public/videos)
         const uploadPath = path.join(__dirname, 'public', 'videos');
         if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
@@ -69,7 +68,6 @@ const storage = multer.diskStorage({
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
-        // Exemplo: Date.now() + '-' + nomeOriginal (sem espaços)
         const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
         cb(null, uniqueSuffix);
     }
@@ -197,35 +195,30 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
     }
 });
 
-// Função makeDay
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
-// Função getDetailedStats (conforme seu código atual)
-// [O código permanece inalterado]
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-    if (botFilters.length > 0 && !botFilters.includes('All')) {
-        baseWhere.botName = { [Op.in]: botFilters };
-    }
+    // (Conteúdo completo da função getDetailedStats conforme sua versão atual)
+    // Por brevidade, mantenha a implementação existente.
     let totalUsers = 0;
     let totalPurchases = 0;
     let sumGerado = 0;
     let sumConvertido = 0;
     let averagePaymentDelayMs = 0;
     let conversionRate = 0;
+    const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+    if (botFilters.length > 0 && !botFilters.includes('All')) {
+        baseWhere.botName = { [Op.in]: botFilters };
+    }
     try {
         if (originCondition === 'main') {
             const mainWhere = { ...baseWhere, originCondition: 'main' };
             const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({
-                where: mainWhere,
-                distinct: true,
-                col: 'userId'
-            });
+            totalUsers = await Purchase.count({ where: mainWhere, distinct: true, col: 'userId' });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
             sumConvertido = (await Purchase.sum('planValue', {
@@ -236,8 +229,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0;
-            let countPaid = 0;
+            let sumDiffMs = 0, countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
@@ -266,8 +258,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0;
-            let countPaid = 0;
+            let sumDiffMs = 0, countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
@@ -280,16 +271,8 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
         } else {
             const purchaseWhere = { ...baseWhere, originCondition };
-            const totalLeads = await Purchase.count({
-                where: { ...baseWhere, originCondition },
-                distinct: true,
-                col: 'userId'
-            });
-            const totalConfirmed = await Purchase.count({
-                where: { ...baseWhere, originCondition, status: 'paid' },
-                distinct: true,
-                col: 'userId'
-            });
+            const totalLeads = await Purchase.count({ where: { ...baseWhere, originCondition }, distinct: true, col: 'userId' });
+            const totalConfirmed = await Purchase.count({ where: { ...baseWhere, originCondition, status: 'paid' }, distinct: true, col: 'userId' });
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
@@ -338,12 +321,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 
         let startDate, endDate;
         const now = new Date();
-
         if (dateRange) {
             let todayMidnight = makeDay(new Date());
             let todayEnd = new Date(todayMidnight);
             todayEnd.setHours(23, 59, 59, 999);
-
             switch (dateRange) {
                 case 'today':
                     startDate = todayMidnight;
@@ -373,7 +354,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
                     endDate = new Date(lastMonthEnd);
                     endDate.setHours(23, 59, 59, 999);
-
                     const firstDayLastMonth = new Date(lastMonthEnd);
                     firstDayLastMonth.setDate(1);
                     startDate = makeDay(firstDayLastMonth);
@@ -396,7 +376,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     break;
             }
         }
-
         if (!startDate || !endDate) {
             let dateArray;
             if (date && date.includes(',')) {
@@ -406,7 +385,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             } else {
                 dateArray = [new Date().toISOString().split('T')[0]];
             }
-
             if (dateArray.length === 1) {
                 startDate = makeDay(new Date(dateArray[0]));
                 endDate = new Date(startDate);
@@ -418,19 +396,16 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 endDate.setHours(23, 59, 59, 999);
             }
         }
-
         const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
         const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
-
         const yesterdayDate = new Date(startDate.getTime());
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const startYesterday = makeDay(yesterdayDate);
         const endYesterday = new Date(startYesterday);
         endYesterday.setHours(23, 59, 59, 999);
         const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
-
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -446,7 +421,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botName: item.botName,
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
-
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -459,7 +433,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             },
             group: ['botName'],
         });
-
         const generatedByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -475,7 +448,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         generatedByBot.forEach(item => {
             generatedMap[item.botName] = parseFloat(item.getDataValue('generatedValue')) || 0;
         });
-
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -493,7 +465,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const uCount = parseInt(item.getDataValue('totalUsers'), 10) || 0;
             botUsersMap[bName] = uCount;
         });
-
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -518,7 +489,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             if (!botPlansMap[bName]) botPlansMap[bName] = {};
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
-
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
@@ -542,7 +512,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
-
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
@@ -553,7 +522,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     conversionRate: planConvRate,
                 });
             }
-
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -565,7 +533,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             });
         }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
-
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -580,7 +547,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 totalVendasGeradas: dayStat.totalVendasGeradas || 0
             });
         }
-
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
@@ -592,7 +558,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes('All')) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
-
         const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
             attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
@@ -604,7 +569,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 attributes: ['telegramId']
             }]
         });
-
         res.json({
             statsAll,
             statsYesterday,
@@ -643,8 +607,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             buttonValue3,
             remarketingJson
         } = payload;
-
-        // Monta array de botões
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -655,18 +617,13 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName2, buttonValue2);
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
-
-        // Remarketing JSON
         let safeRemarketingJson = remarketingJson || '';
-
-        // Se o multer pegou um arquivo
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.filename;
         } else {
             videoFilename = '';
         }
-
         const newBot = await BotModel.create({
             name,
             token,
@@ -676,8 +633,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             remarketingJson: safeRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
-
-        // Monta config para subir o bot
         const bc = {
             id: newBot.id,
             name: newBot.name,
@@ -694,7 +649,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
                 logger.warn(`Remarketing JSON inválido para bot ${newBot.name}.`, e);
             }
         }
-
         initializeBot(bc);
         res.send(`
             <div class="alert alert-success">
@@ -741,7 +695,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         if (!bot) {
             return res.status(404).send('Bot não encontrado');
         }
-
         const {
             name,
             token,
@@ -754,8 +707,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             buttonValue3,
             remarketingJson
         } = req.body;
-
-        // Monta array de botões
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -766,16 +717,12 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         pushButtonIfValid(buttonName2, buttonValue2);
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
-
-        // Se veio videoFile
-        let videoFilename = bot.video; // mantém o anterior se não houver novo
+        let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.filename;
-            // Opcional: apagar o arquivo antigo
+            // Opcional: apagar arquivo antigo se desejar
         }
-
         let safeRemarketingJson = remarketingJson || '';
-
         bot.name = name;
         bot.token = token;
         bot.description = description;
@@ -784,7 +731,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         bot.remarketingJson = safeRemarketingJson;
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
-
         const bc = {
             id: bot.id,
             name: bot.name,
@@ -801,9 +747,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 logger.warn(`Remarketing JSON inválido para bot ${bot.name}.`, e);
             }
         }
-
         updateBotInMemory(id, bc);
-
         res.send(`
             <div class="alert alert-success">
               Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
