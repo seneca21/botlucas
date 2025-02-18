@@ -1,28 +1,31 @@
+//------------------------------------------------------
 // app.js
-
+//------------------------------------------------------
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
-const multer = require('multer');
 const { Op, Sequelize } = require('sequelize');
 
-const db = require('./services/index');
+// Para upload de arquivos (multer):
+const multer = require('multer');
+const fs = require('fs');
+
+const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const Bot = db.Bot;
+const BotModel = db.BotModel; // Model da tabela "Bots"
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
-const config = ConfigService.loadConfig();
+const config = ConfigService.loadConfig(); // carrega config.json
 
-const { reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service.js');
+// Importa funções para gerenciar bots
+const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-const upload = multer({ dest: 'src/videos/' }); // salva local
 
 // Sessão
 app.use(session({
@@ -32,96 +35,117 @@ app.use(session({
 }));
 
 function checkAuth(req, res, next) {
-    if (req.session.loggedIn) {
-        next();
-    } else {
-        res.redirect('/login');
-    }
+    if (req.session.loggedIn) next();
+    else res.redirect('/login');
 }
 
-// Conecta DB
+//------------------------------------------------------
+// Conexão DB
+//------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
-    .catch(err => logger.error('❌ Erro ao conectar DB:', err));
+    .catch((err) => logger.error('❌ Erro ao conectar DB:', err));
 
 db.sequelize
     .sync({ alter: true })
-    .then(() => {
+    .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
-        // Carrega bots do DB (adicional ao config.json)
-        reloadBotsFromDB();
+        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
+        await reloadBotsFromDB();
     })
-    .catch(err => logger.error('❌ Erro ao sincronizar modelos:', err));
+    .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
-// Rotas de LOGIN
+//------------------------------------------------------
+// Configura o Multer para uploads de vídeo
+//------------------------------------------------------
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Cria a pasta se não existir (public/videos)
+        const uploadPath = path.join(__dirname, 'public', 'videos');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        // Exemplo: Date.now() + '-' + nomeOriginal (sem espaços)
+        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
+        cb(null, uniqueSuffix);
+    }
+});
+const upload = multer({ storage });
+
+//------------------------------------------------------
+// LOGIN/LOGOUT
+//------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
-  <!DOCTYPE html>
-  <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8">
-    <title>Login</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <style>
-      body {
-        background-color: #f8f9fa;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-      }
-      .login-container {
-        background-color: #fff;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        width: 300px;
-      }
-      .login-container h1 {
-        font-size: 1.5rem;
-        margin-bottom: 1.5rem;
-        text-align: center;
-      }
-      .btn-login {
-        border-radius: 50px;
-      }
-      .input-group-text {
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="login-container">
-      <h1>Login</h1>
-      <form method="POST" action="/login">
-        <div class="form-group">
-          <label for="username">Usuário</label>
-          <input type="text" class="form-control" id="username" name="username" placeholder="Digite seu usuário" required>
-        </div>
-        <div class="form-group">
-          <label for="password">Senha</label>
-          <div class="input-group">
-            <input type="password" class="form-control" id="password" name="password" placeholder="Digite sua senha" required>
-            <div class="input-group-append">
-              <span class="input-group-text" id="togglePassword">&#128065;</span>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Login</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+      <style>
+        body {
+          background-color: #f8f9fa;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .login-container {
+          background-color: #fff;
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          width: 300px;
+        }
+        .login-container h1 {
+          font-size: 1.5rem;
+          margin-bottom: 1.5rem;
+          text-align: center;
+        }
+        .btn-login {
+          border-radius: 50px;
+        }
+        .input-group-text {
+          cursor: pointer;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="login-container">
+        <h1>Login</h1>
+        <form method="POST" action="/login">
+          <div class="form-group">
+            <label for="username">Usuário</label>
+            <input type="text" class="form-control" id="username" name="username" placeholder="Digite seu usuário" required>
+          </div>
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="password" name="password" placeholder="Digite sua senha" required>
+              <div class="input-group-append">
+                <span class="input-group-text" id="togglePassword">&#128065;</span>
+              </div>
             </div>
           </div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block btn-login">Entrar</button>
-      </form>
-    </div>
-    <script>
-      document.getElementById('togglePassword').addEventListener('click', function () {
-        const passwordInput = document.getElementById('password');
-        const currentType = passwordInput.getAttribute('type');
-        const newType = currentType === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', newType);
-      });
-    </script>
-  </body>
-  </html>
+          <button type="submit" class="btn btn-primary btn-block btn-login">Entrar</button>
+        </form>
+      </div>
+      <script>
+        document.getElementById('togglePassword').addEventListener('click', function () {
+          const passwordInput = document.getElementById('password');
+          const currentType = passwordInput.getAttribute('type');
+          const newType = currentType === 'password' ? 'text' : 'password';
+          passwordInput.setAttribute('type', newType);
+        });
+      </script>
+    </body>
+    </html>
   `;
     res.send(html);
 });
@@ -136,7 +160,7 @@ app.post('/login', (req, res) => {
         logger.info(`✅ Usuário ${username} logou com sucesso.`);
         return res.redirect('/');
     } else {
-        logger.warn(`❌ Tentativa login inválida: ${username}`);
+        logger.warn(`❌ Tentativa de login inválida com usuário: ${username}`);
         return res.send('Credenciais inválidas. <a href="/login">Tentar novamente</a>');
     }
 });
@@ -149,59 +173,59 @@ app.get('/logout', (req, res) => {
     });
 });
 
-// Rota principal
+//------------------------------------------------------
+// Rota principal -> index.html
+//------------------------------------------------------
 app.get('/', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Servir pasta public
+// Servimos a pasta public
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
-// ROTA GET: /api/bots-list
-app.get('/api/bots-list', checkAuth, (req, res) => {
+//------------------------------------------------------
+// Rotas de ESTATÍSTICAS & BOT LIST
+//------------------------------------------------------
+app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
-        // Pega do config e do BD
-        const configBots = config.bots?.map(b => b.name) || [];
-        Bot.findAll().then(dbBots => {
-            const dbNames = dbBots.map(b => b.name);
-            const merged = Array.from(new Set([...configBots, ...dbNames]));
-            res.json(merged);
-        }).catch(err => {
-            logger.error('Erro DB bot-list:', err);
-            res.json(configBots);
-        });
+        const botRows = await BotModel.findAll();
+        const botNames = botRows.map(b => b.name);
+        res.json(botNames);
     } catch (err) {
-        logger.error('Erro /api/bots-list:', err);
-        res.status(500).json({ error: 'Erro' });
+        logger.error('Erro ao retornar lista de bots:', err);
+        res.status(500).json({ error: 'Erro ao retornar lista de bots' });
     }
 });
 
-// FUNÇÃO makeDay
+// Função makeDay
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
-// getDetailedStats (igual ao seu)
+// Função getDetailedStats (conforme seu código atual)
+// [O código permanece inalterado]
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
     }
-
     let totalUsers = 0;
     let totalPurchases = 0;
     let sumGerado = 0;
     let sumConvertido = 0;
     let averagePaymentDelayMs = 0;
     let conversionRate = 0;
-
     try {
         if (originCondition === 'main') {
             const mainWhere = { ...baseWhere, originCondition: 'main' };
             const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({ where: mainWhere, distinct: true, col: 'userId' });
+            totalUsers = await Purchase.count({
+                where: mainWhere,
+                distinct: true,
+                col: 'userId'
+            });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
             sumConvertido = (await Purchase.sum('planValue', {
@@ -224,7 +248,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-
         } else if (!originCondition) {
             const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
             let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
@@ -239,25 +262,23 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
             })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-            const paid = await Purchase.findAll({
+            const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
             let sumDiffMs = 0;
-            let cPaid = 0;
-            for (const p of paid) {
+            let countPaid = 0;
+            for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
                     if (diff >= 0) {
                         sumDiffMs += diff;
-                        cPaid++;
+                        countPaid++;
                     }
                 }
             }
-            averagePaymentDelayMs = cPaid > 0 ? Math.round(sumDiffMs / cPaid) : 0;
-
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
         } else {
-            // not_purchased / purchased
             const purchaseWhere = { ...baseWhere, originCondition };
             const totalLeads = await Purchase.count({
                 where: { ...baseWhere, originCondition },
@@ -272,7 +293,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, originCondition, status: 'paid' },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -288,14 +308,12 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-
             totalUsers = totalLeads;
             totalPurchases = totalConfirmed;
         }
     } catch (err) {
-        logger.error(`Erro interno getDetailedStats: ${err.message}`);
+        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
     }
-
     return {
         totalUsers,
         totalPurchases,
@@ -306,7 +324,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     };
 }
 
-// /api/bots-stats
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
@@ -315,7 +332,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
         }
-
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
@@ -357,6 +373,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
                     endDate = new Date(lastMonthEnd);
                     endDate.setHours(23, 59, 59, 999);
+
                     const firstDayLastMonth = new Date(lastMonthEnd);
                     firstDayLastMonth.setDate(1);
                     startDate = makeDay(firstDayLastMonth);
@@ -389,6 +406,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             } else {
                 dateArray = [new Date().toISOString().split('T')[0]];
             }
+
             if (dateArray.length === 1) {
                 startDate = makeDay(new Date(dateArray[0]));
                 endDate = new Date(startDate);
@@ -418,7 +436,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'vendas'],
             ],
-            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+            },
             group: ['botName'],
             order: [[Sequelize.literal('"vendas"'), 'DESC']],
         });
@@ -433,7 +453,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalPurchases'],
                 [Sequelize.fn('SUM', Sequelize.col('planValue')), 'totalValue'],
             ],
-            where: { purchasedAt: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
+            where: {
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
             group: ['botName'],
         });
 
@@ -442,7 +465,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 'botName',
                 [Sequelize.fn('SUM', Sequelize.col('planValue')), 'generatedValue']
             ],
-            where: { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
+            where: {
+                pixGeneratedAt: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null }
+            },
             group: ['botName']
         });
         const generatedMap = {};
@@ -455,7 +481,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 'botName',
                 [Sequelize.fn('COUNT', Sequelize.col('botName')), 'totalUsers'],
             ],
-            where: { lastInteraction: { [Op.between]: [startDate, endDate] }, botName: { [Op.ne]: null } },
+            where: {
+                lastInteraction: { [Op.between]: [startDate, endDate] },
+                botName: { [Op.ne]: null },
+            },
             group: ['botName'],
         });
         const botUsersMap = {};
@@ -480,7 +509,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
-
         const botPlansMap = {};
         planSalesByBot.forEach(row => {
             const bName = row.botName;
@@ -595,193 +623,201 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     }
 });
 
-// ============================
+//------------------------------------------------------
 // Rotas de Gerenciar Bots
-// ============================
+//------------------------------------------------------
 
-// Lista
-app.get('/admin/bots/list', checkAuth, async (req, res) => {
-    try {
-        const bots = await Bot.findAll();
-        let html = `<h3>Lista de Bots no BD:</h3><ul>`;
-        bots.forEach(b => {
-            html += `<li><a href="/admin/bots/${b.id}">${b.name}</a></li>`;
-        });
-        html += `</ul>
-    <a href="/admin/bots/new">[Criar Novo Bot]</a>
-    `;
-        res.send(html);
-    } catch (err) {
-        logger.error('Erro ao listar bots:', err);
-        res.send('Erro ao listar bots.');
-    }
-});
-
-// Form new
-app.get('/admin/bots/new', checkAuth, (req, res) => {
-    const form = `
-  <h2>Novo Bot</h2>
-  <form action="/admin/bots" method="POST" enctype="multipart/form-data">
-    <div>Nome: <input name="name" required></div>
-    <div>Token: <input name="token" required></div>
-    <div>Descrição: <textarea name="description" rows="3"></textarea></div>
-    <div>Video (arquivo): <input type="file" name="videoFile"></div>
-    <div>Buttons JSON: <textarea name="buttonsJson" rows="3"></textarea></div>
-    <div>Remarketing JSON: <textarea name="remarketingJson" rows="3"></textarea></div>
-    <button type="submit">Salvar</button>
-  </form>
-  <a href="/admin/bots/list">[Voltar]</a>
-  `;
-    res.send(form);
-});
-
-// Create
+// [POST] Criar Novo Bot (com upload de vídeo opcional)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
-        const { name, token, description } = req.body;
-        let videoFilename = req.body.video || null;
-        if (req.file) {
-            // Se subiu arquivo, renomeamos como o nome do original ou algo:
-            videoFilename = req.file.originalname;
-            // Mover do temp "req.file.path" para "src/videos/videoFilename"
-            const targetPath = path.join(__dirname, 'src', 'videos', videoFilename);
-            fs.renameSync(req.file.path, targetPath);
-        }
-        const buttonsJson = req.body.buttonsJson || '[]';
-        const remarketingJson = req.body.remarketingJson || '{}';
+        const payload = req.body;
+        const {
+            name,
+            token,
+            description,
+            buttonName1,
+            buttonValue1,
+            buttonName2,
+            buttonValue2,
+            buttonName3,
+            buttonValue3,
+            remarketingJson
+        } = payload;
 
-        const newBot = await Bot.create({
+        // Monta array de botões
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+            }
+        }
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
+        const buttonsJson = JSON.stringify(buttons);
+
+        // Remarketing JSON
+        let safeRemarketingJson = remarketingJson || '';
+
+        // Se o multer pegou um arquivo
+        let videoFilename = '';
+        if (req.file) {
+            videoFilename = req.file.filename;
+        } else {
+            videoFilename = '';
+        }
+
+        const newBot = await BotModel.create({
             name,
             token,
             description,
             video: videoFilename,
             buttonsJson,
-            remarketingJson
+            remarketingJson: safeRemarketingJson
         });
-
         logger.info(`✅ Bot ${name} inserido no BD.`);
 
-        // Tenta parse remarketing
-        let remarketingParsed = null;
-        try {
-            remarketingParsed = JSON.parse(remarketingJson);
-        } catch (jsonErr) {
-            logger.warn(`Remarketing JSON inválido p/ bot ${name}. ${jsonErr}`);
+        // Monta config para subir o bot
+        const bc = {
+            id: newBot.id,
+            name: newBot.name,
+            token: newBot.token,
+            description: newBot.description,
+            video: newBot.video,
+            buttons: buttons,
+            remarketing: {}
+        };
+        if (safeRemarketingJson) {
+            try {
+                bc.remarketing = JSON.parse(safeRemarketingJson);
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para bot ${newBot.name}.`, e);
+            }
         }
-        let buttonsParsed = null;
-        try {
-            buttonsParsed = JSON.parse(buttonsJson);
-        } catch { }
 
-        // re-inicializa em memória
-        const memoryConfig = {
+        initializeBot(bc);
+        res.send(`
+            <div class="alert alert-success">
+              Bot <strong>${name}</strong> cadastrado e iniciado com sucesso!
+            </div>
+        `);
+    } catch (err) {
+        logger.error('Erro ao criar bot:', err);
+        res.status(500).send('Erro ao criar bot: ' + err.message);
+    }
+});
+
+// [GET] Lista de bots (JSON)
+app.get('/admin/bots/list', checkAuth, async (req, res) => {
+    try {
+        const bots = await BotModel.findAll();
+        res.json(bots);
+    } catch (err) {
+        logger.error('Erro ao listar bots:', err);
+        res.status(500).json({ error: 'Erro ao listar bots' });
+    }
+});
+
+// [GET] Retorna 1 bot (para edição) em JSON
+app.get('/admin/bots/:id', checkAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot não encontrado' });
+        }
+        res.json(bot);
+    } catch (err) {
+        logger.error('Erro ao obter bot:', err);
+        res.status(500).json({ error: 'Erro ao obter bot' });
+    }
+});
+
+// [POST] Editar bot existente (com upload de vídeo opcional)
+app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).send('Bot não encontrado');
+        }
+
+        const {
             name,
             token,
             description,
-            video: videoFilename,
-            buttons: buttonsParsed || [],
-            remarketing: remarketingParsed || {}
-        };
-        // Inicia
-        require('./services/bot.service').initializeSingleBot(memoryConfig);
+            buttonName1,
+            buttonValue1,
+            buttonName2,
+            buttonValue2,
+            buttonName3,
+            buttonValue3,
+            remarketingJson
+        } = req.body;
 
-        res.send(`
-      Bot criado com sucesso! <br>
-      <a href="/admin/bots/list">[Voltar]</a>
-    `);
-    } catch (err) {
-        logger.error('Erro ao criar bot:', err);
-        res.status(500).send('Erro ao criar bot. ' + err.message);
-    }
-});
+        // Monta array de botões
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+            }
+        }
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
+        const buttonsJson = JSON.stringify(buttons);
 
-// Edit form
-app.get('/admin/bots/:id', checkAuth, async (req, res) => {
-    try {
-        const b = await Bot.findByPk(req.params.id);
-        if (!b) return res.send('Bot não encontrado.');
-
-        const form = `
-    <h2>Editar Bot #${b.id}</h2>
-    <form action="/admin/bots/edit/${b.id}" method="POST" enctype="multipart/form-data">
-      <div>Nome: <input name="name" value="${b.name}" required></div>
-      <div>Token: <input name="token" value="${b.token}" required></div>
-      <div>Descrição: <textarea name="description" rows="3">${b.description || ''}</textarea></div>
-      <div>Video atual: <b>${b.video || '-- sem vídeo --'}</b></div>
-      <div>Alterar vídeo: <input type="file" name="videoFile"></div>
-      <div>Buttons JSON: <textarea name="buttonsJson" rows="3">${b.buttonsJson || ''}</textarea></div>
-      <div>Remarketing JSON: <textarea name="remarketingJson" rows="3">${b.remarketingJson || ''}</textarea></div>
-      <button type="submit">Salvar</button>
-    </form>
-    <a href="/admin/bots/list">[Voltar]</a>
-    `;
-        res.send(form);
-    } catch (err) {
-        logger.error('Erro ao pegar bot:', err);
-        res.send('Erro ao pegar bot.');
-    }
-});
-
-// Update
-app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
-    try {
-        const b = await Bot.findByPk(req.params.id);
-        if (!b) return res.send('Bot não encontrado.');
-
-        b.name = req.body.name;
-        b.token = req.body.token;
-        b.description = req.body.description || '';
+        // Se veio videoFile
+        let videoFilename = bot.video; // mantém o anterior se não houver novo
         if (req.file) {
-            const newFilename = req.file.originalname;
-            const targetPath = path.join(__dirname, 'src', 'videos', newFilename);
-            fs.renameSync(req.file.path, targetPath);
-            b.video = newFilename;
-        }
-        b.buttonsJson = req.body.buttonsJson || '[]';
-        b.remarketingJson = req.body.remarketingJson || '{}';
-        await b.save();
-
-        logger.info(`✅ Bot ${b.name} (ID ${b.id}) atualizado no BD.`);
-
-        // Tenta atualizar em memória
-        // Precisamos parse:
-        let remarketingParsed = null;
-        try {
-            remarketingParsed = JSON.parse(b.remarketingJson);
-        } catch (e) {
-            logger.warn(`remarketing JSON parse fail: ${e}`);
-        }
-        let buttonsParsed = null;
-        try {
-            buttonsParsed = JSON.parse(b.buttonsJson);
-        } catch (e) {
-            logger.warn(`buttons JSON parse fail: ${e}`);
+            videoFilename = req.file.filename;
+            // Opcional: apagar o arquivo antigo
         }
 
-        const memConfig = {
-            name: b.name,
-            token: b.token,
-            description: b.description,
-            video: b.video,
-            buttons: buttonsParsed || [],
-            remarketing: remarketingParsed || {}
+        let safeRemarketingJson = remarketingJson || '';
+
+        bot.name = name;
+        bot.token = token;
+        bot.description = description;
+        bot.video = videoFilename;
+        bot.buttonsJson = buttonsJson;
+        bot.remarketingJson = safeRemarketingJson;
+        await bot.save();
+        logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
+
+        const bc = {
+            id: bot.id,
+            name: bot.name,
+            token: bot.token,
+            description: bot.description,
+            video: bot.video,
+            buttons: buttons,
+            remarketing: {}
         };
+        if (safeRemarketingJson) {
+            try {
+                bc.remarketing = JSON.parse(safeRemarketingJson);
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para bot ${bot.name}.`, e);
+            }
+        }
 
-        // Correção do erro: "updateBotInMemory is not a function"
-        // Precisamos do updateBotInMemory
-        updateBotInMemory(memConfig);
+        updateBotInMemory(id, bc);
 
         res.send(`
-      Bot editado com sucesso! <br>
-      <a href="/admin/bots/list">[Voltar]</a>
-    `);
+            <div class="alert alert-success">
+              Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
+            </div>
+        `);
     } catch (err) {
         logger.error('Erro ao editar bot:', err);
-        res.status(500).send('Erro ao editar bot. ' + err.message);
+        res.status(500).send('Erro ao editar bot: ' + err.message);
     }
 });
 
-// Subir server
+//------------------------------------------------------
+// Sobe servidor
+//------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
