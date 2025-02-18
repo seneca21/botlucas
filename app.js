@@ -22,8 +22,8 @@ AWS.config.update({
 const s3 = new AWS.S3();
 
 // Configure o multer para enviar para o bucket S3
-if (!process.env.BUCKETEER_BUCKET) {
-    throw new Error("A variável de ambiente BUCKETEER_BUCKET não está definida.");
+if (!process.env.BUCKETEER_BUCKET_NAME) {
+    throw new Error("A variável de ambiente T não está definida.");
 }
 const storage = multerS3({
     s3: s3,
