@@ -71,7 +71,7 @@ const s3 = new aws.S3();
 const storage = multerS3({
     s3: s3,
     bucket: process.env.BUCKETEER_BUCKET_NAME,
-    acl: 'public-read',
+    // Removida a opção "acl" pois o bucket não permite ACLs
     key: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
         cb(null, uniqueSuffix);
@@ -209,7 +209,6 @@ function makeDay(date) {
 
 // Função para obter estatísticas detalhadas
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // (Implementação completa conforme sua versão original)
     let totalUsers = 0, totalPurchases = 0, sumGerado = 0, sumConvertido = 0, averagePaymentDelayMs = 0, conversionRate = 0;
     try {
         if (originCondition === 'main') {
@@ -347,8 +346,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
 
-        // Bot Ranking e outros cálculos permanecem conforme sua lógica original...
-        // (Implemente todas as queries conforme sua versão)
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -365,7 +362,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Últimas movimentações com paginação
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
