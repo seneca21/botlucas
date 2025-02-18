@@ -1,3 +1,4 @@
+// public/js/dashboard.js
 $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
@@ -281,6 +282,7 @@ $(document).ready(function () {
 
     //------------------------------------------------------------
     // updateDashboard
+    // => Faz fade out/in para atualizar os dados
     //------------------------------------------------------------
     async function updateDashboard(movStatus, page, perPage) {
         try {
@@ -289,6 +291,7 @@ $(document).ready(function () {
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
+
             let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
@@ -298,22 +301,34 @@ $(document).ready(function () {
             } else {
                 url += `&dateRange=${dr.dateRange}`;
             }
+
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
 
-            // Atualiza os dados e gráficos
+            await fadeOutMain(200);
             fillDashboardData(data);
+            await fadeInMain(200);
+
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    //------------------------------------------------------------
-    // Preenche dados e gráficos
-    //------------------------------------------------------------
+    function fadeOutMain(duration) {
+        return new Promise((resolve) => {
+            $('#mainContent').stop(true, true).fadeTo(duration, 0, resolve);
+        });
+    }
+
+    function fadeInMain(duration) {
+        return new Promise((resolve) => {
+            $('#mainContent').stop(true, true).fadeTo(duration, 1, resolve);
+        });
+    }
+
     function fillDashboardData(data) {
         $('#totalUsers').text(data.statsAll.totalUsers);
         $('#totalPurchases').text(data.statsAll.totalPurchases);
@@ -321,15 +336,14 @@ $(document).ready(function () {
         const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
         $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
+        // Gráfico de Barras
         const barData = {
             labels: ['Usuários', 'Compras'],
-            datasets: [
-                {
-                    label: 'Quantidade',
-                    data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                    backgroundColor: ['#36A2EB', '#FF0000']
-                },
-            ],
+            datasets: [{
+                label: 'Quantidade',
+                data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
+                backgroundColor: ['#36A2EB', '#FF0000']
+            }]
         };
         const barCtx = document.getElementById('salesChart').getContext('2d');
         if (!salesChart) {
@@ -338,9 +352,7 @@ $(document).ready(function () {
                 data: barData,
                 options: {
                     responsive: true,
-                    scales: {
-                        y: { beginAtZero: true }
-                    },
+                    scales: { y: { beginAtZero: true } },
                     plugins: { chartBackground: {} }
                 }
             });
@@ -350,6 +362,7 @@ $(document).ready(function () {
         applyChartOptions(salesChart);
         salesChart.update();
 
+        // Gráfico de Linha
         const lineLabels = data.stats7Days.map(item => {
             const parts = item.date.split('-');
             return `${parts[2]}/${parts[0]}`;
@@ -357,10 +370,9 @@ $(document).ready(function () {
         const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
         const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
         const conversionRates = data.stats7Days.map(item => {
-            return item.totalVendasGeradas > 0
-                ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
-                : 0;
+            return item.totalVendasGeradas > 0 ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100 : 0;
         });
+
         const lineData = {
             labels: lineLabels,
             datasets: [
@@ -402,48 +414,96 @@ $(document).ready(function () {
                 options: {
                     responsive: true,
                     scales: {
-                        'y-axis-convertido': {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: true
-                        },
-                        'y-axis-gerado': {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            grid: { drawOnChartArea: false }
-                        },
+                        'y-axis-convertido': { type: 'linear', position: 'left', beginAtZero: true },
+                        'y-axis-gerado': { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } },
                         'y-axis-conversion': {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            suggestedMax: 100,
+                            type: 'linear', position: 'right', beginAtZero: true, suggestedMax: 100,
                             grid: { drawOnChartArea: false },
-                            ticks: { callback: value => value + '%' }
-                        }
+                            ticks: { callback: (value) => value + '%' }
+                        },
+                        x: {}
                     },
                     plugins: {
                         chartBackground: {},
                         tooltip: {
                             callbacks: {
-                                label: ctx => {
+                                label: function (ctx) {
                                     const value = ctx.parsed.y || 0;
-                                    if (ctx.dataset.label === 'Taxa de Conversão (%)') {
-                                        return `Taxa: ${value.toFixed(2)}%`;
-                                    } else {
-                                        return `R$ ${value.toFixed(2)}`;
-                                    }
-                                },
-                            },
-                        },
-                    },
-                },
+                                    return ctx.dataset.label === 'Taxa de Conversão (%)'
+                                        ? `Taxa: ${value.toFixed(2)}%`
+                                        : `R$ ${value.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         } else {
             lineComparisonChart.data = lineData;
         }
         applyChartOptions(lineComparisonChart);
         lineComparisonChart.update();
+
+        // Ranking Simples
+        const botRankingTbody = $('#botRanking');
+        botRankingTbody.empty();
+        if (data.botRanking && data.botRanking.length > 0) {
+            data.botRanking.forEach(bot => {
+                botRankingTbody.append(`
+                    <tr>
+                        <td>${bot.botName || 'N/A'}</td>
+                        <td>${bot.vendas}</td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Ranking Detalhado
+        const detailsTbody = $('#botDetailsBody');
+        detailsTbody.empty();
+        if (data.botDetails && data.botDetails.length > 0) {
+            data.botDetails.forEach(bot => {
+                let plansHtml = '';
+                bot.plans.forEach(plan => {
+                    plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
+                });
+                detailsTbody.append(`
+                    <tr>
+                        <td>${bot.botName}</td>
+                        <td>R$${bot.valorGerado.toFixed(2)}</td>
+                        <td>${bot.totalPurchases}</td>
+                        <td>${plansHtml}</td>
+                        <td>${bot.conversionRate.toFixed(2)}%</td>
+                        <td>R$${bot.averageValue.toFixed(2)}</td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Estatísticas Detalhadas
+        $('#cardAllLeads').text(data.statsAll.totalUsers);
+        $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
+        $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
+        $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
+        $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
+
+        $('#cardMainLeads').text(data.statsMain.totalUsers);
+        $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
+        $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
+        $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
+        $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
+
+        $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
+        $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+        $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
+        $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
+        $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+        $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
+        $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+        $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
+        $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
+        $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
         totalMovementsCount = data.totalMovements || 0;
         renderPagination(totalMovementsCount, currentPage, currentPerPage);
@@ -455,9 +515,14 @@ $(document).ready(function () {
                 const leadId = mov.User ? mov.User.telegramId : 'N/A';
                 let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
                 let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
-                let statusHtml = mov.status === 'paid' ? `<span style="color:green;font-weight:bold;">Paid</span>` :
-                    mov.status === 'pending' ? `<span style="color:#ff9900;font-weight:bold;">Pending</span>` :
-                        `<span style="font-weight:bold;">${mov.status}</span>`;
+                let statusHtml = '';
+                if (mov.status === 'paid') {
+                    statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
+                } else if (mov.status === 'pending') {
+                    statusHtml = `<span style="color:#ff9900;font-weight:bold;">Pending</span>`;
+                } else {
+                    statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+                }
                 let payDelayHtml = '—';
                 if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                     const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
@@ -477,7 +542,11 @@ $(document).ready(function () {
                 `);
             });
         } else {
-            movementsTbody.append(`<tr><td colspan="6">Nenhuma movimentação encontrada</td></tr>`);
+            movementsTbody.append(`
+                <tr>
+                    <td colspan="6">Nenhuma movimentação encontrada</td>
+                </tr>
+            `);
         }
     }
 
@@ -495,15 +564,11 @@ $(document).ready(function () {
     loadBotList();
     refreshDashboard();
 
-    // Mostra ou esconde #botFilterContainer conforme a aba ativa
     const defaultSection = $('#sidebarNav .nav-link.active').data('section');
     if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
         $('#botFilterContainer').show();
-    } else {
-        $('#botFilterContainer').hide();
     }
 
-    // Eventos de filtros e abas
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
@@ -513,6 +578,7 @@ $(document).ready(function () {
         currentPage = 1;
         refreshDashboard();
     });
+
     $('#dateRangeSelector').on('change', function () {
         if ($(this).val() === 'custom') {
             $('#customDateModal').modal('show');
@@ -526,21 +592,30 @@ $(document).ready(function () {
         currentPage = 1;
         refreshDashboard();
     });
+
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
-        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection').addClass('d-none');
+
+        $('#statsSection').addClass('d-none');
+        $('#rankingSimplesSection').addClass('d-none');
+        $('#rankingDetalhadoSection').addClass('d-none');
+        $('#statsDetailedSection').addClass('d-none');
+
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
+
         if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
             $('#botFilterContainer').show();
         } else {
             $('#botFilterContainer').hide();
         }
+
         currentPage = 1;
         refreshDashboard();
     });
+
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
