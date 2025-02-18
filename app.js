@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js (atualizado)
+// app.js
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -10,6 +10,9 @@ const { Op, Sequelize } = require('sequelize');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
+const BotModel = db.BotModel; // Importado para criar/ler bots do BD
+
+const { initializeBot, reloadBotsFromDB } = require('./services/bot.service'); // Para iniciar/recarregar bots
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -19,14 +22,14 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// SESSÃO
+// Sessão
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
-// MIDDLEWARE: Checa se usuário está logado
+// Middleware de autenticação
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) {
         next();
@@ -52,6 +55,7 @@ db.sequelize
 // Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
+    // Página de login sofisticada
     const html = `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -158,9 +162,11 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // ROTA: /api/bots-list => retorna array de nomes de bots
 //------------------------------------------------------
-app.get('/api/bots-list', checkAuth, (req, res) => {
+app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
-        const botNames = config.bots.map(b => b.name);
+        // Agora retorna do BD
+        const botRows = await BotModel.findAll();
+        const botNames = botRows.map(b => b.name);
         res.json(botNames);
     } catch (err) {
         logger.error('Erro ao retornar lista de bots:', err);
@@ -179,13 +185,9 @@ function makeDay(date) {
 
 /**
  * Calcula as estatísticas para um determinado intervalo e condição.
- * Assegure-se de SEMPRE retornar um objeto com as chaves esperadas:
- * { totalUsers, totalPurchases, conversionRate, totalVendasGeradas, totalVendasConvertidas, averagePaymentDelayMs }
+ * Retorna obj com { totalUsers, totalPurchases, conversionRate, totalVendasGeradas, totalVendasConvertidas, averagePaymentDelayMs }
  */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // Exemplo adaptado do que você já tinha; não tire nada que já existia.
-    // Ajuste para sempre retornar o objeto mesmo se houver erro ou sem dados.
-
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
@@ -200,7 +202,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
 
     try {
         if (originCondition === 'main') {
-            // Filtra originCondition=main
             const mainWhere = { ...baseWhere, originCondition: 'main' };
             const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
             totalUsers = await Purchase.count({
@@ -231,7 +232,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
         } else if (!originCondition) {
-            // Todas as compras
             const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
             let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
             if (botFilters.length > 0 && !botFilters.includes('All')) {
@@ -297,18 +297,13 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-
-            // Ajustamos no final:
             totalUsers = totalLeads;
             totalPurchases = totalConfirmed;
         }
-
     } catch (err) {
         logger.error(`Erro interno em getDetailedStats: ${err.message}`);
-        // Em caso de erro, não retorna "undefined" — segue para return final abaixo
     }
 
-    // Retorna SEMPRE o objeto com as 6 chaves esperadas
     return {
         totalUsers,
         totalPurchases,
@@ -325,8 +320,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
-
-        // Parâmetros antigos
         let { date } = req.query;
         let botFilters = [];
         if (req.query.botFilter) {
@@ -337,11 +330,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
 
-        // Definimos startDate e endDate finais
         let startDate, endDate;
         const now = new Date();
 
-        // Se o user escolheu algo em dateRange
         if (dateRange) {
             let todayMidnight = makeDay(new Date());
             let todayEnd = new Date(todayMidnight);
@@ -370,16 +361,13 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     endDate = todayEnd;
                     break;
                 case 'lastMonth':
-                    // Primeiro dia deste mês
                     const firstDayCurrentMonth = new Date(todayMidnight);
                     firstDayCurrentMonth.setDate(1);
-                    // Dia 0 desse "1" => último dia do mês anterior
                     const lastMonthEnd = new Date(firstDayCurrentMonth);
                     lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
                     endDate = new Date(lastMonthEnd);
                     endDate.setHours(23, 59, 59, 999);
 
-                    // Início = primeiro dia do mês anterior
                     const firstDayLastMonth = new Date(lastMonthEnd);
                     firstDayLastMonth.setDate(1);
                     startDate = makeDay(firstDayLastMonth);
@@ -399,12 +387,10 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     }
                     break;
                 default:
-                    // caso default, deixamos para logic antiga
                     break;
             }
         }
 
-        // Caso ainda não tenhamos startDate/endDate, checamos "date" antigo
         if (!startDate || !endDate) {
             let dateArray;
             if (date && date.includes(',')) {
@@ -412,7 +398,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             } else if (date) {
                 dateArray = [date.trim()];
             } else {
-                // Se não informado, utiliza a data de hoje
                 dateArray = [new Date().toISOString().split('T')[0]];
             }
 
@@ -428,13 +413,11 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             }
         }
 
-        // Calcula estatísticas
         const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
         const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
         const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
         const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
 
-        // "Ontem"
         const yesterdayDate = new Date(startDate.getTime());
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const startYesterday = makeDay(yesterdayDate);
@@ -581,9 +564,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        // Estatísticas para os últimos 7 dias
-        // Se "today" => startDate == hoje 00:00, e i=6 => data 6 dias antes ...
-        // Precisamos evitar que getDetailedStats retorne undefined.
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -592,9 +572,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
 
-            // Garante que retorne ao menos um objeto vazio
             const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters) || {};
-
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
                 totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
@@ -602,7 +580,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             });
         }
 
-        // Movimentações + paginação
         const lastMovementsWhere = {
             pixGeneratedAt: { [Op.between]: [startDate, endDate] }
         };
@@ -645,10 +622,85 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     }
 });
 
-// Inicializa o bot
-require('./services/bot.service.js');
+//------------------------------------------------------
+// Rotas para Gerenciar Bots (Criar via Form)
+//------------------------------------------------------
+app.get('/admin/bots', checkAuth, (req, res) => {
+    const html = `
+    <h1>Cadastrar Novo Bot</h1>
+    <form method="POST" action="/admin/bots">
+      <label>Nome:</label><br/>
+      <input name="name" required /><br/><br/>
+      <label>Token:</label><br/>
+      <input name="token" required /><br/><br/>
+      <label>Descrição:</label><br/>
+      <textarea name="description"></textarea><br/><br/>
+      <label>Vídeo:</label><br/>
+      <input name="video" /><br/><br/>
+      <label>Buttons (JSON):</label><br/>
+      <textarea name="buttonsJson"></textarea><br/><br/>
+      <label>Remarketing (JSON):</label><br/>
+      <textarea name="remarketingJson"></textarea><br/><br/>
+      <button type="submit">Salvar</button>
+    </form>
+    <br/>
+    <a href="/">Voltar para Dashboard</a>
+    `;
+    res.send(html);
+});
 
+app.post('/admin/bots', checkAuth, async (req, res) => {
+    try {
+        const { name, token, description, video, buttonsJson, remarketingJson } = req.body;
+
+        const newBot = await BotModel.create({
+            name,
+            token,
+            description,
+            video,
+            buttonsJson,
+            remarketingJson
+        });
+        logger.info(`✅ Bot ${name} inserido no BD.`);
+
+        // Monta config e inicia
+        const botConfig = {
+            name: newBot.name,
+            token: newBot.token,
+            description: newBot.description,
+            video: newBot.video,
+            buttons: [],
+            remarketing: {}
+        };
+        if (newBot.buttonsJson) {
+            try {
+                botConfig.buttons = JSON.parse(newBot.buttonsJson);
+            } catch { }
+        }
+        if (newBot.remarketingJson) {
+            try {
+                botConfig.remarketing = JSON.parse(newBot.remarketingJson);
+            } catch { }
+        }
+        initializeBot(botConfig);
+
+        res.send(`Bot ${name} cadastrado e iniciado com sucesso! <a href="/">Voltar</a>`);
+    } catch (err) {
+        logger.error('Erro ao criar bot:', err);
+        res.status(500).send('Erro ao criar bot: ' + err.message);
+    }
+});
+
+//------------------------------------------------------
+// Inicializa todos os bots do BD ao subir
+//------------------------------------------------------
+(async () => {
+    await reloadBotsFromDB();
+})();
+
+//------------------------------------------------------
 // Sobe servidor
+//------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);

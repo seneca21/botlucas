@@ -1,7 +1,7 @@
 // services/index.js
 
 const { Sequelize } = require('sequelize');
-const logger = require('./logger'); // se precisar
+const logger = require('./logger');
 
 // Cria a conexão manualmente com as novas credenciais:
 const sequelize = new Sequelize(
@@ -23,9 +23,11 @@ const sequelize = new Sequelize(
 );
 
 // Importamos os models (User.js e Purchase.js) de dentro de ../models
-// Eles devem estar configurados com as colunas corretas (pixGeneratedAt etc.)
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
+
+// Importa também o Bot
+const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes);
 
 // Relações, se houver
 User.hasMany(Purchase, { foreignKey: 'userId' });
@@ -34,5 +36,6 @@ Purchase.belongsTo(User, { foreignKey: 'userId' });
 module.exports = {
   sequelize,
   User,
-  Purchase
+  Purchase,
+  BotModel
 };
