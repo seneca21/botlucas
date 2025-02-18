@@ -1,10 +1,10 @@
-//------------------------------------------------------
 // services/bot.service.js
-//------------------------------------------------------
+
 const { Telegraf, Markup } = require('telegraf');
 const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const ConfigService = require('./config.service');
 const db = require('./index'); // importa index do Sequelize
 const User = db.User;
@@ -409,22 +409,23 @@ function initializeBot(botConfig) {
       }
 
       // Determina a fonte do vídeo: se for URL (vindo do S3) ou local
-      let videoPath;
+      let videoInput;
       if (messageConfig.video && messageConfig.video.startsWith('http')) {
-        videoPath = messageConfig.video;
+        // Obtém stream do vídeo via axios
+        const response = await axios.get(messageConfig.video, { responseType: 'stream' });
+        videoInput = { source: response.data };
       } else {
-        videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
+        let videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
         if (!fs.existsSync(videoPath)) {
           logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
           return;
         }
+        videoInput = { source: fs.createReadStream(videoPath) };
       }
 
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
-
-      const videoInput = videoPath.startsWith('http') ? { url: videoPath } : { source: videoPath };
 
       await bot.telegram.sendVideo(user.telegramId, videoInput, {
         caption: messageConfig.text,
@@ -436,6 +437,7 @@ function initializeBot(botConfig) {
     }
   }
 
+  // Tratamento de erros do bot
   bot.catch((err, ctx) => {
     logger.error(`❌ Erro no bot:`, err);
     if (err.response && err.response.error_code === 403) {
@@ -445,7 +447,7 @@ function initializeBot(botConfig) {
     }
   });
 
-  // Rota /start atualizada para buscar o vídeo via URL se disponível
+  // Rota /start com envio do vídeo corrigido
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -467,24 +469,24 @@ function initializeBot(botConfig) {
       logger.info('📩 /start recebido');
       await registerUser(ctx);
 
-      // Se o campo video já for uma URL (vindo do S3) utiliza-o; senão, busca no diretório local.
-      let videoSource;
+      let videoInput;
       if (botConfig.video && botConfig.video.startsWith('http')) {
-        videoSource = botConfig.video;
+        // Se o vídeo já estiver armazenado no S3 (URL), obtém o stream via axios
+        const response = await axios.get(botConfig.video, { responseType: 'stream' });
+        videoInput = { source: response.data };
       } else {
-        videoSource = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
-        if (!fs.existsSync(videoSource)) {
-          logger.error(`❌ Vídeo não achado: ${videoSource}`);
+        const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
+        if (!fs.existsSync(videoPath)) {
+          logger.error(`❌ Vídeo não achado: ${videoPath}`);
           await ctx.reply('⚠️ Erro ao carregar vídeo.');
           return;
         }
+        videoInput = { source: fs.createReadStream(videoPath) };
       }
 
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
         Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
-
-      const videoInput = videoSource.startsWith('http') ? { url: videoSource } : { source: videoSource };
 
       await ctx.replyWithVideo(
         videoInput,
