@@ -27,7 +27,7 @@ if (!process.env.BUCKETEER_BUCKET_NAME) {
 }
 const storage = multerS3({
     s3: s3,
-    bucket: process.env.BUCKETEER_BUCKET, // Nome do bucket fornecido pelo Bucketeer
+    bucket: process.env.BUCKETEER_BUCKET_NAME, // Nome do bucket fornecido pelo Bucketeer
     acl: 'public-read',
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
