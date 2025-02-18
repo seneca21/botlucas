@@ -10,7 +10,7 @@ const { Op, Sequelize } = require('sequelize');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Importado se precisar
+const BotModel = db.BotModel; // Importado para gerenciar tabela Bots
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -41,8 +41,9 @@ db.sequelize
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
     .catch((err) => logger.error('❌ Erro ao conectar DB:', err));
 
+// Aqui é onde as tabelas são criadas/alteradas automaticamente
 db.sequelize
-    .sync({ alter: true }) // <--- CRIAR/ALTERAR TABELAS AQUI
+    .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
         // Depois de sync, recarrega e inicializa Bots do BD
@@ -173,7 +174,7 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS (conforme seu código original)
+// FUNÇÕES DE ESTATÍSTICAS (seu código original)
 //------------------------------------------------------
 function makeDay(date) {
     const d = new Date(date);
@@ -182,8 +183,6 @@ function makeDay(date) {
 }
 
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    const { Purchase, User } = db;
-
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
         baseWhere.botName = { [Op.in]: botFilters };
@@ -209,6 +208,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
             })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -239,6 +239,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
             })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -271,6 +272,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, originCondition, status: 'paid' },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -608,119 +610,155 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 
 //------------------------------------------------------
 // Rotas para gerenciar Bots
+// Agora com 3 campos de botões (nome+valor) para cada
 //------------------------------------------------------
 app.get('/admin/bots', checkAuth, (req, res) => {
+    // Formulário para cadastrar Bot + 3 botões
     const html = `
-    <h1>Cadastrar Novo Bot</h1>
-    <form method="POST" action="/admin/bots" style="max-width:700px;">
-      <label>Nome do Bot:</label><br/>
-      <input name="name" required style="width:200px;margin-bottom:10px;"/><br/>
-
-      <label>Token do Bot:</label><br/>
-      <input name="token" required style="width:300px;margin-bottom:10px;"/><br/>
-
-      <label>Descrição (mensagem do /start):</label><br/>
-      <textarea name="description" style="width:400px;height:80px;margin-bottom:10px;"></textarea><br/>
-
-      <label>Nome do vídeo (ex: "video.mp4"):</label><br/>
-      <input name="video" style="width:300px;margin-bottom:10px;"/><br/>
-
-      <hr/>
-      <h3>Botões (até 3)</h3>
-      <div style="display:flex;gap:2rem; margin-bottom:1rem;">
-        <div>
-          <label>Botão 1: Nome</label><br/>
-          <input name="button1Name" style="width:140px;margin-bottom:6px;"/><br/>
-          <label>Botão 1: Valor (R$)</label><br/>
-          <input name="button1Value" type="number" step="0.01" style="width:140px;"/>
-        </div>
-        <div>
-          <label>Botão 2: Nome</label><br/>
-          <input name="button2Name" style="width:140px;margin-bottom:6px;"/><br/>
-          <label>Botão 2: Valor (R$)</label><br/>
-          <input name="button2Value" type="number" step="0.01" style="width:140px;"/>
-        </div>
-        <div>
-          <label>Botão 3: Nome</label><br/>
-          <input name="button3Name" style="width:140px;margin-bottom:6px;"/><br/>
-          <label>Botão 3: Valor (R$)</label><br/>
-          <input name="button3Value" type="number" step="0.01" style="width:140px;"/>
-        </div>
-      </div>
-
-      <hr/>
-      <h3>Remarketing (JSON)</h3>
-      <p style="font-size:0.9rem;">Exemplo de JSON: 
-        <code>{"messages":[{"condition":"not_purchased","text":"XYZ","buttons":[{"name":"Plan A","value":10}]}],"intervals":{"not_purchased_minutes":5,"purchased_seconds":30}}</code>
-      </p>
-      <textarea name="remarketingJson" style="width:600px;height:100px;"></textarea><br/><br/>
-
-      <button type="submit">Salvar</button>
-    </form>
-    <br/>
-    <a href="/">Voltar para Dashboard</a>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cadastro de Bot</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+  <style>
+    body {
+      margin: 20px;
+    }
+    .card {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 15px;
+    }
+    .btn-back {
+      margin-top: 15px;
+    }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+    .button-row input {
+      flex: 1;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2 class="header">Cadastrar Novo Bot</h2>
+  <form method="POST" action="/admin/bots">
+    <div class="form-group">
+      <label>Nome do Bot:</label>
+      <input class="form-control" name="name" required />
+    </div>
+    <div class="form-group">
+      <label>Token do Bot:</label>
+      <input class="form-control" name="token" required />
+    </div>
+    <div class="form-group">
+      <label>Descrição (caption):</label>
+      <textarea class="form-control" name="description"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Vídeo (nome do arquivo):</label>
+      <input class="form-control" name="video" />
+    </div>
+    <hr/>
+    <h5>Botões (até 3):</h5>
+    <div class="button-row">
+      <input class="form-control" placeholder="Nome Botão 1" name="buttonName1"/>
+      <input class="form-control" placeholder="Valor Pix 1" name="buttonValue1"/>
+    </div>
+    <div class="button-row">
+      <input class="form-control" placeholder="Nome Botão 2" name="buttonName2"/>
+      <input class="form-control" placeholder="Valor Pix 2" name="buttonValue2"/>
+    </div>
+    <div class="button-row">
+      <input class="form-control" placeholder="Nome Botão 3" name="buttonName3"/>
+      <input class="form-control" placeholder="Valor Pix 3" name="buttonValue3"/>
+    </div>
+    <hr/>
+    <div class="form-group">
+      <label>Remarketing (JSON se quiser personalizar):</label>
+      <textarea class="form-control" name="remarketingJson"></textarea>
+      <small class="text-muted">Ex: {"messages":[...],"intervals":{...}}</small>
+    </div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="/" class="btn btn-secondary btn-back">Voltar para Dashboard</a>
+  </form>
+</div>
+</body>
+</html>
     `;
     res.send(html);
 });
 
 app.post('/admin/bots', checkAuth, async (req, res) => {
     try {
-        const { name, token, description, video, button1Name, button1Value, button2Name, button2Value, button3Name, button3Value, remarketingJson } = req.body;
+        const {
+            name, token, description, video,
+            buttonName1, buttonValue1,
+            buttonName2, buttonValue2,
+            buttonName3, buttonValue3,
+            remarketingJson
+        } = req.body;
 
-        // Montamos o array de botões a partir dos 3 inputs
-        const buttonsArray = [];
-        function addButtonIfValid(btnName, btnValue) {
-            if (btnName && btnValue && !isNaN(parseFloat(btnValue))) {
-                buttonsArray.push({
-                    name: btnName.trim(),
-                    value: parseFloat(btnValue)
-                });
+        // Monta array de botões
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
             }
         }
-        addButtonIfValid(button1Name, button1Value);
-        addButtonIfValid(button2Name, button2Value);
-        addButtonIfValid(button3Name, button3Value);
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
 
-        // Converte para string JSON
-        const buttonsJson = JSON.stringify(buttonsArray);
+        const buttonsJson = JSON.stringify(buttons);
 
-        // Cria o registro na tabela
+        // Verifica se remarketingJson está preenchido
+        let safeRemarketingJson = remarketingJson || '';
+        // Se quiser, poderíamos validar se é JSON válido
+
+        // Cria no BD
         const newBot = await BotModel.create({
             name,
             token,
             description,
             video,
             buttonsJson,
-            remarketingJson
+            remarketingJson: safeRemarketingJson
         });
-        logger.info(`✅ Bot ${name} inserido no BD com ${buttonsArray.length} botões.`);
+        logger.info(`✅ Bot ${name} inserido no BD.`);
 
-        // Monta config e inicia imediatamente
+        // Monta config e inicia o bot imediatamente
         const botConfig = {
             name: newBot.name,
             token: newBot.token,
-            description: newBot.description || '',
-            video: newBot.video || '',
-            buttons: [],
+            description: newBot.description,
+            video: newBot.video,
+            buttons: buttons, // array de {name, value}
             remarketing: {}
         };
-        // parse do buttonsJson
-        if (newBot.buttonsJson) {
+        if (safeRemarketingJson) {
             try {
-                botConfig.buttons = JSON.parse(newBot.buttonsJson);
-            } catch { }
-        }
-        // parse do remarketingJson
-        if (newBot.remarketingJson) {
-            try {
-                botConfig.remarketing = JSON.parse(newBot.remarketingJson);
-            } catch { }
+                botConfig.remarketing = JSON.parse(safeRemarketingJson);
+            } catch (err) {
+                logger.warn(`Remarketing JSON inválido para bot ${newBot.name}.`, err);
+            }
         }
 
-        // Inicia o bot
+        // initializeBot (da bot.service)
         initializeBot(botConfig);
 
-        res.send(`Bot <strong>${name}</strong> cadastrado e iniciado com sucesso!<br/><a href="/">Voltar</a>`);
+        res.send(`
+            <h3>Bot ${name} cadastrado e iniciado com sucesso!</h3>
+            <p><a href="/">Voltar</a></p>
+        `);
     } catch (err) {
         logger.error('Erro ao criar bot:', err);
         res.status(500).send('Erro ao criar bot: ' + err.message);
