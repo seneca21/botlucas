@@ -329,10 +329,10 @@ function initializeBot(botConfig) {
           Expires: 60
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
-        // Remove a porta do URL
+        // Reconstrói o URL removendo qualquer porta
         const urlObj = new URL(presignedUrl);
-        urlObj.port = '';
-        videoSource = urlObj.toString();
+        const newUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+        videoSource = newUrl;
       }
 
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
@@ -396,10 +396,10 @@ function initializeBot(botConfig) {
           Expires: 60
         };
         const presignedUrl = s3.getSignedUrl('getObject', params);
-        // Remove a porta do URL
+        // Reconstrói o URL sem porta
         const urlObj = new URL(presignedUrl);
-        urlObj.port = '';
-        videoSource = urlObj.toString();
+        const newUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+        videoSource = newUrl;
       }
 
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
@@ -449,7 +449,6 @@ function initializeBot(botConfig) {
       await user.save();
     }
     const telegramId = ctx.chat.id.toString();
-    // Aqui você pode inserir lógica de rate limit para a seleção do plano, se desejar.
     if (!userSessions[ctx.chat.id]) userSessions[ctx.chat.id] = {};
     userSessions[ctx.chat.id].originCondition = 'main';
     userSessions[ctx.chat.id].selectedPlan = plan;
