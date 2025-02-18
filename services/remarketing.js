@@ -1,9 +1,10 @@
-// services/remarketing.js
+// services/bot.service.js
+
 const { Markup } = require('telegraf');
 const User = require('../models/User');
 const ConfigService = require('./config.service');
 
-async function sendRemarketingMessages(bot) {
+async function sendRemarketingMessages() {
     try {
         console.log('⏰ Executando tarefa de remarketing...');
 
@@ -30,13 +31,11 @@ async function sendRemarketingMessages(bot) {
         for (const user of users) {
             console.log(`🔄 Preparando para enviar mensagem para Telegram ID: ${user.telegramId}`);
 
-            // Obter a mensagem de remarketing (apenas uma, por exemplo, a primeira)
+            // Obter a mensagem de remarketing (apenas uma)
             const message = remarketingMessages[0];
 
-            // Monta a URL do vídeo a partir do bucket S3
-            const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.${process.env.BUCKETEER_AWS_REGION}.amazonaws.com/${message.video}`;
-
-            await bot.telegram.sendVideo(user.telegramId, videoUrl, {
+            // Enviar vídeo com a mensagem e botões
+            await bot.telegram.sendVideo(user.telegramId, { source: `./videos/${message.video}` }, {
                 caption: message.text,
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
