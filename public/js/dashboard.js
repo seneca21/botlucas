@@ -1,24 +1,18 @@
 // public/js/dashboard.js
 $(document).ready(function () {
-    const today = new Date().toISOString().split('T')[0];
-    $('#datePicker').val(today);
-
     let salesChart;
     let lineComparisonChart;
 
-    // -----------------------------------------------------------
-    // Variáveis de estado para paginação e filtro
-    // -----------------------------------------------------------
     let currentPage = 1;
     let currentPerPage = 10;
     let totalMovementsCount = 0;
     let totalPages = 1;
 
     // Armazenamos os bots selecionados
-    let selectedBots = []; // ex: ["All"] ou ["@Bot1","@Bot2"]
+    let selectedBots = [];
 
     //------------------------------------------------------------
-    // 1) PLUGIN chartBackground
+    // PLUGIN: Background chart
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -33,7 +27,7 @@ $(document).ready(function () {
     Chart.register(chartBackgroundPlugin);
 
     //------------------------------------------------------------
-    // 2) DARK MODE
+    // DARK MODE
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
@@ -69,7 +63,7 @@ $(document).ready(function () {
     }
 
     function getChartConfigs() {
-        const isDark = $('body').hasClass('dark-mode');
+        const isDark = body.hasClass('dark-mode');
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
@@ -89,7 +83,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // formatDuration(ms) -> "Xm Ys"
+    // formatDuration
     //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
@@ -100,19 +94,18 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // renderPagination
+    // RENDER PAGINATION
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
         paginationContainer.empty();
 
-        if (totalPages <= 1) return; // nada
+        if (totalPages <= 1) return;
 
-        // Botões
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
 
-        // << (Volta 10)
+        // << (back 10)
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -124,7 +117,7 @@ $(document).ready(function () {
         }
         group.append(doubleLeft);
 
-        // < (Volta 1)
+        // < (back 1)
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -136,10 +129,9 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // janela de 3 páginas
+        // 3 pages window
         let startPage = page - 1;
         let endPage = page + 1;
-
         if (startPage < 1) {
             startPage = 1;
             endPage = 3;
@@ -149,7 +141,6 @@ $(document).ready(function () {
             startPage = endPage - 2;
             if (startPage < 1) startPage = 1;
         }
-
         for (let p = startPage; p <= endPage; p++) {
             const btn = $(`<button class="btn btn-light">${p}</button>`);
             if (p === page) {
@@ -163,7 +154,7 @@ $(document).ready(function () {
             group.append(btn);
         }
 
-        // > (Avança 1)
+        // > (forward 1)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -175,7 +166,7 @@ $(document).ready(function () {
         }
         group.append(singleRight);
 
-        // >> (Avança 10)
+        // >> (forward 10)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -191,7 +182,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Carrega bots e monta o drop-down com checkboxes
+    // LOAD BOTS (para o dropdown)
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
@@ -202,40 +193,31 @@ $(document).ready(function () {
             .catch(err => console.error('Erro ao carregar bots-list:', err));
     }
 
-    // Renderiza drop-down custom de checkboxes
     function renderBotCheckboxDropdown(botNames) {
-        // Cria o contêiner do drop-down
         const container = $('#botFilterContainer');
         container.empty();
 
-        // Botão que ao clicar, mostra/oculta a lista de checkboxes
         const toggleBtn = $(`
             <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
-                Selecionar Bots
+                Bots
             </button>
         `);
 
-        // Lista de checkboxes
-        const checkList = $('<div class="dropdown-menu p-2" style="max-height:250px; overflow:auto;"></div>');
+        const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
 
-        // Checkbox "All"
+        // All
         const allId = 'bot_all';
         const allItem = $(`
-            <div class="form-check">
+            <div class="form-check pl-2">
                 <input class="form-check-input" type="checkbox" id="${allId}" value="All">
                 <label class="form-check-label" for="${allId}">All</label>
             </div>
         `);
         allItem.find('input').on('change', function () {
             if ($(this).prop('checked')) {
-                // Se "All" é marcado, desmarca todos os outros
                 checkList.find('input[type="checkbox"]').not(`#${allId}`).prop('checked', false);
                 selectedBots = ['All'];
             } else {
-                // Se desmarcou "All", e não marcou mais nada,
-                // selectedBots vira vazio (exibe zero? ou iremos exibir nada?)
-                // Mas do jeito que pediram, se "All" for desmarcado
-                // a pessoa deve escolher manualmente os bots
                 selectedBots = [];
             }
             currentPage = 1;
@@ -243,25 +225,20 @@ $(document).ready(function () {
         });
         checkList.append(allItem);
 
-        // Demais bots
         botNames.forEach(bot => {
             const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
             const item = $(`
-                <div class="form-check">
+                <div class="form-check pl-2">
                     <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
                     <label class="form-check-label" for="${safeId}">${bot}</label>
                 </div>
             `);
             item.find('input').on('change', function () {
                 if ($(this).prop('checked')) {
-                    // se o user marcou esse bot, então desmarca "All" se estiver marcado
                     checkList.find(`#${allId}`).prop('checked', false);
-                    // remove "All" de selectedBots se estiver
                     selectedBots = selectedBots.filter(b => b !== 'All');
-                    // adiciona esse bot
                     selectedBots.push(bot);
                 } else {
-                    // se o user desmarcou esse bot
                     selectedBots = selectedBots.filter(b => b !== bot);
                 }
                 currentPage = 1;
@@ -270,19 +247,13 @@ $(document).ready(function () {
             checkList.append(item);
         });
 
-        // Cria um "dropdown" com Bootstrap 4
-        // -> Precisamos de .dropdown / .show ou usar script bootstrap
-        // Aqui, faremos um menu manual. Ao clicar no toggle, add .show
         const dropDiv = $('<div class="dropdown-multi"></div>');
         dropDiv.append(toggleBtn).append(checkList);
 
-        // Lógica de abrir/fechar no clique
         toggleBtn.on('click', function (e) {
             e.stopPropagation();
             checkList.toggleClass('show');
         });
-
-        // Ao clicar fora, fecha
         $(document).on('click', function (e) {
             if (!dropDiv.is(e.target) && dropDiv.has(e.target).length === 0) {
                 checkList.removeClass('show');
@@ -293,26 +264,42 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Função principal: puxa /api/bots-stats
+    // GET DATE RANGE
     //------------------------------------------------------------
-    async function updateDashboard(date, movStatus, page, perPage) {
+    function getDateRangeParams() {
+        const rangeValue = $('#dateRangeSelector').val();
+        if (rangeValue === 'custom') {
+            const sDate = $('#startDateInput').val();
+            const eDate = $('#endDateInput').val();
+            return {
+                dateRange: 'custom',
+                startDate: sDate,
+                endDate: eDate
+            };
+        }
+        return { dateRange: rangeValue };
+    }
+
+    //------------------------------------------------------------
+    // UPDATE DASHBOARD
+    //------------------------------------------------------------
+    async function updateDashboard(movStatus, page, perPage) {
         try {
-            // Monta param botFilter
-            // se selectedBots.length=0 => filtra nada
-            // se tem "All" => param=All
-            // else => param="@Bot1,@Bot2" etc
+            const dr = getDateRangeParams();
             let botFilterParam = '';
-            if (selectedBots.length === 0) {
-                // se nenhum selecionado => param= (vazio)
-                // mas se quiser default "All", poderia
-            } else {
+            if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
 
-            let url = `/api/bots-stats?date=${date}`;
+            let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
-            url += `&page=${page}&perPage=${perPage}`;
+
+            if (dr.dateRange === 'custom') {
+                url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
+            } else {
+                url += `&dateRange=${dr.dateRange}`;
+            }
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -320,14 +307,12 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
-            // Estatísticas do Dia
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // ----- Gráfico de Barras -----
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -339,7 +324,6 @@ $(document).ready(function () {
                 ],
             };
             const barCtx = document.getElementById('salesChart').getContext('2d');
-
             if (!salesChart) {
                 salesChart = new Chart(barCtx, {
                     type: 'bar',
@@ -347,12 +331,12 @@ $(document).ready(function () {
                     options: {
                         responsive: true,
                         scales: {
-                            y: { beginAtZero: true },
+                            y: { beginAtZero: true }
                         },
                         plugins: {
-                            chartBackground: {},
-                        },
-                    },
+                            chartBackground: {}
+                        }
+                    }
                 });
             } else {
                 salesChart.data = barData;
@@ -360,13 +344,17 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
-            // ----- Gráfico de Linha (7 dias) -----
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[0]}`;
             });
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
+            const conversionRates = data.stats7Days.map(item => {
+                return item.totalVendasGeradas > 0
+                    ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
+                    : 0;
+            });
 
             const lineData = {
                 labels: lineLabels,
@@ -378,7 +366,9 @@ $(document).ready(function () {
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 6,
-                        tension: 0.4
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-convertido'
                     },
                     {
                         label: 'Valor Gerado (R$)',
@@ -387,10 +377,24 @@ $(document).ready(function () {
                         borderColor: '#36A2EB',
                         pointBackgroundColor: '#36A2EB',
                         pointHoverRadius: 6,
-                        tension: 0.4
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-gerado'
+                    },
+                    {
+                        label: 'Taxa de Conversão (%)',
+                        data: conversionRates,
+                        fill: false,
+                        borderColor: 'green',
+                        pointBackgroundColor: 'green',
+                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        cubicInterpolationMode: 'monotone',
+                        yAxisID: 'y-axis-conversion'
                     }
-                ],
+                ]
             };
+
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -399,7 +403,37 @@ $(document).ready(function () {
                     options: {
                         responsive: true,
                         scales: {
-                            y: { beginAtZero: false },
+                            'y-axis-convertido': {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                offset: true
+                            },
+                            'y-axis-gerado': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            'y-axis-conversion': {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                offset: true,
+                                suggestedMax: 100,
+                                grid: {
+                                    drawOnChartArea: false
+                                },
+                                ticks: {
+                                    callback: function (value) {
+                                        return value + '%';
+                                    }
+                                }
+                            },
+                            x: {}
                         },
                         plugins: {
                             chartBackground: {},
@@ -407,7 +441,11 @@ $(document).ready(function () {
                                 callbacks: {
                                     label: function (ctx) {
                                         const value = ctx.parsed.y || 0;
-                                        return `R$ ${value.toFixed(2)}`;
+                                        if (ctx.dataset.label === 'Taxa de Conversão (%)') {
+                                            return `Taxa: ${value.toFixed(2)}%`;
+                                        } else {
+                                            return `R$ ${value.toFixed(2)}`;
+                                        }
                                     },
                                 },
                             },
@@ -420,10 +458,9 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            // ----- Ranking Simples -----
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
-            if (data.botRanking?.length > 0) {
+            if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
                         <tr>
@@ -432,12 +469,13 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
 
-            // ----- Ranking Detalhado -----
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
-            if (data.botDetails?.length > 0) {
+            if (data.botDetails && data.botDetails.length > 0) {
                 data.botDetails.forEach(bot => {
                     let plansHtml = '';
                     bot.plans.forEach(plan => {
@@ -454,48 +492,44 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
 
-            // ----- Stats Detailed (All, Main, etc.)
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
             $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
             $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
 
-            // main
             $('#cardMainLeads').text(data.statsMain.totalUsers);
             $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
             $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
             $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
             $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
 
-            // not_purchased
             $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
             $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
             $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
             $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            // purchased
             $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
             $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
             $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            // ----- Últimas Movimentações
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
             const movementsTbody = $('#lastMovementsBody');
             movementsTbody.empty();
-            if (data.lastMovements?.length > 0) {
+            if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach(mov => {
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
                     let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
                     let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
-
                     let statusHtml = '';
                     if (mov.status === 'paid') {
                         statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
@@ -504,7 +538,6 @@ $(document).ready(function () {
                     } else {
                         statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
                     }
-
                     let payDelayHtml = '—';
                     if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                         const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
@@ -512,7 +545,6 @@ $(document).ready(function () {
                             payDelayHtml = formatDuration(diffMs);
                         }
                     }
-
                     movementsTbody.append(`
                         <tr>
                             <td>${leadId}</td>
@@ -531,50 +563,59 @@ $(document).ready(function () {
                     </tr>
                 `);
             }
-
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
     }
 
-    // "refreshDashboard"
+    //------------------------------------------------------------
+    // REFRESH
+    //------------------------------------------------------------
     function refreshDashboard() {
-        const date = $('#datePicker').val();
         const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard(date, movStatus, currentPage, currentPerPage);
+        updateDashboard(movStatus, currentPage, currentPerPage);
     }
 
-    // 1) Cria contêiner p/ drop-down de bots
-    $('#botFilter').remove(); // remove <select id="botFilter"> antigo, se existir
-    // cria um container <div id="botFilterContainer"></div> dentro do mesmo lugar
-    $('#movStatusFilter').parent().before(`
-        <div id="botFilterContainer" style="position:relative;"></div>
-    `);
-
-    // 2) Carrega a lista de bots e renderiza checkboxes
+    //------------------------------------------------------------
+    // Inicial
+    //------------------------------------------------------------
     loadBotList();
-
-    // 3) Chamamos refreshDashboard() inicial
     refreshDashboard();
 
-    // ===== EVENTOS =====
-    $('#datePicker').on('change', function () {
-        currentPage = 1;
-        refreshDashboard();
-    });
+    const defaultSection = $('#sidebarNav .nav-link.active').data('section');
+    if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
+        $('#botFilterContainer').show();
+    } else {
+        $('#botFilterContainer').hide();
+    }
 
+    //------------------------------------------------------------
+    // EVENTOS
+    //------------------------------------------------------------
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
     });
-
     $('#movPerPage').on('change', function () {
         currentPerPage = parseInt($(this).val(), 10);
         currentPage = 1;
         refreshDashboard();
     });
 
-    // Sidebar toggle
+    $('#dateRangeSelector').on('change', function () {
+        if ($(this).val() === 'custom') {
+            $('#customDateModal').modal('show');
+        } else {
+            currentPage = 1;
+            refreshDashboard();
+        }
+    });
+    $('#applyCustomDateBtn').on('click', function () {
+        $('#customDateModal').modal('hide');
+        currentPage = 1;
+        refreshDashboard();
+    });
+
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
@@ -584,13 +625,209 @@ $(document).ready(function () {
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
+        $('#manageBotsSection').addClass('d-none');
 
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
+
+        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
+            targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
+            $('#botFilterContainer').show();
+        } else {
+            $('#botFilterContainer').hide();
+            if (targetSection === 'manageBotsSection') {
+                loadExistingBots();
+            }
+        }
+
+        currentPage = 1;
+        refreshDashboard();
     });
 
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
+    });
+
+    //------------------------------------------------------------
+    // [1] Form Criar Novo Bot
+    //------------------------------------------------------------
+    $('#addBotForm').on('submit', function (e) {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('name', $('#botNameInput').val().trim());
+        formData.append('token', $('#botTokenInput').val().trim());
+        formData.append('description', $('#botDescriptionInput').val().trim());
+        formData.append('buttonName1', $('#buttonName1').val().trim());
+        formData.append('buttonValue1', $('#buttonValue1').val().trim());
+        formData.append('buttonName2', $('#buttonName2').val().trim());
+        formData.append('buttonValue2', $('#buttonValue2').val().trim());
+        formData.append('buttonName3', $('#buttonName3').val().trim());
+        formData.append('buttonValue3', $('#buttonValue3').val().trim());
+        formData.append('remarketingJson', $('#remarketingInput').val().trim());
+
+        const videoFile = $('#botVideoFile')[0].files[0];
+        if (videoFile) {
+            formData.append('videoFile', videoFile);
+        }
+
+        fetch('/admin/bots', {
+            method: 'POST',
+            body: formData
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const textErr = await res.text();
+                    throw new Error(textErr);
+                }
+                return res.text();
+            })
+            .then(htmlResponse => {
+                $('#addBotResponse').html(htmlResponse);
+                loadBotList();
+                loadExistingBots();
+                $('#addBotForm')[0].reset();
+            })
+            .catch(err => {
+                $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
+    });
+
+    //------------------------------------------------------------
+    // [2] Lista de Bots Existentes
+    //------------------------------------------------------------
+    function loadExistingBots() {
+        $('#existingBotsBody').html(`<tr><td colspan="4">Carregando...</td></tr>`);
+        fetch('/admin/bots/list')
+            .then(res => res.json())
+            .then(list => {
+                const tbody = $('#existingBotsBody');
+                tbody.empty();
+                if (!list || list.length === 0) {
+                    tbody.html(`<tr><td colspan="4">Nenhum bot cadastrado</td></tr>`);
+                    return;
+                }
+                list.forEach(bot => {
+                    let videoLabel = bot.video ? bot.video : '—';
+                    tbody.append(`
+                    <tr>
+                        <td>${bot.id}</td>
+                        <td>${bot.name}</td>
+                        <td>${videoLabel}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
+                        </td>
+                    </tr>
+                `);
+                });
+            })
+            .catch(err => {
+                console.error('Erro ao carregar bots:', err);
+                $('#existingBotsBody').html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
+            });
+    }
+
+    $(document).on('click', '[data-edit-bot]', function () {
+        const botId = $(this).attr('data-edit-bot');
+        editBot(botId);
+    });
+
+    function editBot(botId) {
+        $('#editBotForm')[0].reset();
+        $('#editBotResponse').empty();
+        $('#editBotId').val(botId);
+
+        fetch(`/admin/bots/${botId}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Bot não encontrado');
+                return res.json();
+            })
+            .then(bot => {
+                $('#editBotName').val(bot.name);
+                $('#editBotToken').val(bot.token);
+                $('#editBotDescription').val(bot.description || '');
+                let bjson = [];
+                try {
+                    bjson = JSON.parse(bot.buttonsJson || '[]');
+                } catch (e) { }
+                if (bjson[0]) {
+                    $('#editButtonName1').val(bjson[0].name);
+                    $('#editButtonValue1').val(bjson[0].value);
+                } else {
+                    $('#editButtonName1').val('');
+                    $('#editButtonValue1').val('');
+                }
+                if (bjson[1]) {
+                    $('#editButtonName2').val(bjson[1].name);
+                    $('#editButtonValue2').val(bjson[1].value);
+                } else {
+                    $('#editButtonName2').val('');
+                    $('#editButtonValue2').val('');
+                }
+                if (bjson[2]) {
+                    $('#editButtonName3').val(bjson[2].name);
+                    $('#editButtonValue3').val(bjson[2].value);
+                } else {
+                    $('#editButtonName3').val('');
+                    $('#editButtonValue3').val('');
+                }
+
+                $('#editRemarketingJson').val(bot.remarketingJson || '');
+                $('#editBotContainer').show();
+            })
+            .catch(err => {
+                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
+    }
+
+    $('#cancelEditBotBtn').on('click', function () {
+        $('#editBotContainer').hide();
+    });
+
+    $('#editBotForm').on('submit', function (e) {
+        e.preventDefault();
+        const botId = $('#editBotId').val();
+        if (!botId) {
+            $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('name', $('#editBotName').val().trim());
+        formData.append('token', $('#editBotToken').val().trim());
+        formData.append('description', $('#editBotDescription').val().trim());
+        formData.append('buttonName1', $('#editButtonName1').val().trim());
+        formData.append('buttonValue1', $('#editButtonValue1').val().trim());
+        formData.append('buttonName2', $('#editButtonName2').val().trim());
+        formData.append('buttonValue2', $('#editButtonValue2').val().trim());
+        formData.append('buttonName3', $('#editButtonName3').val().trim());
+        formData.append('buttonValue3', $('#editButtonValue3').val().trim());
+        formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
+
+        const videoFile = $('#editVideoFile')[0].files[0];
+        if (videoFile) {
+            formData.append('videoFile', videoFile);
+        }
+
+        fetch(`/admin/bots/edit/${botId}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const textErr = await res.text();
+                    throw new Error(textErr);
+                }
+                return res.text();
+            })
+            .then(htmlResp => {
+                $('#editBotResponse').html(htmlResp);
+                loadExistingBots();
+                loadBotList();
+            })
+            .catch(err => {
+                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
     });
 });
