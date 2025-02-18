@@ -445,7 +445,7 @@ function initializeBot(botConfig) {
     }
   });
 
-  // Rota /start com atualização para buscar o vídeo via URL se disponível
+  // Rota /start atualizada para buscar o vídeo via URL se disponível
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -766,7 +766,7 @@ function initializeBot(botConfig) {
     await ctx.answerCbQuery();
   });
 
-  // Rotinas de limpeza dos rate limits e bloqueios
+  // Rotinas de limpeza
   function cleanRateLimitMap(rateLimitMap, expirationFunction, mapName) {
     const now = Date.now();
     for (const [telegramId, userData] of rateLimitMap) {

@@ -73,7 +73,7 @@ const upload = multer({
     storage: multerS3({
         s3: s3Client,
         bucket: process.env.BUCKETEER_BUCKET_NAME,
-        acl: 'public-read', // Vídeo ficará acessível publicamente
+        // Removida a propriedade "acl" pois o bucket não permite ACLs.
         key: function (req, file, cb) {
             const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
             cb(null, uniqueSuffix);
@@ -209,12 +209,12 @@ function makeDay(date) {
     return d;
 }
 
-// Função para obter estatísticas detalhadas (mantém sua implementação original)
+// Função para obter estatísticas detalhadas
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     // ... sua implementação atual ...
 }
 
-// Rota /api/bots-stats (mantém sua implementação atual)
+// Rota /api/bots-stats
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     // ... sua implementação atual ...
 });
@@ -256,6 +256,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
 
         let videoFilename = '';
         if (req.file) {
+            // Aqui, req.file.location é o URL do arquivo no S3.
             videoFilename = req.file.location;
         }
 
