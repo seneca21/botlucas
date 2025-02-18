@@ -1,5 +1,4 @@
 // services/index.js
-
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se necessário
 

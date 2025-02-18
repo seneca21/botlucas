@@ -1,5 +1,4 @@
 // services/bot.service.js
-
 const { Telegraf, Markup } = require('telegraf');
 const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
@@ -407,18 +406,21 @@ function initializeBot(botConfig) {
         return;
       }
 
-      // Busca o vídeo na pasta src/videos (conforme solicitado)
-      const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
-      if (!fs.existsSync(videoPath)) {
-        logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
-        return;
+      // Busca o vídeo no bucket S3: o vídeo já deve ter sido enviado e o campo "video" armazenado conterá a URL.
+      let videoSource = botConfig.video;
+      if (!videoSource.startsWith('http')) {
+        videoSource = path.resolve(__dirname, `../public/videos/${botConfig.video}`);
+        if (!fs.existsSync(videoSource)) {
+          logger.error(`❌ Vídeo não achado: ${videoSource}`);
+          return;
+        }
       }
 
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
 
-      await bot.telegram.sendVideo(user.telegramId, { source: videoPath }, {
+      await bot.telegram.sendVideo(user.telegramId, videoSource, {
         caption: messageConfig.text,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
@@ -434,59 +436,6 @@ function initializeBot(botConfig) {
       logger.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
     } else {
       ctx.reply('⚠️ Erro inesperado. Tente mais tarde.');
-    }
-  });
-
-  // Rota /start
-  bot.start(async (ctx) => {
-    try {
-      const telegramId = ctx.from.id.toString();
-      const botName = botConfig.name;
-      const isBotPaused = checkStartFlood(botName);
-      if (isBotPaused) return;
-
-      const blockData = userBlockStatus.get(telegramId);
-      if (blockData && (blockData.isBlocked || blockData.isBanned)) {
-        return;
-      }
-
-      const canStartNow = canAttemptStart(telegramId);
-      if (!canStartNow) {
-        handleUserBlock(telegramId);
-        return;
-      }
-
-      logger.info('📩 /start recebido');
-      await registerUser(ctx);
-
-      // Busca o vídeo na pasta src/videos
-      const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
-      if (!fs.existsSync(videoPath)) {
-        logger.error(`❌ Vídeo não achado: ${videoPath}`);
-        await ctx.reply('⚠️ Erro ao carregar vídeo.');
-        return;
-      }
-
-      const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
-        Markup.button.callback(btn.name, `select_plan_${idx}`)
-      );
-
-      await ctx.replyWithVideo(
-        { source: videoPath },
-        {
-          caption: botConfig.description || 'Sem descrição',
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
-        }
-      );
-      logger.info(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
-    } catch (error) {
-      logger.error('❌ Erro /start:', error);
-      if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
-      } else {
-        await ctx.reply('⚠️ Erro ao processar /start.');
-      }
     }
   });
 
@@ -515,8 +464,7 @@ function initializeBot(botConfig) {
     }
 
     const telegramId = ctx.chat.id.toString();
-    const canSelect = canAttemptSelectPlan(telegramId, plan.name);
-    if (!canSelect) {
+    if (!canAttemptSelectPlan(telegramId, plan.name)) {
       await ctx.answerCbQuery();
       handleUserBlock(telegramId);
       return;
@@ -590,8 +538,7 @@ function initializeBot(botConfig) {
       return;
     }
 
-    const rateLimitResult = canAttemptVerification(telegramId);
-    if (!rateLimitResult.allowed) {
+    if (!canAttemptVerification(telegramId)) {
       handleUserBlock(telegramId);
       return;
     }
@@ -678,8 +625,7 @@ function initializeBot(botConfig) {
       return;
     }
 
-    const rateLimitResult = canAttemptVerification(telegramId);
-    if (!rateLimitResult.allowed) {
+    if (!canAttemptVerification(telegramId)) {
       await ctx.answerCbQuery();
       handleUserBlock(telegramId);
       return;
