@@ -8,15 +8,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/style.css" />
     <style>
-        /* CSS extra para dashboards */
-
         body.dark-mode {
             background-color: #121212;
             color: #fff;
         }
 
-        /* Lembre-se que #sidebar, #mainContent etc. vêm do seu style.css */
-        /* Ajustes para o dropdown-multi do filtro de bots */
+        /* Sidebar e mainContent do seu style.css original */
         .dropdown-multi {
             position: relative;
             display: inline-block;
@@ -44,7 +41,7 @@
             display: block;
         }
 
-        /* Seção de Gerenciar Bots */
+        /* Aba gerenciar bots */
         #manageBotsSection .form-control {
             margin-bottom: 0.5rem;
         }
@@ -62,6 +59,15 @@
 
         .bot-buttons-row input {
             flex: 1;
+        }
+
+        /* Tabela de bots existentes */
+        #existingBotsTable td {
+            vertical-align: middle;
+        }
+
+        #editBotForm label {
+            margin-top: 0.5rem;
         }
     </style>
 </head>
@@ -92,7 +98,7 @@
                             Estatísticas do Dia
                         </a>
                     </li>
-                    <!-- NOVA ABA -->
+                    <!-- Nova aba: Gerenciar Bots -->
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="manageBotsSection">
                             Gerenciar Bots
@@ -124,7 +130,7 @@
             <div class="py-3">
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
-                <!-- Date Range + Bot Filter (aparecem em stats/sections que quiser) -->
+                <!-- Data Range + Bot Filter -->
                 <div class="form-inline mb-3" style="gap:1rem;">
                     <label style="margin-right:0.5rem;">Filtro de Data:</label>
                     <select id="dateRangeSelector" class="form-control form-control-sm">
@@ -135,12 +141,11 @@
                         <option value="lastMonth">Mês anterior</option>
                         <option value="custom">Personalizado</option>
                     </select>
-
                     <!-- Filtro de bots -->
                     <div id="botFilterContainer" style="display:none; margin-left:1rem;"></div>
                 </div>
 
-                <!-- Modal para intervalo customizado -->
+                <!-- Modal de datas personalizadas -->
                 <div class="modal fade" id="customDateModal" tabindex="-1" role="dialog"
                     aria-labelledby="customDateModalLabel" aria-hidden="true">
                     <div class="modal-dialog modal-sm" role="document">
@@ -210,7 +215,6 @@
                             <h4 class="text-center">Usuários e Compras</h4>
                             <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
                         </div>
-
                         <div class="col-md-6">
                             <h4 class="text-center">Vendas Pagas e Geradas</h4>
                             <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
@@ -291,7 +295,7 @@
                 <section id="statsDetailedSection" class="d-none">
                     <h3>Estatísticas do Dia</h3>
                     <div class="row">
-                        <!-- COL 1: All -->
+                        <!-- colunas de stats (All, Main, NotPurchased, Purchased) -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">TODAS AS COMPRAS</h5>
                             <div class="card text-center shadow-sm mb-3">
@@ -325,8 +329,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 2: Main -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">PLANO PRINCIPAL</h5>
                             <div class="card text-center shadow-sm mb-3">
@@ -360,8 +362,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 3: Not_Purchased -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">REMARKETING</h5>
                             <div class="card text-center shadow-sm mb-3">
@@ -395,8 +395,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- COL 4: Purchased -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">UPSELL</h5>
                             <div class="card text-center shadow-sm mb-3">
@@ -433,11 +431,82 @@
                     </div>
                 </section>
 
-                <!-- SEÇÃO 5: GERENCIAR BOTS -->
+                <!-- SEÇÃO 5: Gerenciar Bots -->
                 <section id="manageBotsSection" class="d-none">
                     <h3>Gerenciar Bots</h3>
-                    <p>Nesta seção, você pode cadastrar novos bots com até 3 botões.</p>
-                    <form id="addBotForm" style="max-width:600px;">
+                    <p>Aqui você pode cadastrar novos bots ou editar os já existentes, enviando um arquivo de vídeo
+                        direto do seu PC.</p>
+                    <hr />
+
+                    <!-- Lista de Bots existentes -->
+                    <h5>Bots Existentes</h5>
+                    <table class="table table-bordered table-striped" id="existingBotsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Vídeo</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="existingBotsBody">
+                            <tr>
+                                <td colspan="4">Carregando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div id="editBotContainer" class="mt-4" style="display:none;">
+                        <h5>Editar Bot</h5>
+                        <form id="editBotForm" enctype="multipart/form-data">
+                            <input type="hidden" id="editBotId" />
+                            <label for="editBotName">Nome:</label>
+                            <input type="text" id="editBotName" class="form-control" required />
+
+                            <label for="editBotToken">Token:</label>
+                            <input type="text" id="editBotToken" class="form-control" required />
+
+                            <label for="editBotDescription">Descrição:</label>
+                            <textarea id="editBotDescription" class="form-control" rows="2"></textarea>
+
+                            <label>Vídeo (upload opcional):</label>
+                            <input type="file" id="editVideoFile" class="form-control-file" accept="video/*" />
+
+                            <hr />
+                            <h6>Botões (até 3)</h6>
+                            <div class="bot-buttons-row">
+                                <input type="text" id="editButtonName1" class="form-control"
+                                    placeholder="Nome Botão 1" />
+                                <input type="text" id="editButtonValue1" class="form-control"
+                                    placeholder="Valor Pix 1" />
+                            </div>
+                            <div class="bot-buttons-row">
+                                <input type="text" id="editButtonName2" class="form-control"
+                                    placeholder="Nome Botão 2" />
+                                <input type="text" id="editButtonValue2" class="form-control"
+                                    placeholder="Valor Pix 2" />
+                            </div>
+                            <div class="bot-buttons-row">
+                                <input type="text" id="editButtonName3" class="form-control"
+                                    placeholder="Nome Botão 3" />
+                                <input type="text" id="editButtonValue3" class="form-control"
+                                    placeholder="Valor Pix 3" />
+                            </div>
+                            <hr />
+                            <label>Remarketing JSON:</label>
+                            <textarea id="editRemarketingJson" class="form-control" rows="3"></textarea>
+
+                            <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
+                            <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
+                        </form>
+                        <div id="editBotResponse" class="mt-2"></div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Form para criar novo bot -->
+                    <h5>Cadastrar Novo Bot</h5>
+                    <form id="addBotForm" style="max-width:600px;" enctype="multipart/form-data">
                         <label for="botNameInput">Nome do Bot:</label>
                         <input type="text" id="botNameInput" class="form-control" required />
 
@@ -447,11 +516,11 @@
                         <label for="botDescriptionInput">Descrição:</label>
                         <textarea id="botDescriptionInput" class="form-control" rows="2"></textarea>
 
-                        <label for="botVideoInput">Vídeo (arquivo .mp4, etc.):</label>
-                        <input type="text" id="botVideoInput" class="form-control" />
+                        <label>Vídeo (upload do PC):</label>
+                        <input type="file" id="botVideoFile" class="form-control-file" accept="video/*" />
 
                         <hr />
-                        <h5>Botões</h5>
+                        <h6>Botões (até 3)</h6>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName1" placeholder="Nome Botão 1" />
                             <input type="text" class="form-control" id="buttonValue1" placeholder="Valor Pix 1" />
@@ -470,7 +539,7 @@
                         <textarea id="remarketingInput" class="form-control" rows="3"></textarea>
                         <small class="text-muted">Exemplo: {"messages":[...],"intervals":{...}}</small>
 
-                        <button type="submit" class="btn btn-primary mt-3">Salvar Bot</button>
+                        <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                     </form>
                     <div id="addBotResponse" class="mt-3"></div>
                 </section>

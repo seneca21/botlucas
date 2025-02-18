@@ -7,21 +7,27 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const { Op, Sequelize } = require('sequelize');
 
+// Para upload de arquivos (multer):
+const multer = require('multer');
+const fs = require('fs');
+
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Importado para gerenciar tabela Bots
+const BotModel = db.BotModel; // Model da tabela "Bots"
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
-const { initializeBot, reloadBotsFromDB } = require('./services/bot.service');
+// Precisamos das funções para inicializar/editars bots
+const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// Sessão
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
@@ -34,25 +40,44 @@ function checkAuth(req, res, next) {
 }
 
 //------------------------------------------------------
-// Conecta DB
+// Conexão DB
 //------------------------------------------------------
 db.sequelize
     .authenticate()
     .then(() => logger.info('✅ Conexão com DB estabelecida.'))
     .catch((err) => logger.error('❌ Erro ao conectar DB:', err));
 
-// Aqui é onde as tabelas são criadas/alteradas automaticamente
 db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info('✅ Modelos sincronizados (alter).');
-        // Depois de sync, recarrega e inicializa Bots do BD
+        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// Rotas de LOGIN / LOGOUT
+// Configura o Multer p/ uploads de vídeo
+//------------------------------------------------------
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Cria a pasta se não existir (public/videos)
+        const uploadPath = path.join(__dirname, 'public', 'videos');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        // Exemplo: Date.now() + '-' + nomeOriginal
+        const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
+        cb(null, uniqueSuffix);
+    }
+});
+const upload = multer({ storage });
+
+//------------------------------------------------------
+// LOGIN/LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
@@ -159,11 +184,10 @@ app.get('/', checkAuth, (req, res) => {
 app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// ROTA: /api/bots-list => retorna array de nomes de bots
+// Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
-        // Lê do BD
         const botRows = await BotModel.findAll();
         const botNames = botRows.map(b => b.name);
         res.json(botNames);
@@ -173,15 +197,14 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
     }
 });
 
-//------------------------------------------------------
-// FUNÇÕES DE ESTATÍSTICAS (seu código original)
-//------------------------------------------------------
+// Função makeDay
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
+// Precisamos do Purchase e do User p/ estatísticas
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes('All')) {
@@ -294,7 +317,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     } catch (err) {
         logger.error(`Erro interno em getDetailedStats: ${err.message}`);
     }
-
     return {
         totalUsers,
         totalPurchases,
@@ -305,9 +327,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     };
 }
 
-//------------------------------------------------------
-// ROTA: /api/bots-stats
-//------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
@@ -557,7 +576,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
-
             const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters) || {};
             stats7Days.push({
                 date: dayStart.toISOString().split('T')[0],
@@ -609,101 +627,135 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Rotas para gerenciar Bots
-// Agora com 3 campos de botões (nome+valor) para cada
+// Rotas de Gerenciar Bots
 //------------------------------------------------------
-app.get('/admin/bots', checkAuth, (req, res) => {
-    // Formulário para cadastrar Bot + 3 botões
-    const html = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Cadastro de Bot</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-  <style>
-    body {
-      margin: 20px;
+
+// [POST] Criar Novo Bot (com upload de vídeo opcional)
+app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
+    try {
+        const payload = req.body; // se for multipart, body vem via multer
+        const {
+            name,
+            token,
+            description,
+            buttonName1,
+            buttonValue1,
+            buttonName2,
+            buttonValue2,
+            buttonName3,
+            buttonValue3,
+            remarketingJson
+        } = payload;
+
+        // Monta array de botões
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+            }
+        }
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
+        const buttonsJson = JSON.stringify(buttons);
+
+        // Verifica se remarketingJson está preenchido
+        let safeRemarketingJson = remarketingJson || '';
+
+        // Se o multer pegou um arquivo
+        let videoFilename = '';
+        if (req.file) {
+            videoFilename = req.file.filename; // salvamos esse nome no BD
+        }
+        else {
+            // Caso não tenha subido arquivo, poderíamos deixar em branco
+            videoFilename = '';
+        }
+
+        const newBot = await BotModel.create({
+            name,
+            token,
+            description,
+            video: videoFilename,
+            buttonsJson,
+            remarketingJson: safeRemarketingJson
+        });
+        logger.info(`✅ Bot ${name} inserido no BD.`);
+
+        // Monta config p/ subir o bot
+        const bc = {
+            name: newBot.name,
+            token: newBot.token,
+            description: newBot.description,
+            video: newBot.video, // esse é o nome do arquivo que iremos usar
+            buttons: buttons,
+            remarketing: {}
+        };
+        if (safeRemarketingJson) {
+            try {
+                bc.remarketing = JSON.parse(safeRemarketingJson);
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido p/ bot ${newBot.name}.`, e);
+            }
+        }
+
+        initializeBot(bc);
+        res.send(`
+            <div class="alert alert-success">
+              Bot <strong>${name}</strong> cadastrado e iniciado com sucesso!
+            </div>
+        `);
+    } catch (err) {
+        logger.error('Erro ao criar bot:', err);
+        res.status(500).send('Erro ao criar bot: ' + err.message);
     }
-    .card {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 15px;
-    }
-    .btn-back {
-      margin-top: 15px;
-    }
-    .button-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 1rem;
-    }
-    .button-row input {
-      flex: 1;
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-  </style>
-</head>
-<body>
-<div class="card">
-  <h2 class="header">Cadastrar Novo Bot</h2>
-  <form method="POST" action="/admin/bots">
-    <div class="form-group">
-      <label>Nome do Bot:</label>
-      <input class="form-control" name="name" required />
-    </div>
-    <div class="form-group">
-      <label>Token do Bot:</label>
-      <input class="form-control" name="token" required />
-    </div>
-    <div class="form-group">
-      <label>Descrição (caption):</label>
-      <textarea class="form-control" name="description"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Vídeo (nome do arquivo):</label>
-      <input class="form-control" name="video" />
-    </div>
-    <hr/>
-    <h5>Botões (até 3):</h5>
-    <div class="button-row">
-      <input class="form-control" placeholder="Nome Botão 1" name="buttonName1"/>
-      <input class="form-control" placeholder="Valor Pix 1" name="buttonValue1"/>
-    </div>
-    <div class="button-row">
-      <input class="form-control" placeholder="Nome Botão 2" name="buttonName2"/>
-      <input class="form-control" placeholder="Valor Pix 2" name="buttonValue2"/>
-    </div>
-    <div class="button-row">
-      <input class="form-control" placeholder="Nome Botão 3" name="buttonName3"/>
-      <input class="form-control" placeholder="Valor Pix 3" name="buttonValue3"/>
-    </div>
-    <hr/>
-    <div class="form-group">
-      <label>Remarketing (JSON se quiser personalizar):</label>
-      <textarea class="form-control" name="remarketingJson"></textarea>
-      <small class="text-muted">Ex: {"messages":[...],"intervals":{...}}</small>
-    </div>
-    <button type="submit" class="btn btn-primary">Salvar</button>
-    <a href="/" class="btn btn-secondary btn-back">Voltar para Dashboard</a>
-  </form>
-</div>
-</body>
-</html>
-    `;
-    res.send(html);
 });
 
-app.post('/admin/bots', checkAuth, async (req, res) => {
+// [GET] Lista de bots (JSON)
+app.get('/admin/bots/list', checkAuth, async (req, res) => {
     try {
+        const bots = await BotModel.findAll();
+        res.json(bots);
+    } catch (err) {
+        logger.error('Erro ao listar bots:', err);
+        res.status(500).json({ error: 'Erro ao listar bots' });
+    }
+});
+
+// [GET] Retorna 1 bot (para edição) em JSON
+app.get('/admin/bots/:id', checkAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot não encontrado' });
+        }
+        res.json(bot);
+    } catch (err) {
+        logger.error('Erro ao obter bot:', err);
+        res.status(500).json({ error: 'Erro ao obter bot' });
+    }
+});
+
+// [POST] Editar bot existente (com upload de vídeo opcional)
+app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).send('Bot não encontrado');
+        }
+
         const {
-            name, token, description, video,
-            buttonName1, buttonValue1,
-            buttonName2, buttonValue2,
-            buttonName3, buttonValue3,
+            name,
+            token,
+            description,
+            buttonName1,
+            buttonValue1,
+            buttonName2,
+            buttonValue2,
+            buttonName3,
+            buttonValue3,
             remarketingJson
         } = req.body;
 
@@ -717,51 +769,55 @@ app.post('/admin/bots', checkAuth, async (req, res) => {
         pushButtonIfValid(buttonName1, buttonValue1);
         pushButtonIfValid(buttonName2, buttonValue2);
         pushButtonIfValid(buttonName3, buttonValue3);
-
         const buttonsJson = JSON.stringify(buttons);
 
-        // Verifica se remarketingJson está preenchido
+        // Se veio videoFile
+        let videoFilename = bot.video; // mantemos o anterior se não subir nada
+        if (req.file) {
+            videoFilename = req.file.filename;
+            // Se quiser apagar o arquivo anterior, você pode
+            // fs.unlinkSync(path.join(__dirname, 'public', 'videos', bot.video))...
+        }
+
+        // remarketing
         let safeRemarketingJson = remarketingJson || '';
-        // Se quiser, poderíamos validar se é JSON válido
 
-        // Cria no BD
-        const newBot = await BotModel.create({
-            name,
-            token,
-            description,
-            video,
-            buttonsJson,
-            remarketingJson: safeRemarketingJson
-        });
-        logger.info(`✅ Bot ${name} inserido no BD.`);
+        bot.name = name;
+        bot.token = token;
+        bot.description = description;
+        bot.video = videoFilename;
+        bot.buttonsJson = buttonsJson;
+        bot.remarketingJson = safeRemarketingJson;
+        await bot.save();
+        logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
 
-        // Monta config e inicia o bot imediatamente
-        const botConfig = {
-            name: newBot.name,
-            token: newBot.token,
-            description: newBot.description,
-            video: newBot.video,
-            buttons: buttons, // array de {name, value}
+        // Precisamos atualizar a instância em memória (bot.service)
+        const bc = {
+            name: bot.name,
+            token: bot.token,
+            description: bot.description,
+            video: bot.video,
+            buttons: buttons,
             remarketing: {}
         };
         if (safeRemarketingJson) {
             try {
-                botConfig.remarketing = JSON.parse(safeRemarketingJson);
-            } catch (err) {
-                logger.warn(`Remarketing JSON inválido para bot ${newBot.name}.`, err);
+                bc.remarketing = JSON.parse(safeRemarketingJson);
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido p/ bot ${bot.name}.`, e);
             }
         }
 
-        // initializeBot (da bot.service)
-        initializeBot(botConfig);
+        updateBotInMemory(id, bc);
 
         res.send(`
-            <h3>Bot ${name} cadastrado e iniciado com sucesso!</h3>
-            <p><a href="/">Voltar</a></p>
+            <div class="alert alert-success">
+              Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
+            </div>
         `);
     } catch (err) {
-        logger.error('Erro ao criar bot:', err);
-        res.status(500).send('Erro ao criar bot: ' + err.message);
+        logger.error('Erro ao editar bot:', err);
+        res.status(500).send('Erro ao editar bot: ' + err.message);
     }
 });
 

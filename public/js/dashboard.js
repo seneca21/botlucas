@@ -12,7 +12,7 @@ $(document).ready(function () {
     let selectedBots = [];
 
     //------------------------------------------------------------
-    // 1) PLUGIN: Background
+    // PLUGIN: Background chart
     //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
@@ -27,7 +27,7 @@ $(document).ready(function () {
     Chart.register(chartBackgroundPlugin);
 
     //------------------------------------------------------------
-    // 2) DARK MODE
+    // DARK MODE
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
@@ -182,7 +182,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // LOAD BOTS
+    // LOAD BOTS (para o dropdown)
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
@@ -479,6 +479,8 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
 
             //--------------------------------------------------
@@ -503,6 +505,8 @@ $(document).ready(function () {
                         </tr>
                     `);
                 });
+            } else {
+                detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
 
             //--------------------------------------------------
@@ -592,13 +596,12 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // INICIAL
+    // Inicial
     //------------------------------------------------------------
     loadBotList();
     refreshDashboard();
 
-    // Por padrão, a primeira aba do sidebar é statsSection => .active
-    // Se for statsSection ou statsDetailedSection => exibimos #botFilterContainer
+    // Checa a aba default
     const defaultSection = $('#sidebarNav .nav-link.active').data('section');
     if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
         $('#botFilterContainer').show();
@@ -633,13 +636,12 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // Sidebar nav
+    // Sidebar
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
 
-        // Esconde seções
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
@@ -649,82 +651,214 @@ $(document).ready(function () {
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
 
-        // Se for statsSection ou statsDetailedSection => exibe botFilter
         if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
             targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
             $('#botFilterContainer').show();
         } else {
             $('#botFilterContainer').hide();
+            // Se for manageBots, carregamos a lista
+            if (targetSection === 'manageBotsSection') {
+                loadExistingBots();
+            }
         }
 
         currentPage = 1;
         refreshDashboard();
     });
 
-    // Toggle sidebar
     $('#toggleSidebarBtn').on('click', function () {
         $('#sidebar').toggleClass('collapsed');
         $('main[role="main"]').toggleClass('expanded');
     });
 
     //------------------------------------------------------------
-    // FORM: Cadastrar Novo Bot (aba ManageBots)
+    // [1] Form Criar Novo Bot
     //------------------------------------------------------------
     $('#addBotForm').on('submit', function (e) {
         e.preventDefault();
 
-        const name = $('#botNameInput').val().trim();
-        const token = $('#botTokenInput').val().trim();
-        const description = $('#botDescriptionInput').val().trim();
-        const video = $('#botVideoInput').val().trim();
+        const formData = new FormData();
+        formData.append('name', $('#botNameInput').val().trim());
+        formData.append('token', $('#botTokenInput').val().trim());
+        formData.append('description', $('#botDescriptionInput').val().trim());
+        formData.append('buttonName1', $('#buttonName1').val().trim());
+        formData.append('buttonValue1', $('#buttonValue1').val().trim());
+        formData.append('buttonName2', $('#buttonName2').val().trim());
+        formData.append('buttonValue2', $('#buttonValue2').val().trim());
+        formData.append('buttonName3', $('#buttonName3').val().trim());
+        formData.append('buttonValue3', $('#buttonValue3').val().trim());
+        formData.append('remarketingJson', $('#remarketingInput').val().trim());
 
-        const buttonName1 = $('#buttonName1').val().trim();
-        const buttonValue1 = $('#buttonValue1').val().trim();
-        const buttonName2 = $('#buttonName2').val().trim();
-        const buttonValue2 = $('#buttonValue2').val().trim();
-        const buttonName3 = $('#buttonName3').val().trim();
-        const buttonValue3 = $('#buttonValue3').val().trim();
-
-        const remarketingJson = $('#remarketingInput').val().trim();
-
-        // Monta objeto para POST
-        const payload = {
-            name,
-            token,
-            description,
-            video,
-            buttonName1,
-            buttonValue1,
-            buttonName2,
-            buttonValue2,
-            buttonName3,
-            buttonValue3,
-            remarketingJson
-        };
+        const videoFile = $('#botVideoFile')[0].files[0];
+        if (videoFile) {
+            formData.append('videoFile', videoFile);
+        }
 
         fetch('/admin/bots', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+            body: formData
         })
             .then(async (res) => {
                 if (!res.ok) {
                     const textErr = await res.text();
-                    throw new Error(textErr || 'Erro ao criar bot');
+                    throw new Error(textErr);
                 }
                 return res.text();
             })
             .then(htmlResponse => {
                 $('#addBotResponse').html(htmlResponse);
-                // Recarrega a lista de bots no dropdown
+                // Recarrega a lista de bots
                 loadBotList();
-                // Limpa formulário
+                loadExistingBots();
+                // Limpa
                 $('#addBotForm')[0].reset();
             })
             .catch(err => {
                 $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
+    });
+
+    //------------------------------------------------------------
+    // [2] Lista de Bots Existentes
+    //------------------------------------------------------------
+    function loadExistingBots() {
+        $('#existingBotsBody').html(`<tr><td colspan="4">Carregando...</td></tr>`);
+        fetch('/admin/bots/list')
+            .then(res => res.json())
+            .then(list => {
+                const tbody = $('#existingBotsBody');
+                tbody.empty();
+                if (!list || list.length === 0) {
+                    tbody.html(`<tr><td colspan="4">Nenhum bot cadastrado</td></tr>`);
+                    return;
+                }
+                list.forEach(bot => {
+                    let videoLabel = bot.video ? bot.video : '—';
+                    tbody.append(`
+                    <tr>
+                        <td>${bot.id}</td>
+                        <td>${bot.name}</td>
+                        <td>${videoLabel}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
+                        </td>
+                    </tr>
+                `);
+                });
+            })
+            .catch(err => {
+                console.error('Erro ao carregar bots:', err);
+                $('#existingBotsBody').html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
+            });
+    }
+
+    // Ao clicar em "Editar"
+    $(document).on('click', '[data-edit-bot]', function () {
+        const botId = $(this).attr('data-edit-bot');
+        editBot(botId);
+    });
+
+    function editBot(botId) {
+        // Limpa e abre form
+        $('#editBotForm')[0].reset();
+        $('#editBotResponse').empty();
+        $('#editBotId').val(botId);
+
+        // Carrega
+        fetch(`/admin/bots/${botId}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Bot não encontrado');
+                return res.json();
+            })
+            .then(bot => {
+                $('#editBotName').val(bot.name);
+                $('#editBotToken').val(bot.token);
+                $('#editBotDescription').val(bot.description || '');
+                // parse buttons
+                let bjson = [];
+                try {
+                    bjson = JSON.parse(bot.buttonsJson || '[]');
+                } catch (e) { }
+                if (bjson[0]) {
+                    $('#editButtonName1').val(bjson[0].name);
+                    $('#editButtonValue1').val(bjson[0].value);
+                } else {
+                    $('#editButtonName1').val('');
+                    $('#editButtonValue1').val('');
+                }
+                if (bjson[1]) {
+                    $('#editButtonName2').val(bjson[1].name);
+                    $('#editButtonValue2').val(bjson[1].value);
+                } else {
+                    $('#editButtonName2').val('');
+                    $('#editButtonValue2').val('');
+                }
+                if (bjson[2]) {
+                    $('#editButtonName3').val(bjson[2].name);
+                    $('#editButtonValue3').val(bjson[2].value);
+                } else {
+                    $('#editButtonName3').val('');
+                    $('#editButtonValue3').val('');
+                }
+
+                $('#editRemarketingJson').val(bot.remarketingJson || '');
+                // exibe
+                $('#editBotContainer').show();
+            })
+            .catch(err => {
+                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
+    }
+
+    // Cancelar
+    $('#cancelEditBotBtn').on('click', function () {
+        $('#editBotContainer').hide();
+    });
+
+    // [POST] Salvar Edição
+    $('#editBotForm').on('submit', function (e) {
+        e.preventDefault();
+        const botId = $('#editBotId').val();
+        if (!botId) {
+            $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('name', $('#editBotName').val().trim());
+        formData.append('token', $('#editBotToken').val().trim());
+        formData.append('description', $('#editBotDescription').val().trim());
+        formData.append('buttonName1', $('#editButtonName1').val().trim());
+        formData.append('buttonValue1', $('#editButtonValue1').val().trim());
+        formData.append('buttonName2', $('#editButtonName2').val().trim());
+        formData.append('buttonValue2', $('#editButtonValue2').val().trim());
+        formData.append('buttonName3', $('#editButtonName3').val().trim());
+        formData.append('buttonValue3', $('#editButtonValue3').val().trim());
+        formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
+
+        const videoFile = $('#editVideoFile')[0].files[0];
+        if (videoFile) {
+            formData.append('videoFile', videoFile);
+        }
+
+        fetch(`/admin/bots/edit/${botId}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const textErr = await res.text();
+                    throw new Error(textErr);
+                }
+                return res.text();
+            })
+            .then(htmlResp => {
+                $('#editBotResponse').html(htmlResp);
+                loadExistingBots();
+                loadBotList();
+            })
+            .catch(err => {
+                $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
             });
     });
 });
