@@ -14,7 +14,7 @@ const fs = require('fs');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-// ATENÇÃO: Use o modelo exportado como BotModel (não db.Bot)
+// IMPORTANTE: use o modelo BotModel exportado pelo index.js
 const BotModel = db.BotModel;
 
 const logger = require('./services/logger');
@@ -808,6 +808,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             }
         }
 
+        // Atualiza a instância em memória (esta função agora para o update para evitar duplicação)
         updateBotInMemory(id, bc);
 
         res.send(`
