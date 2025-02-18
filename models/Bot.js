@@ -21,17 +21,17 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true
             },
             buttonsJson: {
-                type: DataTypes.TEXT, // ou JSONB, caso queira
+                type: DataTypes.TEXT,
                 allowNull: true
             },
             remarketingJson: {
-                type: DataTypes.TEXT, // ou JSONB
+                type: DataTypes.TEXT,
                 allowNull: true
             }
         },
         {
-            tableName: 'Bots', // Faz o Sequelize criar a tabela "Bots"
-            timestamps: false   // ou true, se quiser createdAt/updatedAt
+            tableName: 'Bots',  // o nome da tabela
+            timestamps: false   // caso não queira createdAt/updatedAt
         }
     );
 
