@@ -158,12 +158,13 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
 // ROTA: /api/bots-list => retorna array de nomes de bots
-// Atualização: Se não houver bots cadastrados no BD, utiliza a configuração do config.json
+// Atualizado para consultar o BD e, se não houver registros, usar config.json
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         let bots = await BotModel.findAll({ attributes: ['name'] });
         if (!bots || bots.length === 0) {
+            // Fallback: utiliza os bots do config.json se não houver bots no BD
             bots = config.bots.map(b => ({ name: b.name }));
         }
         const botNames = bots.map(b => b.name);
@@ -178,8 +179,7 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 // FUNÇÃO Auxiliar -> converte data para "meia-noite" em Brasília
 //------------------------------------------------------
 function makeDayBrasilia(rawDate) {
-    // Converte rawDate (string ou Date) para data/hora local em Brasília
-    // Em seguida, zera para 00:00:00.000
+    // Converte rawDate (string ou Date) para data/hora local em Brasília e zera a hora para 00:00:00.000
     const dateStringBr = new Date(rawDate).toLocaleString("en-US", {
         timeZone: "America/Sao_Paulo"
     });
@@ -189,7 +189,7 @@ function makeDayBrasilia(rawDate) {
 }
 
 //------------------------------------------------------
-// getDetailedStats (mantendo todas as funções atuais, mas otimizando chamadas paralelas)
+// getDetailedStats (mantendo as funções atuais, com chamadas paralelas otimizadas)
 //------------------------------------------------------
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
