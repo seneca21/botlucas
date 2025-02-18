@@ -10,7 +10,7 @@ const { Op, Sequelize } = require('sequelize');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Modelo Bot
+const BotModel = db.BotModel; // NOVO: Importa o modelo de bots
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -158,13 +158,12 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
 // ROTA: /api/bots-list => retorna array de nomes de bots
-// Se houver registros na tabela Bots, utiliza-os; caso contrário, utiliza a configuração do config.json
+// Atualização: Se não houver bots cadastrados no BD, utiliza a configuração do config.json
 //------------------------------------------------------
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         let bots = await BotModel.findAll({ attributes: ['name'] });
         if (!bots || bots.length === 0) {
-            // Fallback para os bots definidos em config.json
             bots = config.bots.map(b => ({ name: b.name }));
         }
         const botNames = bots.map(b => b.name);
@@ -179,6 +178,8 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 // FUNÇÃO Auxiliar -> converte data para "meia-noite" em Brasília
 //------------------------------------------------------
 function makeDayBrasilia(rawDate) {
+    // Converte rawDate (string ou Date) para data/hora local em Brasília
+    // Em seguida, zera para 00:00:00.000
     const dateStringBr = new Date(rawDate).toLocaleString("en-US", {
         timeZone: "America/Sao_Paulo"
     });
@@ -188,7 +189,144 @@ function makeDayBrasilia(rawDate) {
 }
 
 //------------------------------------------------------
-// /api/bots-stats => obtém estatísticas detalhadas
+// getDetailedStats (mantendo todas as funções atuais, mas otimizando chamadas paralelas)
+//------------------------------------------------------
+async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
+    let totalUsers = 0;
+    let totalPurchases = 0;
+    let sumGerado = 0;
+    let sumConvertido = 0;
+    let averagePaymentDelayMs = 0;
+    let conversionRate = 0;
+
+    try {
+        const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+        if (botFilters.length > 0 && !botFilters.includes('All')) {
+            baseWhere.botName = { [Op.in]: botFilters };
+        }
+
+        if (originCondition === 'main') {
+            const mainWhere = { ...baseWhere, originCondition: 'main' };
+            const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+
+            const [userCount, purchaseCount, sumG, sumC, paidPurchases] = await Promise.all([
+                Purchase.count({ where: mainWhere, distinct: true, col: 'userId' }),
+                Purchase.count({ where: purchaseWhere }),
+                Purchase.sum('planValue', { where: mainWhere }),
+                Purchase.sum('planValue', { where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } }),
+                Purchase.findAll({
+                    where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                    attributes: ['pixGeneratedAt', 'purchasedAt']
+                })
+            ]);
+
+            totalUsers = userCount;
+            totalPurchases = purchaseCount;
+            sumGerado = sumG || 0;
+            sumConvertido = sumC || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            let sumDiffMs = 0, countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+
+        } else if (!originCondition) {
+            let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes('All')) {
+                baseWhere.botName = { [Op.in]: botFilters };
+                userWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+
+            const [userCount, purchaseCount, sumG, sumC, paidPurchases] = await Promise.all([
+                User.count({ where: userWhere }),
+                Purchase.count({ where: purchaseWhere }),
+                Purchase.sum('planValue', { where: baseWhere }),
+                Purchase.sum('planValue', { where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } }),
+                Purchase.findAll({
+                    where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
+                    attributes: ['pixGeneratedAt', 'purchasedAt']
+                })
+            ]);
+
+            totalUsers = userCount;
+            totalPurchases = purchaseCount;
+            sumGerado = sumG || 0;
+            sumConvertido = sumC || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            let sumDiffMs = 0, countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+
+        } else {
+            // Para originCondition 'not_purchased' ou 'purchased'
+            const totalLeads = await Purchase.count({
+                where: { ...baseWhere, originCondition },
+                distinct: true,
+                col: 'userId'
+            });
+            const totalConfirmed = await Purchase.count({
+                where: { ...baseWhere, originCondition, status: 'paid' },
+                distinct: true,
+                col: 'userId'
+            });
+            sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, originCondition, status: 'paid' },
+                attributes: ['pixGeneratedAt', 'purchasedAt']
+            });
+            let sumDiffMs = 0, countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+
+            totalUsers = totalLeads;
+            totalPurchases = totalConfirmed;
+        }
+
+    } catch (err) {
+        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
+    }
+
+    return {
+        totalUsers,
+        totalPurchases,
+        conversionRate,
+        totalVendasGeradas: sumGerado,
+        totalVendasConvertidas: sumConvertido,
+        averagePaymentDelayMs
+    };
+}
+
+//------------------------------------------------------
+// /api/bots-stats => utiliza makeDayBrasilia(...)
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
@@ -273,6 +411,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 }
             }
         }
+
         if (!startDate || !endDate) {
             let dateArray;
             if (date && date.includes(',')) {
@@ -285,6 +424,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 endDate = new Date(brToday);
                 endDate.setHours(23, 59, 59, 999);
             }
+
             if (!startDate || !endDate) {
                 if (dateArray && dateArray.length === 1) {
                     startDate = makeDayBrasilia(new Date(dateArray[0]));
@@ -300,6 +440,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 }
             }
         }
+
         if (!startDate || !endDate) {
             const brToday = makeDayBrasilia(new Date());
             startDate = brToday;
@@ -307,21 +448,19 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             endDate.setHours(23, 59, 59, 999);
         }
 
-        // Carrega estatísticas (as funções getDetailedStats permanecem inalteradas no seu código)
-        const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
-        const statsMain = await getDetailedStats(startDate, endDate, 'main', botFilters);
-        const statsNotPurchased = await getDetailedStats(startDate, endDate, 'not_purchased', botFilters);
-        const statsPurchased = await getDetailedStats(startDate, endDate, 'purchased', botFilters);
+        const [statsAll, statsMain, statsNotPurchased, statsPurchased, statsYesterday] = await Promise.all([
+            getDetailedStats(startDate, endDate, null, botFilters),
+            getDetailedStats(startDate, endDate, 'main', botFilters),
+            getDetailedStats(startDate, endDate, 'not_purchased', botFilters),
+            getDetailedStats(startDate, endDate, 'purchased', botFilters),
+            (async () => {
+                const startYesterday = makeDayBrasilia(new Date(new Date(startDate).setDate(startDate.getDate() - 1)));
+                const endYesterday = new Date(startYesterday);
+                endYesterday.setHours(23, 59, 59, 999);
+                return await getDetailedStats(startYesterday, endYesterday, null, botFilters);
+            })()
+        ]);
 
-        const startDateCopy = new Date(startDate);
-        const yesterdayDate = new Date(startDateCopy);
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-        const startYesterday = makeDayBrasilia(yesterdayDate);
-        const endYesterday = new Date(startYesterday);
-        endYesterday.setHours(23, 59, 59, 999);
-        const statsYesterday = await getDetailedStats(startYesterday, endYesterday, null, botFilters);
-
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -338,7 +477,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado e estatísticas adicionais (conforme seu código atual)
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -351,6 +489,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             },
             group: ['botName'],
         });
+
         const generatedByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -366,6 +505,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         generatedByBot.forEach(item => {
             generatedMap[item.botName] = parseFloat(item.getDataValue('generatedValue')) || 0;
         });
+
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -383,6 +523,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const uCount = parseInt(item.getDataValue('totalUsers'), 10) || 0;
             botUsersMap[bName] = uCount;
         });
+
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -398,6 +539,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
+
         const botPlansMap = {};
         planSalesByBot.forEach(row => {
             const bName = row.botName;
@@ -407,6 +549,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             if (!botPlansMap[bName]) botPlansMap[bName] = {};
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
+
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
@@ -430,6 +573,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
@@ -440,6 +584,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     conversionRate: planConvRate,
                 });
             }
+
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -452,24 +597,23 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
 
-        const stats7Days = [];
-        for (let i = 6; i >= 0; i--) {
-            const tempDate = new Date(startDate);
-            tempDate.setDate(tempDate.getDate() - i);
-            const dayStart = makeDayBrasilia(tempDate);
-            const dayEnd = new Date(dayStart);
-            dayEnd.setHours(23, 59, 59, 999);
-            const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters) || {};
-            stats7Days.push({
-                date: dayStart.toISOString().split('T')[0],
-                totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
-                totalVendasGeradas: dayStat.totalVendasGeradas || 0
-            });
-        }
+        const stats7Days = await Promise.all(
+            Array.from({ length: 7 }, async (_, i) => {
+                const tempDate = new Date(startDate);
+                tempDate.setDate(tempDate.getDate() - (6 - i));
+                const dayStart = makeDayBrasilia(tempDate);
+                const dayEnd = new Date(dayStart);
+                dayEnd.setHours(23, 59, 59, 999);
+                const dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters) || {};
+                return {
+                    date: dayStart.toISOString().split('T')[0],
+                    totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
+                    totalVendasGeradas: dayStat.totalVendasGeradas || 0
+                };
+            })
+        );
 
-        const lastMovementsWhere = {
-            pixGeneratedAt: { [Op.between]: [startDate, endDate] }
-        };
+        const lastMovementsWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
         if (movStatus === 'pending') {
             lastMovementsWhere.status = 'pending';
         } else if (movStatus === 'paid') {
@@ -478,6 +622,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes('All')) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
+
         const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
             attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
@@ -508,7 +653,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     }
 });
 
-// Inicializa o bot (arquivo bot.service.js já cuida da inicialização)
+// Inicializa o bot (com as alterações do gerenciador de bots)
 require('./services/bot.service.js');
 
 // Sobe servidor
