@@ -1,5 +1,7 @@
+// services/index.js
+
 const { Sequelize } = require('sequelize');
-const logger = require('./logger'); // Se necessário
+const logger = require('./logger'); // se necessário
 
 // Cria a conexão com o banco de dados
 const sequelize = new Sequelize(

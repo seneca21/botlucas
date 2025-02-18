@@ -289,7 +289,7 @@ function booleanParaTexto(value, verdadeiro, falso) {
 }
 
 // =====================================
-// Função para carregar bots do BD e iniciar cada um
+// Carregar bots do BD e iniciar cada um
 // =====================================
 async function reloadBotsFromDB() {
   try {
@@ -407,7 +407,8 @@ function initializeBot(botConfig) {
         return;
       }
 
-      const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
+      // Atualizado: busca o vídeo em public/videos (não mais em src/videos)
+      const videoPath = path.resolve(__dirname, `../public/videos/${messageConfig.video}`);
       if (!fs.existsSync(videoPath)) {
         logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
         return;
@@ -453,25 +454,28 @@ function initializeBot(botConfig) {
       return;
     }
 
-    const user = await User.findOne({ where: { telegramId: chatId.toString() } });
+    const user = await User.findOne({ where: { telegramId: ctx.chat.id.toString() } });
     if (user) {
       user.lastInteraction = new Date();
       user.botName = botConfig.name;
       await user.save();
     }
 
-    const telegramId = chatId.toString();
-    const rateLimitResult = canAttemptVerification(telegramId);
-    if (!rateLimitResult.allowed) {
+    const telegramId = ctx.chat.id.toString();
+    const planId = buttonConfig.name; // although "buttonConfig" não foi definido aqui; usamos plan.name abaixo
+    const canSelect = canAttemptSelectPlan(telegramId, plan.name);
+    if (!canSelect) {
       await ctx.answerCbQuery();
       handleUserBlock(telegramId);
       return;
     }
 
-    const session = userSessions[chatId] || {};
-    const remarketingCond = session.remarketingCondition || 'not_purchased';
+    if (!userSessions[ctx.chat.id]) userSessions[ctx.chat.id] = {};
+    userSessions[ctx.chat.id].originCondition = 'main';
+    userSessions[ctx.chat.id].selectedPlan = plan;
+    userSessions[ctx.chat.id].paymentCheckCount = 0;
 
-    logger.info(`✅ Plano remarketing ${plan.name} R$${plan.value} selecionado. Condition = ${remarketingCond}`);
+    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
 
     try {
       const chargeData = {
@@ -487,150 +491,14 @@ function initializeBot(botConfig) {
         planName: plan.name,
         planValue: plan.value,
         botName: botConfig.name,
-        purchasedAt: null,
-        status: 'pending',
-        originCondition: remarketingCond,
-        pixGeneratedAt: new Date()
-      });
-
-      session.chargeId = chargeId;
-      session.selectedPlan = plan;
-      session.originCondition = remarketingCond;
-      session.paymentCheckCount = 0;
-      session.purchaseId = newPurchase.id;
-
-      userSessions[chatId] = session;
-
-      await ctx.reply(
-        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
-        { parse_mode: 'Markdown' }
-      );
-      await ctx.reply(
-        '⚠️ Após pagamento, clique em "Verificar Pagamento".',
-        Markup.inlineKeyboard([
-          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
-        ])
-      );
-    } catch (error) {
-      logger.error('❌ Erro cobrança (remarketing):', error);
-      if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
-        delete userSessions[chatId];
-      } else {
-        await ctx.reply('⚠️ Erro ao criar cobrança. Tente mais tarde.');
-      }
-    }
-
-    await ctx.answerCbQuery();
-  });
-
-  bot.start(async (ctx) => {
-    try {
-      const telegramId = ctx.from.id.toString();
-      const botName = botConfig.name;
-      const isBotPaused = checkStartFlood(botName);
-      if (isBotPaused) return;
-
-      const blockData = userBlockStatus.get(telegramId);
-      if (blockData && (blockData.isBlocked || blockData.isBanned)) {
-        return;
-      }
-
-      const canStartNow = canAttemptStart(telegramId);
-      if (!canStartNow) {
-        handleUserBlock(telegramId);
-        return;
-      }
-
-      logger.info('📩 /start recebido');
-      await registerUser(ctx);
-
-      const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
-      if (!fs.existsSync(videoPath)) {
-        logger.error(`❌ Vídeo não achado: ${videoPath}`);
-        await ctx.reply('⚠️ Erro ao carregar vídeo.');
-        return;
-      }
-
-      const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
-        Markup.button.callback(btn.name, `select_plan_${idx}`)
-      );
-
-      await ctx.replyWithVideo(
-        { source: videoPath },
-        {
-          caption: botConfig.description || 'Sem descrição',
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
-        }
-      );
-      logger.info(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
-    } catch (error) {
-      logger.error('❌ Erro /start:', error);
-      if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
-      } else {
-        await ctx.reply('⚠️ Erro ao processar /start.');
-      }
-    }
-  });
-
-  bot.action(/^select_plan_(\d+)$/, async (ctx) => {
-    const chatId = ctx.chat.id;
-    const buttonIndex = parseInt(ctx.match[1], 10);
-    const buttonConfig = (botConfig.buttons || [])[buttonIndex];
-
-    if (!buttonConfig) {
-      logger.error(`❌ Plano index ${buttonIndex} não encontrado no bot ${botConfig.name}.`);
-      await ctx.answerCbQuery();
-      return;
-    }
-
-    const user = await User.findOne({ where: { telegramId: chatId.toString() } });
-    if (user) {
-      user.lastInteraction = new Date();
-      user.botName = botConfig.name;
-      await user.save();
-    }
-
-    const telegramId = chatId.toString();
-    const planId = buttonConfig.name;
-    const canSelect = canAttemptSelectPlan(telegramId, planId);
-    if (!canSelect) {
-      await ctx.answerCbQuery();
-      handleUserBlock(telegramId);
-      return;
-    }
-
-    if (!userSessions[chatId]) userSessions[chatId] = {};
-    userSessions[chatId].originCondition = 'main';
-    userSessions[chatId].selectedPlan = buttonConfig;
-    userSessions[chatId].paymentCheckCount = 0;
-
-    logger.info(`✅ Plano ${buttonConfig.name} (R$${buttonConfig.value}) (main) enviado.`);
-
-    try {
-      const chargeData = {
-        value: buttonConfig.value * 100,
-        webhook_url: null,
-      };
-      const chargeResult = await createCharge(chargeData);
-      const chargeId = chargeResult.id;
-      const emv = chargeResult.qr_code;
-
-      const newPurchase = await Purchase.create({
-        userId: user ? user.id : null,
-        planName: buttonConfig.name,
-        planValue: buttonConfig.value,
-        botName: botConfig.name,
         originCondition: 'main',
         pixGeneratedAt: new Date(),
         status: 'pending',
         purchasedAt: null
       });
 
-      userSessions[chatId].chargeId = chargeId;
-      userSessions[chatId].purchaseId = newPurchase.id;
+      userSessions[ctx.chat.id].chargeId = chargeId;
+      userSessions[ctx.chat.id].purchaseId = newPurchase.id;
 
       await ctx.reply(
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
@@ -646,7 +514,7 @@ function initializeBot(botConfig) {
       logger.error('❌ Erro ao criar cobrança:', error);
       if (error.response && error.response.error_code === 403) {
         logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
-        delete userSessions[chatId];
+        delete userSessions[ctx.chat.id];
       } else {
         await ctx.reply('⚠️ Erro ao criar cobrança.');
       }
