@@ -394,7 +394,7 @@ function initializeBot(botConfig) {
         return;
       }
       // O vídeo agora está armazenado no bucket S3 (Bucketeer)
-      const videoUrl = `https://${process.env.BUCKETEER_BUCKET}.s3.amazonaws.com/${botConfig.video}`;
+      const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${botConfig.video}`;
       if (!botConfig.video) {
         logger.error(`❌ Nenhum vídeo configurado para o bot ${botConfig.name}`);
         return;
