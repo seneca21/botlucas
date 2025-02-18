@@ -69,6 +69,7 @@ function canAttemptVerification(telegramId) {
   } else {
     userData.violations += 1;
     userData.attempts = 0;
+
     if (userData.violations === 1) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       verificationLimits.set(telegramId, userData);
@@ -85,6 +86,7 @@ function canAttemptVerification(telegramId) {
       logger.info(`Verificação: ${telegramId} - Bloqueado por 24 horas.`);
       return { allowed: false, message: `🚫 Bloqueado por 24 horas.` };
     }
+
     verificationLimits.set(telegramId, userData);
     logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
     return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.` };
@@ -102,6 +104,7 @@ const START_WAIT_SECOND_MS = 24 * 60 * 60 * 1000;
 function canAttemptStart(telegramId) {
   const now = Date.now();
   let userData = startLimits.get(telegramId);
+
   if (!userData) {
     startLimits.set(telegramId, {
       startCount: 1,
@@ -110,10 +113,12 @@ function canAttemptStart(telegramId) {
     logger.info(`/start: ${telegramId} - Primeiro start permitido.`);
     return true;
   }
+
   if (now < userData.nextAllowedStartTime) {
     logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
     return false;
   }
+
   if (userData.startCount < MAX_STARTS) {
     userData.startCount++;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS;
@@ -139,6 +144,7 @@ const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
 function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
   let userData = selectPlanLimits.get(telegramId);
+
   if (!userData) {
     selectPlanLimits.set(telegramId, {
       selectedPlans: new Set([planId]),
@@ -148,16 +154,19 @@ function canAttemptSelectPlan(telegramId, planId) {
     logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) sel.`);
     return true;
   }
+
   if (now < userData.blockUntil) {
     logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
     return false;
   }
+
   if (userData.selectedPlans.has(planId)) {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
     logger.info(`Seleção de Plano: ${telegramId} - Repetida do plano (${planId}). Bloqueado 24h.`);
     return false;
   }
+
   if (userData.selectedPlans.size < MAX_SELECT_PLAN_ATTEMPTS) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
@@ -183,6 +192,7 @@ const START_FLOOD_PAUSE_MS = 8 * 60 * 1000;
 function checkStartFlood(botName) {
   const now = Date.now();
   let floodData = startFloodProtection.get(botName);
+
   if (!floodData) {
     startFloodProtection.set(botName, {
       startTimestamps: [now],
@@ -191,6 +201,7 @@ function checkStartFlood(botName) {
     });
     return false;
   }
+
   if (floodData.isPaused) {
     if (now >= floodData.pauseUntil) {
       floodData.isPaused = false;
@@ -201,8 +212,10 @@ function checkStartFlood(botName) {
       return true;
     }
   }
+
   floodData.startTimestamps = floodData.startTimestamps.filter(ts => now - ts <= START_FLOOD_WINDOW_MS);
   floodData.startTimestamps.push(now);
+
   if (floodData.startTimestamps.length >= START_FLOOD_LIMIT) {
     floodData.isPaused = true;
     floodData.pauseUntil = now + START_FLOOD_PAUSE_MS;
@@ -210,6 +223,7 @@ function checkStartFlood(botName) {
     logger.warn(`Proteção Flood: ${botName} - Pausando /start por 8min, ${floodData.startTimestamps.length} starts em 3min.`);
     return true;
   }
+
   startFloodProtection.set(botName, floodData);
   return false;
 }
@@ -233,7 +247,9 @@ function handleUserBlock(telegramId) {
     isBanned: false,
     banExpiresAt: 0
   };
+
   if (blockData.isBanned) return;
+
   blockData.blockCount += 1;
   if (blockData.blockCount === BLOCK_COUNT_THRESHOLD) {
     setTimeout(() => {
@@ -384,8 +400,9 @@ function initializeBot(botConfig) {
         logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
-      // Monta a URL pública do vídeo armazenado no Bucketeer (S3)
+      // Agora buscamos o vídeo no S3 – monta a URL pública
       const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${messageConfig.video}`;
+      // Não verificamos localmente com fs.existsSync; assumimos que o arquivo está no S3
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
@@ -408,6 +425,302 @@ function initializeBot(botConfig) {
     }
   });
 
+  bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
+    const chatId = ctx.chat.id;
+    const planValue = parseFloat(ctx.match[1]);
+    const mainPlan = (botConfig.buttons || []).find(btn => btn.value === planValue);
+    let remarketingPlan = null;
+    if (botConfig.remarketing && botConfig.remarketing.messages) {
+      remarketingPlan = botConfig.remarketing.messages
+        .flatMap(msg => msg.buttons || [])
+        .find(btn => btn.value === planValue);
+    }
+    const plan = mainPlan || remarketingPlan;
+    if (!plan) {
+      logger.error(`❌ Plano valor ${planValue} não encontrado no bot ${botConfig.name}.`);
+      await ctx.answerCbQuery();
+      return;
+    }
+    const user = await User.findOne({ where: { telegramId: ctx.chat.id.toString() } });
+    if (user) {
+      user.lastInteraction = new Date();
+      user.botName = botConfig.name;
+      await user.save();
+    }
+    const telegramId = ctx.chat.id.toString();
+    const canSelect = canAttemptSelectPlan(telegramId, plan.name);
+    if (!canSelect) {
+      await ctx.answerCbQuery();
+      handleUserBlock(telegramId);
+      return;
+    }
+    if (!userSessions[ctx.chat.id]) userSessions[ctx.chat.id] = {};
+    userSessions[ctx.chat.id].originCondition = 'main';
+    userSessions[ctx.chat.id].selectedPlan = plan;
+    userSessions[ctx.chat.id].paymentCheckCount = 0;
+    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+    try {
+      const chargeData = {
+        value: plan.value * 100,
+        webhook_url: null,
+      };
+      const chargeResult = await createCharge(chargeData);
+      const chargeId = chargeResult.id;
+      const emv = chargeResult.qr_code;
+      const newPurchase = await Purchase.create({
+        userId: user ? user.id : null,
+        planName: plan.name,
+        planValue: plan.value,
+        botName: botConfig.name,
+        originCondition: 'main',
+        pixGeneratedAt: new Date(),
+        status: 'pending',
+        purchasedAt: null
+      });
+      userSessions[ctx.chat.id].chargeId = chargeId;
+      userSessions[ctx.chat.id].purchaseId = newPurchase.id;
+      await ctx.reply(
+        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
+        { parse_mode: 'Markdown' }
+      );
+      await ctx.reply(
+        '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
+        Markup.inlineKeyboard([
+          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
+        ])
+      );
+    } catch (error) {
+      logger.error('❌ Erro ao criar cobrança:', error);
+      if (error.response && error.response.error_code === 403) {
+        logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
+        delete userSessions[ctx.chat.id];
+      } else {
+        await ctx.reply('⚠️ Erro ao criar cobrança.');
+      }
+    }
+    await ctx.answerCbQuery();
+  });
+
+  bot.command('status_pagamento', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const telegramId = chatId.toString();
+    const session = userSessions[chatId];
+    if (!session || !session.chargeId) {
+      await ctx.reply('⚠️ Não há cobrança em andamento.');
+      return;
+    }
+    const blockData = userBlockStatus.get(telegramId);
+    if (blockData && (blockData.isBlocked || blockData.isBanned)) return;
+    const rateLimitResult = canAttemptVerification(telegramId);
+    if (!rateLimitResult.allowed) {
+      handleUserBlock(telegramId);
+      return;
+    }
+    try {
+      logger.info('🔍 Verificando pagamento...');
+      const paymentStatus = await checkPaymentStatus(session.chargeId);
+      if (paymentStatus.status === 'paid') {
+        await ctx.reply('🎉 Pagamento confirmado!');
+        const user = await User.findOne({ where: { telegramId: chatId.toString() } });
+        if (user) {
+          user.hasPurchased = true;
+          await user.save();
+          if (session.purchaseId) {
+            await Purchase.update(
+              { status: 'paid', purchasedAt: new Date() },
+              { where: { id: session.purchaseId } }
+            );
+            logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
+          }
+          if (botConfig.remarketing && botConfig.remarketing.intervals) {
+            const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
+            setTimeout(async () => {
+              try {
+                const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
+                if (currentUser && currentUser.hasPurchased) {
+                  await sendRemarketingMessage(currentUser, 'purchased');
+                  logger.info(`✅ Upsell enviado -> ${chatId}`);
+                }
+              } catch (err) {
+                logger.error(`❌ Erro upsell -> ${chatId}:`, err);
+              }
+            }, purchasedInterval * 1000);
+          }
+          if (session.selectedPlan && session.selectedPlan.link) {
+            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply('⚠️ Link do produto não encontrado.');
+          }
+        }
+        delete userSessions[chatId];
+      } else if (paymentStatus.status === 'expired') {
+        await ctx.reply('❌ Cobrança expirou.');
+        delete userSessions[chatId];
+      } else {
+        session.paymentCheckCount = (session.paymentCheckCount || 0) + 1;
+        const count = session.paymentCheckCount;
+        if (count === 1) {
+          await ctx.reply('⏳ Pagamento pendente');
+        } else if (count === 2) {
+          await ctx.reply('⏳ Pagamento pendente, conclua o pagamento.');
+        }
+      }
+    } catch (error) {
+      logger.error('❌ Erro ao verificar pagamento:', error);
+      if (error.response && error.response.error_code === 403) {
+        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
+        delete userSessions[chatId];
+      } else {
+        await ctx.reply('⚠️ Erro ao verificar pagamento.');
+      }
+    }
+  });
+
+  bot.action(/check_payment_(.+)/, async (ctx) => {
+    const chatId = ctx.chat.id;
+    const telegramId = chatId.toString();
+    const chargeId = ctx.match[1];
+    const session = userSessions[chatId];
+    if (!session || session.chargeId !== chargeId) {
+      await ctx.reply('⚠️ Cobrança não corresponde.');
+      await ctx.answerCbQuery();
+      return;
+    }
+    const blockData = userBlockStatus.get(telegramId);
+    if (blockData && (blockData.isBlocked || blockData.isBanned)) {
+      await ctx.answerCbQuery();
+      return;
+    }
+    const rateLimitResult = canAttemptVerification(telegramId);
+    if (!rateLimitResult.allowed) {
+      await ctx.answerCbQuery();
+      handleUserBlock(telegramId);
+      return;
+    }
+    try {
+      logger.info('🔍 Verificando pagamento...');
+      const paymentStatus = await checkPaymentStatus(chargeId);
+      if (paymentStatus.status === 'paid') {
+        await ctx.reply('🎉 Pagamento confirmado!');
+        const user = await User.findOne({ where: { telegramId: chatId.toString() } });
+        if (user) {
+          user.hasPurchased = true;
+          await user.save();
+          if (session.purchaseId) {
+            await Purchase.update(
+              { status: 'paid', purchasedAt: new Date() },
+              { where: { id: session.purchaseId } }
+            );
+            logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
+          }
+          if (botConfig.remarketing && botConfig.remarketing.intervals) {
+            const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
+            setTimeout(async () => {
+              try {
+                const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
+                if (currentUser && currentUser.hasPurchased) {
+                  await sendRemarketingMessage(currentUser, 'purchased');
+                  logger.info(`✅ Upsell enviado -> ${chatId}`);
+                }
+              } catch (err) {
+                logger.error(`❌ Erro upsell -> ${chatId}:`, err);
+              }
+            }, purchasedInterval * 1000);
+          }
+          if (session.selectedPlan && session.selectedPlan.link) {
+            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply('⚠️ Link do produto não encontrado.');
+          }
+        }
+        delete userSessions[chatId];
+      } else if (paymentStatus.status === 'expired') {
+        await ctx.reply('❌ Cobrança expirou.');
+        delete userSessions[chatId];
+      } else {
+        session.paymentCheckCount = (session.paymentCheckCount || 0) + 1;
+        const count = session.paymentCheckCount;
+        if (count === 1) {
+          await ctx.reply('⏳ Pagamento pendente');
+        } else if (count === 2) {
+          await ctx.reply('⏳ Pagamento pendente, conclua o pagamento.');
+        }
+      }
+    } catch (error) {
+      logger.error('❌ Erro ao verificar pagamento:', error);
+      if (error.response && error.response.error_code === 403) {
+        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
+        delete userSessions[chatId];
+      } else {
+        await ctx.reply('⚠️ Erro ao verificar pagamento.');
+      }
+    }
+    await ctx.answerCbQuery();
+  });
+
+  // Rotinas de limpeza
+  function cleanRateLimitMap(rateLimitMap, expirationFunction, mapName) {
+    const now = Date.now();
+    for (const [telegramId, userData] of rateLimitMap) {
+      if (expirationFunction(userData, now)) {
+        rateLimitMap.delete(telegramId);
+        logger.info(`Limpeza: Removido ${telegramId} de ${mapName}.`);
+      }
+    }
+  }
+
+  setInterval(() => {
+    cleanRateLimitMap(startLimits, (ud, now) => now > ud.nextAllowedStartTime + START_WAIT_SECOND_MS, 'startLimits');
+  }, 60 * 60 * 1000);
+
+  setInterval(() => {
+    cleanRateLimitMap(selectPlanLimits, (ud, now) => now > ud.blockUntil, 'selectPlanLimits');
+  }, 60 * 60 * 1000);
+
+  setInterval(() => {
+    cleanRateLimitMap(verificationLimits, (ud, now) => now > ud.blockUntil + VERIFICATION_CYCLE_RESET_MS, 'verificationLimits');
+  }, 60 * 60 * 1000);
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [botName, floodData] of startFloodProtection) {
+      if (floodData.isPaused && now >= floodData.pauseUntil) {
+        floodData.isPaused = false;
+        floodData.startTimestamps = [];
+        startFloodProtection.set(botName, floodData);
+        logger.info(`Proteção Flood: ${botName} - pausa encerrada.`);
+      }
+      floodData.startTimestamps = floodData.startTimestamps.filter(ts => now - ts <= START_FLOOD_WINDOW_MS);
+      startFloodProtection.set(botName, floodData);
+    }
+  }, 60 * 1000);
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [telegramId, blockData] of userBlockStatus) {
+      if (blockData.isBlocked && now >= blockData.blockExpiresAt) {
+        blockData.isBlocked = false;
+        blockData.blockExpiresAt = 0;
+        blockData.blockCount = 0;
+        userBlockStatus.set(telegramId, blockData);
+        logger.info(`Lead ${telegramId} desbloqueado após 72h.`);
+      }
+      if (blockData.isBanned && now >= blockData.banExpiresAt) {
+        blockData.isBanned = false;
+        blockData.banExpiresAt = 0;
+        blockData.blockCount = 0;
+        userBlockStatus.set(telegramId, blockData);
+        logger.info(`Lead ${telegramId} desbanido após 1 semana.`);
+      }
+      if (!blockData.isBlocked && !blockData.isBanned && blockData.blockCount === 0) {
+        userBlockStatus.delete(telegramId);
+        logger.info(`Removido ${telegramId} de userBlockStatus.`);
+      }
+    }
+  }, 60 * 60 * 1000);
+
+  // Modificação importante: no comando /start, em vez de buscar o vídeo local,
+  // monta a URL pública a partir do bucket Bucketeer.
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -428,7 +741,7 @@ function initializeBot(botConfig) {
         await ctx.reply('⚠️ Vídeo não definido.');
         return;
       }
-      // Monta a URL pública do vídeo no S3
+      // Monta a URL pública do vídeo no S3 (Bucketeer)
       const videoUrl = `https://${process.env.BUCKETEER_BUCKET_NAME}.s3.amazonaws.com/${botConfig.video}`;
       await ctx.replyWithVideo(
         videoUrl,
@@ -454,8 +767,8 @@ function initializeBot(botConfig) {
     }
   });
 
-  // (Outros comandos, ações e verificações de pagamento permanecem iguais...)
-  // Para fins de brevidade, os demais comandos foram omitidos mas devem permanecer inalterados.
+  // Resto das ações e comandos (select_plan, status_pagamento, check_payment) permanecem inalterados
+  // [O restante do código segue igual ao que você já tem, sem alterações relevantes para os vídeos]
 
   bot.launch()
     .then(() => {
