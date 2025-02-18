@@ -14,8 +14,8 @@ const fs = require('fs');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-// ATENÇÃO: utilize "db.Bot" conforme definido no index (em models/Bot.js)
-const BotModel = db.Bot;
+// IMPORTANTE: Utilize a propriedade exportada "BotModel" (conforme seu index.js)
+const BotModel = db.BotModel;
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -35,13 +35,14 @@ app.use(session({
     saveUninitialized: false
 }));
 
+// Middleware de autenticação
 function checkAuth(req, res, next) {
     if (req.session.loggedIn) next();
     else res.redirect('/login');
 }
 
 //------------------------------------------------------
-// Conexão DB
+// Conexão com o Banco de Dados
 //------------------------------------------------------
 db.sequelize
     .authenticate()
@@ -58,7 +59,7 @@ db.sequelize
     .catch((err) => logger.error('❌ Erro ao sincronizar modelos:', err));
 
 //------------------------------------------------------
-// Configura o Multer para uploads de vídeo
+// Configuração do Multer para Upload de Vídeo
 //------------------------------------------------------
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -78,7 +79,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 //------------------------------------------------------
-// LOGIN/LOGOUT
+// Rotas de LOGIN / LOGOUT
 //------------------------------------------------------
 app.get('/login', (req, res) => {
     const html = `
@@ -633,7 +634,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 // [POST] Criar Novo Bot (com upload de vídeo opcional)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
-        const payload = req.body; // para multipart, os campos vêm via multer
+        const payload = req.body;
         const {
             name,
             token,
@@ -659,13 +660,13 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
-        // Para remarketing, se não estiver preenchido, define como string vazia
+        // Para remarketing, se não preenchido, define como string vazia
         const safeRemarketingJson = remarketingJson || '';
 
-        // Se o multer pegou um arquivo de vídeo
+        // Se o multer capturou um arquivo de vídeo
         let videoFilename = '';
         if (req.file) {
-            videoFilename = req.file.filename; // o nome do arquivo salvo em public/videos
+            videoFilename = req.file.filename;
         }
 
         const newBot = await BotModel.create({
@@ -689,9 +690,17 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         };
         if (safeRemarketingJson) {
             try {
-                bc.remarketing = JSON.parse(safeRemarketingJson.trim());
+                // Apenas tenta fazer o parse se o conteúdo começar com "{" ou "["
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    bc.remarketing = JSON.parse(trimmed);
+                } else {
+                    bc.remarketing = {};
+                    logger.warn(`Remarketing JSON para o bot ${newBot.name} não é válido. Usando objeto vazio.`);
+                }
             } catch (e) {
-                logger.warn(`Remarketing JSON inválido p/ bot ${newBot.name}.`, e);
+                logger.warn(`Remarketing JSON inválido para o bot ${newBot.name}.`, e);
+                bc.remarketing = {};
             }
         }
 
@@ -768,10 +777,10 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         const buttonsJson = JSON.stringify(buttons);
 
         // Se veio novo arquivo de vídeo
-        let videoFilename = bot.video; // mantém o atual se não houver novo upload
+        let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.filename;
-            // Se desejar, pode remover o vídeo antigo (usando fs.unlinkSync)
+            // Se desejar, remova o vídeo antigo com fs.unlinkSync(...)
         }
 
         const safeRemarketingJson = remarketingJson || '';
@@ -796,9 +805,16 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         };
         if (safeRemarketingJson) {
             try {
-                bc.remarketing = JSON.parse(safeRemarketingJson.trim());
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    bc.remarketing = JSON.parse(trimmed);
+                } else {
+                    bc.remarketing = {};
+                    logger.warn(`Remarketing JSON para o bot ${bot.name} não é válido. Usando objeto vazio.`);
+                }
             } catch (e) {
-                logger.warn(`Remarketing JSON inválido p/ bot ${bot.name}.`, e);
+                logger.warn(`Remarketing JSON inválido para o bot ${bot.name}.`, e);
+                bc.remarketing = {};
             }
         }
 
