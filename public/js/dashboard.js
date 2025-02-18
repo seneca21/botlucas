@@ -1,5 +1,4 @@
 // public/js/dashboard.js
-
 $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
@@ -9,9 +8,12 @@ $(document).ready(function () {
     let totalMovementsCount = 0;
     let totalPages = 1;
 
+    // Armazenamos os bots selecionados
     let selectedBots = [];
 
-    // chart background plugin
+    //------------------------------------------------------------
+    // 1) PLUGIN: Background
+    //------------------------------------------------------------
     const chartBackgroundPlugin = {
         id: 'chartBackground',
         beforeDraw(chart, args, options) {
@@ -24,7 +26,9 @@ $(document).ready(function () {
     };
     Chart.register(chartBackgroundPlugin);
 
-    // Dark mode
+    //------------------------------------------------------------
+    // 2) DARK MODE
+    //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
 
@@ -78,6 +82,9 @@ $(document).ready(function () {
         }
     }
 
+    //------------------------------------------------------------
+    // formatDuration
+    //------------------------------------------------------------
     function formatDuration(ms) {
         if (ms <= 0) return '0s';
         const totalSec = Math.floor(ms / 1000);
@@ -86,6 +93,9 @@ $(document).ready(function () {
         return `${minutes}m ${seconds}s`;
     }
 
+    //------------------------------------------------------------
+    // RENDER PAGINATION
+    //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
@@ -119,7 +129,7 @@ $(document).ready(function () {
         }
         group.append(singleLeft);
 
-        // 3-window
+        // 3 pages window
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -144,7 +154,7 @@ $(document).ready(function () {
             group.append(btn);
         }
 
-        // > (fwd 1)
+        // > (forward 1)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -156,7 +166,7 @@ $(document).ready(function () {
         }
         group.append(singleRight);
 
-        // >> (fwd 10)
+        // >> (forward 10)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -171,6 +181,9 @@ $(document).ready(function () {
         paginationContainer.append(group);
     }
 
+    //------------------------------------------------------------
+    // LOAD BOTS
+    //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
             .then(res => res.json())
@@ -192,7 +205,7 @@ $(document).ready(function () {
 
         const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
 
-        // ALL
+        // All
         const allId = 'bot_all';
         const allItem = $(`
             <div class="form-check pl-2">
@@ -250,16 +263,26 @@ $(document).ready(function () {
         container.append(dropDiv);
     }
 
+    //------------------------------------------------------------
+    // GET DATE RANGE
+    //------------------------------------------------------------
     function getDateRangeParams() {
         const rangeValue = $('#dateRangeSelector').val();
         if (rangeValue === 'custom') {
             const sDate = $('#startDateInput').val();
             const eDate = $('#endDateInput').val();
-            return { dateRange: 'custom', startDate: sDate, endDate: eDate };
+            return {
+                dateRange: 'custom',
+                startDate: sDate,
+                endDate: eDate
+            };
         }
         return { dateRange: rangeValue };
     }
 
+    //------------------------------------------------------------
+    // UPDATE DASHBOARD
+    //------------------------------------------------------------
     async function updateDashboard(movStatus, page, perPage) {
         try {
             const dr = getDateRangeParams();
@@ -279,7 +302,9 @@ $(document).ready(function () {
             }
 
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Erro ao obter dados da API');
+            if (!response.ok) {
+                throw new Error('Erro ao obter dados da API');
+            }
             const data = await response.json();
 
             // Estatísticas
@@ -289,7 +314,9 @@ $(document).ready(function () {
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // Gráfico de Barras
+            //--------------------------------------------------
+            // GRÁFICO DE BARRAS
+            //--------------------------------------------------
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -307,8 +334,12 @@ $(document).ready(function () {
                     data: barData,
                     options: {
                         responsive: true,
-                        scales: { y: { beginAtZero: true } },
-                        plugins: { chartBackground: {} }
+                        scales: {
+                            y: { beginAtZero: true }
+                        },
+                        plugins: {
+                            chartBackground: {}
+                        }
                     }
                 });
             } else {
@@ -317,7 +348,9 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
-            // Gráfico de Linha
+            //--------------------------------------------------
+            // GRÁFICO DE LINHA (7 dias)
+            //--------------------------------------------------
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[0]}`;
@@ -336,38 +369,39 @@ $(document).ready(function () {
                     {
                         label: 'Valor Convertido (R$)',
                         data: convertedValues,
+                        fill: false,
                         borderColor: '#ff5c5c',
                         pointBackgroundColor: '#ff5c5c',
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        fill: false,
                         yAxisID: 'y-axis-convertido'
                     },
                     {
                         label: 'Valor Gerado (R$)',
                         data: generatedValues,
+                        fill: false,
                         borderColor: '#36A2EB',
                         pointBackgroundColor: '#36A2EB',
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        fill: false,
                         yAxisID: 'y-axis-gerado'
                     },
                     {
                         label: 'Taxa de Conversão (%)',
                         data: conversionRates,
+                        fill: false,
                         borderColor: 'green',
                         pointBackgroundColor: 'green',
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        fill: false,
                         yAxisID: 'y-axis-conversion'
                     }
                 ]
             };
+
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -387,7 +421,9 @@ $(document).ready(function () {
                                 position: 'right',
                                 beginAtZero: true,
                                 offset: true,
-                                grid: { drawOnChartArea: false }
+                                grid: {
+                                    drawOnChartArea: false
+                                }
                             },
                             'y-axis-conversion': {
                                 type: 'linear',
@@ -395,7 +431,9 @@ $(document).ready(function () {
                                 beginAtZero: true,
                                 offset: true,
                                 suggestedMax: 100,
-                                grid: { drawOnChartArea: false },
+                                grid: {
+                                    drawOnChartArea: false
+                                },
                                 ticks: {
                                     callback: function (value) {
                                         return value + '%';
@@ -415,10 +453,10 @@ $(document).ready(function () {
                                         } else {
                                             return `R$ ${value.toFixed(2)}`;
                                         }
-                                    }
-                                }
-                            }
-                        }
+                                    },
+                                },
+                            },
+                        },
                     },
                 });
             } else {
@@ -427,7 +465,9 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
-            // Ranking Simples
+            //--------------------------------------------------
+            // RANKING SIMPLES
+            //--------------------------------------------------
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -441,7 +481,9 @@ $(document).ready(function () {
                 });
             }
 
-            // Ranking Detalhado
+            //--------------------------------------------------
+            // RANKING DETALHADO
+            //--------------------------------------------------
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -463,7 +505,9 @@ $(document).ready(function () {
                 });
             }
 
-            // Stats Detalhadas
+            //--------------------------------------------------
+            // ESTATÍSTICAS DETALHADAS
+            //--------------------------------------------------
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
@@ -488,7 +532,9 @@ $(document).ready(function () {
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
-            // Movimentações
+            //--------------------------------------------------
+            // ÚLTIMAS MOVIMENTAÇÕES
+            //--------------------------------------------------
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
@@ -537,22 +583,32 @@ $(document).ready(function () {
         }
     }
 
+    //------------------------------------------------------------
+    // REFRESH
+    //------------------------------------------------------------
     function refreshDashboard() {
         const movStatus = $('#movStatusFilter').val() || '';
         updateDashboard(movStatus, currentPage, currentPerPage);
     }
 
-    // Inicial
+    //------------------------------------------------------------
+    // INICIAL
+    //------------------------------------------------------------
     loadBotList();
     refreshDashboard();
 
-    // Verifica aba default
+    // Por padrão, a primeira aba do sidebar é statsSection => .active
+    // Se for statsSection ou statsDetailedSection => exibimos #botFilterContainer
     const defaultSection = $('#sidebarNav .nav-link.active').data('section');
     if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
         $('#botFilterContainer').show();
+    } else {
+        $('#botFilterContainer').hide();
     }
 
-    // movStatus, perPage
+    //------------------------------------------------------------
+    // EVENTOS
+    //------------------------------------------------------------
     $('#movStatusFilter').on('change', function () {
         currentPage = 1;
         refreshDashboard();
@@ -563,7 +619,6 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // dateRangeSelector
     $('#dateRangeSelector').on('change', function () {
         if ($(this).val() === 'custom') {
             $('#customDateModal').modal('show');
@@ -578,22 +633,25 @@ $(document).ready(function () {
         refreshDashboard();
     });
 
-    // Toggle de abas
+    // Sidebar nav
     $('#sidebarNav .nav-link').on('click', function (e) {
         e.preventDefault();
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
 
+        // Esconde seções
         $('#statsSection').addClass('d-none');
         $('#rankingSimplesSection').addClass('d-none');
         $('#rankingDetalhadoSection').addClass('d-none');
         $('#statsDetailedSection').addClass('d-none');
-        $('#botManagerSection').addClass('d-none');
+        $('#manageBotsSection').addClass('d-none');
 
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
 
-        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
+        // Se for statsSection ou statsDetailedSection => exibe botFilter
+        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
+            targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
             $('#botFilterContainer').show();
         } else {
             $('#botFilterContainer').hide();
@@ -609,25 +667,64 @@ $(document).ready(function () {
         $('main[role="main"]').toggleClass('expanded');
     });
 
-    // Form Gerenciar Bots
-    $('#createBotForm').on('submit', function (e) {
+    //------------------------------------------------------------
+    // FORM: Cadastrar Novo Bot (aba ManageBots)
+    //------------------------------------------------------------
+    $('#addBotForm').on('submit', function (e) {
         e.preventDefault();
-        const formData = $(this).serialize();
+
+        const name = $('#botNameInput').val().trim();
+        const token = $('#botTokenInput').val().trim();
+        const description = $('#botDescriptionInput').val().trim();
+        const video = $('#botVideoInput').val().trim();
+
+        const buttonName1 = $('#buttonName1').val().trim();
+        const buttonValue1 = $('#buttonValue1').val().trim();
+        const buttonName2 = $('#buttonName2').val().trim();
+        const buttonValue2 = $('#buttonValue2').val().trim();
+        const buttonName3 = $('#buttonName3').val().trim();
+        const buttonValue3 = $('#buttonValue3').val().trim();
+
+        const remarketingJson = $('#remarketingInput').val().trim();
+
+        // Monta objeto para POST
+        const payload = {
+            name,
+            token,
+            description,
+            video,
+            buttonName1,
+            buttonValue1,
+            buttonName2,
+            buttonValue2,
+            buttonName3,
+            buttonValue3,
+            remarketingJson
+        };
 
         fetch('/admin/bots', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(payload)
         })
-            .then(res => res.text())
-            .then(txt => {
-                $('#createBotResult').html(`<div class="alert alert-success">${txt}</div>`);
+            .then(async (res) => {
+                if (!res.ok) {
+                    const textErr = await res.text();
+                    throw new Error(textErr || 'Erro ao criar bot');
+                }
+                return res.text();
+            })
+            .then(htmlResponse => {
+                $('#addBotResponse').html(htmlResponse);
+                // Recarrega a lista de bots no dropdown
+                loadBotList();
+                // Limpa formulário
+                $('#addBotForm')[0].reset();
             })
             .catch(err => {
-                console.error('Erro ao criar bot:', err);
-                $('#createBotResult').html(`<div class="alert alert-danger">Erro: ${err}</div>`);
+                $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
             });
     });
 });
