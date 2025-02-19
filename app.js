@@ -681,17 +681,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
 
         console.log("Valor recebido de buttonLinkVip1:", buttonLinkVip1);
 
-        // Validação dos campos obrigatórios de Link VIP
-        if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 1.');
-        }
-        if (!buttonLinkVip2 || buttonLinkVip2.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 2.');
-        }
-        if (!buttonLinkVip3 || buttonLinkVip3.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 3.');
-        }
-
+        // Não há validação separada; o valor será tratado como os demais campos
         const buttons = [];
         function pushButtonIfValid(bName, bValue, bLink) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== '') {
@@ -803,17 +793,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         } = req.body;
 
         console.log("Valor recebido de buttonLinkVip1 (edição):", buttonLinkVip1);
-
-        // Validação dos campos obrigatórios de Link VIP
-        if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 1.');
-        }
-        if (!buttonLinkVip2 || buttonLinkVip2.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 2.');
-        }
-        if (!buttonLinkVip3 || buttonLinkVip3.trim() === '') {
-            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 3.');
-        }
 
         const buttons = [];
         function pushButtonIfValid(bName, bValue, bLink) {
