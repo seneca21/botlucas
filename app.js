@@ -681,13 +681,13 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
 
         console.log("Valor recebido de buttonLinkVip1:", buttonLinkVip1);
 
-        // Não há validação separada; o valor será tratado como os demais campos
-        const buttons = [];
+        // Função para empacotar os botões; o link VIP será salvo mesmo se vazio.
         function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== '') {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink.trim() });
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink ? bLink.trim() : "" });
             }
         }
+        const buttons = [];
         pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
         pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
         pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
@@ -794,12 +794,12 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
 
         console.log("Valor recebido de buttonLinkVip1 (edição):", buttonLinkVip1);
 
-        const buttons = [];
         function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== '') {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink.trim() });
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink ? bLink.trim() : "" });
             }
         }
+        const buttons = [];
         pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
         pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
         pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
