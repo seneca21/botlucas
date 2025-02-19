@@ -16,7 +16,7 @@ const fs = require('fs');
 const db = require('./services/index'); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Use o modelo BotModel
+const BotModel = db.BotModel; // IMPORTANTE: use o modelo BotModel exportado pelo index.js
 
 const logger = require('./services/logger');
 const ConfigService = require('./services/config.service');
@@ -72,6 +72,7 @@ const upload = multer({
     storage: multerS3({
         s3: s3Client,
         bucket: process.env.BUCKETEER_BUCKET_NAME,
+        // Removida a propriedade "acl" pois o bucket não permite ACLs.
         key: function (req, file, cb) {
             const uniqueSuffix = Date.now() + '-' + file.originalname.replace(/\s/g, '_');
             cb(null, uniqueSuffix);
@@ -189,6 +190,7 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
+// Agora usamos o BotModel para preencher o dropdown do painel.
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -203,12 +205,15 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 //=====================================================================
 // ATENÇÃO: Ajuste para as estatísticas do painel
 //=====================================================================
+// Nesta versão usamos a função makeDay (que zera a data sem conversão de fuso),
+// que era a versão que funcionava para o painel anteriormente.
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
+// A função getDetailedStats permanece conforme sua implementação atual.
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -225,20 +230,30 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             }
             const mainWhere = { ...baseWhere, originCondition: 'main' };
             const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({ where: mainWhere, distinct: true, col: 'userId' });
+            totalUsers = await Purchase.count({
+                where: mainWhere,
+                distinct: true,
+                col: 'userId'
+            });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: mainWhere })) || 0;
-            sumConvertido = (await Purchase.sum('planValue', { where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
             const paidPurchases = await Purchase.findAll({
                 where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0, countPaid = 0;
+            let sumDiffMs = 0;
+            let countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
@@ -256,17 +271,23 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             totalUsers = await User.count({ where: userWhere });
             totalPurchases = await Purchase.count({ where: purchaseWhere });
             sumGerado = (await Purchase.sum('planValue', { where: baseWhere })) || 0;
-            sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' } })) || 0;
+            sumConvertido = (await Purchase.sum('planValue', {
+                where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
+            })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
             });
-            let sumDiffMs = 0, countPaid = 0;
+            let sumDiffMs = 0;
+            let countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
@@ -275,8 +296,16 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             if (botFilters.length > 0 && !botFilters.includes('All')) {
                 baseWhere.botName = { [Op.in]: botFilters };
             }
-            const totalLeads = await Purchase.count({ where: { ...baseWhere, originCondition }, distinct: true, col: 'userId' });
-            const totalConfirmed = await Purchase.count({ where: { ...baseWhere, originCondition, status: 'paid' }, distinct: true, col: 'userId' });
+            const totalLeads = await Purchase.count({
+                where: { ...baseWhere, originCondition },
+                distinct: true,
+                col: 'userId'
+            });
+            const totalConfirmed = await Purchase.count({
+                where: { ...baseWhere, originCondition, status: 'paid' },
+                distinct: true,
+                col: 'userId'
+            });
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
@@ -288,7 +317,10 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) { sumDiffMs += diff; countPaid++; }
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
@@ -310,7 +342,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
 }
 
 //------------------------------------------------------
-// Rota /api/bots-stats – usando makeDay para definir intervalos
+// Rota /api/bots-stats – usando makeDay para definir os intervalos
 //------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
@@ -421,7 +453,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             endDate.setHours(23, 59, 59, 999);
         }
 
-        // Obtém estatísticas em paralelo
+        // Obtém as estatísticas em paralelo
         const [statsAll, statsMain, statsNotPurchased, statsPurchased, statsYesterday] = await Promise.all([
             getDetailedStats(startDate, endDate, null, botFilters),
             getDetailedStats(startDate, endDate, 'main', botFilters),
@@ -435,7 +467,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })()
         ]);
 
-        // Dados para a segunda aba (cards)
+        // Dados para a segunda aba (cards de: Todas as Compras, Plano Principal, Remarketing e Upsell)
         const statsDetailed = {
             allPurchases: statsAll.totalPurchases,
             mainPlan: statsMain.totalPurchases,
@@ -620,7 +652,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             statsMain,
             statsNotPurchased,
             statsPurchased,
-            statsDetailed,
+            statsDetailed, // Dados para a segunda aba (cards VIP)
             botRanking,
             botDetails,
             stats7Days,
@@ -634,8 +666,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Rotas de Gerenciar Bots (sem alterações na estrutura, com novos campos)
+// Rotas de Gerenciar Bots
 //------------------------------------------------------
+// [POST] Criar Novo Bot (com upload de vídeo opcional)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -643,19 +676,22 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
+            vipLink, // Novo campo para link do grupo VIP
             buttonName1,
             buttonValue1,
             buttonName2,
             buttonValue2,
             buttonName3,
             buttonValue3,
+            // Campos remarketing
             remarketingJson,
-            vipLink,
             remarketingVideo,
             remarketingButtonName1,
             remarketingButtonValue1,
             remarketingButtonName2,
-            remarketingButtonValue2
+            remarketingButtonValue2,
+            remarketingButtonName3,
+            remarketingButtonValue3
         } = payload;
 
         // Monta array de botões principais
@@ -670,7 +706,41 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
-        const safeRemarketingJson = remarketingJson || '';
+        // Monta objeto remarketing (junta os dados do remarketing)
+        const remarketingObj = {};
+        if (remarketingVideo && remarketingVideo.trim() !== '') {
+            remarketingObj.video = remarketingVideo.trim();
+        }
+        // Se os botões de remarketing forem informados, monta array
+        const remarketingButtons = [];
+        function pushRemarketingButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                remarketingButtons.push({ name: bName.trim(), value: parseFloat(bValue) });
+            }
+        }
+        pushRemarketingButtonIfValid(remarketingButtonName1, remarketingButtonValue1);
+        pushRemarketingButtonIfValid(remarketingButtonName2, remarketingButtonValue2);
+        pushRemarketingButtonIfValid(remarketingButtonName3, remarketingButtonValue3);
+        if (remarketingButtons.length > 0) {
+            remarketingObj.buttons = remarketingButtons;
+        }
+        // Se o remarketingJson foi informado, mescla (prioriza remarketingJson se válido)
+        let safeRemarketingJson = remarketingJson || '';
+        if (safeRemarketingJson) {
+            try {
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    // Se for válido, substitui o objeto remarketing
+                    remarketingObj.messages = JSON.parse(trimmed);
+                } else {
+                    logger.warn(`Remarketing JSON para o bot ${name} não é válido. Usando objeto padrão.`);
+                }
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para o bot ${name}.`, e);
+            }
+        }
+        // Converte o objeto remarketing para JSON
+        const finalRemarketingJson = JSON.stringify(remarketingObj);
 
         let videoFilename = '';
         if (req.file) {
@@ -681,15 +751,10 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
+            vipLink, // salva o link do grupo VIP
             video: videoFilename,
             buttonsJson,
-            remarketingJson: safeRemarketingJson,
-            vipLink: vipLink || '',
-            remarketingVideo: remarketingVideo || '',
-            remarketingButtonsJson: JSON.stringify([
-                { name: remarketingButtonName1 || '', value: remarketingButtonValue1 ? parseFloat(remarketingButtonValue1) : 0 },
-                { name: remarketingButtonName2 || '', value: remarketingButtonValue2 ? parseFloat(remarketingButtonValue2) : 0 }
-            ])
+            remarketingJson: finalRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
 
@@ -697,12 +762,10 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name: newBot.name,
             token: newBot.token,
             description: newBot.description,
+            vipLink: newBot.vipLink, // inclui vipLink na configuração
             video: newBot.video,
             buttons: buttons,
-            remarketing: safeRemarketingJson ? JSON.parse(safeRemarketingJson) : {},
-            vipLink: newBot.vipLink,
-            remarketingVideo: newBot.remarketingVideo,
-            remarketingButtons: newBot.remarketingButtonsJson ? JSON.parse(newBot.remarketingButtonsJson) : []
+            remarketing: remarketingObj
         };
 
         initializeBot(bc);
@@ -717,6 +780,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
     }
 });
 
+// [GET] Lista de bots (JSON)
 app.get('/admin/bots/list', checkAuth, async (req, res) => {
     try {
         const bots = await BotModel.findAll();
@@ -727,6 +791,7 @@ app.get('/admin/bots/list', checkAuth, async (req, res) => {
     }
 });
 
+// [GET] Retorna 1 bot (para edição) em JSON
 app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -741,6 +806,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     }
 });
 
+// [POST] Editar bot existente (com upload de vídeo opcional)
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -753,6 +819,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name,
             token,
             description,
+            vipLink, // novo campo vipLink
             buttonName1,
             buttonValue1,
             buttonName2,
@@ -760,12 +827,13 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             buttonName3,
             buttonValue3,
             remarketingJson,
-            vipLink,
             remarketingVideo,
             remarketingButtonName1,
             remarketingButtonValue1,
             remarketingButtonName2,
-            remarketingButtonValue2
+            remarketingButtonValue2,
+            remarketingButtonName3,
+            remarketingButtonValue3
         } = req.body;
 
         const buttons = [];
@@ -779,25 +847,52 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
+        // Monta objeto remarketing
+        const remarketingObj = {};
+        if (remarketingVideo && remarketingVideo.trim() !== '') {
+            remarketingObj.video = remarketingVideo.trim();
+        }
+        const remarketingButtons = [];
+        function pushRemarketingButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                remarketingButtons.push({ name: bName.trim(), value: parseFloat(bValue) });
+            }
+        }
+        pushRemarketingButtonIfValid(remarketingButtonName1, remarketingButtonValue1);
+        pushRemarketingButtonIfValid(remarketingButtonName2, remarketingButtonValue2);
+        pushRemarketingButtonIfValid(remarketingButtonName3, remarketingButtonValue3);
+        if (remarketingButtons.length > 0) {
+            remarketingObj.buttons = remarketingButtons;
+        }
+        let safeRemarketingJson = remarketingJson || '';
+        if (safeRemarketingJson) {
+            try {
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    remarketingObj.messages = JSON.parse(trimmed);
+                } else {
+                    remarketingObj.messages = {};
+                    logger.warn(`Remarketing JSON para o bot ${bot.name} não é válido. Usando objeto vazio.`);
+                }
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para o bot ${bot.name}.`, e);
+                remarketingObj.messages = {};
+            }
+        }
+        const finalRemarketingJson = JSON.stringify(remarketingObj);
+
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
 
-        const safeRemarketingJson = remarketingJson || '';
-
         bot.name = name;
         bot.token = token;
         bot.description = description;
+        bot.vipLink = vipLink; // atualiza vipLink
         bot.video = videoFilename;
         bot.buttonsJson = buttonsJson;
-        bot.remarketingJson = safeRemarketingJson;
-        bot.vipLink = vipLink || '';
-        bot.remarketingVideo = remarketingVideo || '';
-        bot.remarketingButtonsJson = JSON.stringify([
-            { name: remarketingButtonName1 || '', value: remarketingButtonValue1 ? parseFloat(remarketingButtonValue1) : 0 },
-            { name: remarketingButtonName2 || '', value: remarketingButtonValue2 ? parseFloat(remarketingButtonValue2) : 0 }
-        ]);
+        bot.remarketingJson = finalRemarketingJson;
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
 
@@ -805,12 +900,10 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name: bot.name,
             token: bot.token,
             description: bot.description,
+            vipLink: bot.vipLink,
             video: bot.video,
             buttons: buttons,
-            remarketing: safeRemarketingJson ? JSON.parse(safeRemarketingJson) : {},
-            vipLink: bot.vipLink,
-            remarketingVideo: bot.remarketingVideo,
-            remarketingButtons: bot.remarketingButtonsJson ? JSON.parse(bot.remarketingButtonsJson) : []
+            remarketing: remarketingObj
         };
 
         updateBotInMemory(id, bc);
