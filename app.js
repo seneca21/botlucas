@@ -211,6 +211,7 @@ function makeDay(date) {
 }
 
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
+    // ... (mesmo código atual, sem alterações)
     let totalUsers = 0;
     let totalPurchases = 0;
     let sumGerado = 0;
@@ -651,7 +652,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 //------------------------------------------------------
 
 // [POST] Criar Novo Bot (com upload de vídeo opcional)
-// Agora os botões terão campos para nome, valor e link (o vipLink do grupo VIP deixa de ser usado)
+// Agora os campos de botões incluem também o link do botão (por plano)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -659,8 +660,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
-            // O campo vipLink agora não será usado para link geral,
-            // pois cada botão terá seu próprio link.
             vipLink,
             buttonName1,
             buttonValue1,
@@ -692,12 +691,13 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         if (req.file) {
             videoFilename = req.file.location;
         }
-        // Para criação, mesmo que exista vipLink, vamos ignorá-lo (pois cada botão terá seu link)
+        // Para o vipLink, mantemos-o (caso seja útil como fallback)
+        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         const newBot = await BotModel.create({
             name,
             token,
             description,
-            vipLink: '', // campo vazio ou poderá ser mantido para outras finalidades
+            vipLink: fixedVipLink,
             video: videoFilename,
             buttonsJson,
             remarketingJson: safeRemarketingJson
@@ -763,7 +763,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
 });
 
 // [POST] Editar bot existente (com upload de vídeo opcional)
-// Agora inclui os campos de link para cada botão
+// Agora inclui os campos de botões com link (por plano) e o vipLink geral
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -775,7 +775,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name,
             token,
             description,
-            vipLink, // ignorado para link geral
+            vipLink,
             buttonName1,
             buttonValue1,
             buttonLink1,
@@ -806,8 +806,8 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             videoFilename = req.file.location;
         }
         const safeRemarketingJson = remarketingJson || '';
-        // Para o vipLink geral, definimos como vazio
-        const fixedVipLink = '';
+        // Nova abordagem para o vipLink
+        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         bot.name = name;
         bot.token = token;
         bot.description = description;
