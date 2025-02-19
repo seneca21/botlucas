@@ -27,11 +27,15 @@ module.exports = (sequelize, DataTypes) => {
             remarketingJson: {
                 type: DataTypes.TEXT,
                 allowNull: true
+            },
+            vipLink: {  // Coluna adicionada para armazenar o link do grupo VIP
+                type: DataTypes.STRING,
+                allowNull: true
             }
         },
         {
             tableName: 'Bots',  // Tabela "Bots"
-            timestamps: false   // Se quiser createdAt/updatedAt, remova esta linha
+            timestamps: false   // Se desejar timestamps, remova esta linha
         }
     );
 
