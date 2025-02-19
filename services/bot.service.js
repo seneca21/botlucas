@@ -1,6 +1,5 @@
-//------------------------------------------------------
-// bot.service.js
-//------------------------------------------------------
+// services/bot.service.js
+
 const { Telegraf, Markup } = require('telegraf');
 const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
@@ -39,23 +38,20 @@ const s3Client = new S3Client({
 async function getS3VideoStream(videoUrl) {
   try {
     const urlObj = new URL(videoUrl);
-    // O pathname contém a key com a barra inicial, então removemos o primeiro caractere.
-    const key = urlObj.pathname.substring(1);
+    const key = urlObj.pathname.substring(1); // remove a barra inicial
     const command = new GetObjectCommand({
       Bucket: process.env.BUCKETEER_BUCKET_NAME,
       Key: key
     });
     const response = await s3Client.send(command);
-    return response.Body; // stream do vídeo
+    return response.Body;
   } catch (err) {
     logger.error('Erro ao obter stream do S3:', err);
     throw err;
   }
 }
 
-// Objeto global para gerenciar as instâncias de bots, indexado pelo nome do bot
-global.botInstances = global.botInstances || {};
-
+const bots = [];
 const userSessions = {};
 
 // =====================================
@@ -119,11 +115,11 @@ function canAttemptVerification(telegramId) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_THIRD;
       verificationLimits.set(telegramId, userData);
       logger.info(`Verificação: ${telegramId} - Bloqueado por 24 horas.`);
-      return { allowed: false, message: `🚫 Bloqueado por 24 horas.` };
+      return { allowed: false, message: `🚫 Bloqueado por 24 horas devido a múltiplas tentativas.` };
     }
     verificationLimits.set(telegramId, userData);
     logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
-    return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.` };
+    return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente novamente mais tarde.` };
   }
 }
 
@@ -232,7 +228,7 @@ function checkStartFlood(botName) {
       floodData.isPaused = false;
       floodData.startTimestamps = [];
       startFloodProtection.set(botName, floodData);
-      logger.info(`Proteção Flood: ${botName} - pausa encerrada.`);
+      logger.info(`Proteção Flood: ${botName} - Pausa encerrada.`);
     } else {
       return true;
     }
@@ -250,6 +246,9 @@ function checkStartFlood(botName) {
   return false;
 }
 
+// =====================================
+// Proteção contra Bloqueios Múltiplos
+// =====================================
 const userBlockStatus = new Map();
 const BLOCK_COUNT_THRESHOLD = 2;
 const BAN_COUNT_THRESHOLD = 3;
@@ -266,9 +265,7 @@ function handleUserBlock(telegramId) {
     isBanned: false,
     banExpiresAt: 0
   };
-  if (blockData.isBanned) {
-    return;
-  }
+  if (blockData.isBanned) return;
   blockData.blockCount += 1;
   if (blockData.blockCount === BLOCK_COUNT_THRESHOLD) {
     setTimeout(() => {
@@ -316,10 +313,10 @@ async function reloadBotsFromDB() {
         name: botRow.name,
         token: botRow.token,
         description: botRow.description,
-        vipLink: botRow.vipLink, // Campo para o link do grupo VIP
         video: botRow.video,
         buttons: [],
-        remarketing: {}
+        remarketing: {},
+        vipLink: botRow.vipLink || ''  // Inclui o campo vipLink
       };
       if (botRow.buttonsJson) {
         try {
@@ -352,18 +349,8 @@ async function reloadBotsFromDB() {
 // Função para inicializar um bot
 // =====================================
 function initializeBot(botConfig) {
-  // Se já houver uma instância para esse bot, pare-a antes de iniciar a nova.
-  if (global.botInstances[botConfig.name]) {
-    global.botInstances[botConfig.name].stop('update');
-    logger.info(`Bot ${botConfig.name} parado para atualização.`);
-    delete global.botInstances[botConfig.name];
-  }
-
   const bot = new Telegraf(botConfig.token);
   logger.info(`🚀 Bot ${botConfig.name} em execução.`);
-
-  // Registra o bot na coleção global
-  global.botInstances[botConfig.name] = bot;
 
   async function registerUser(ctx) {
     try {
@@ -472,9 +459,7 @@ function initializeBot(botConfig) {
       const isBotPaused = checkStartFlood(botName);
       if (isBotPaused) return;
       const blockData = userBlockStatus.get(telegramId);
-      if (blockData && (blockData.isBlocked || blockData.isBanned)) {
-        return;
-      }
+      if (blockData && (blockData.isBlocked || blockData.isBanned)) return;
       const canStartNow = canAttemptStart(telegramId);
       if (!canStartNow) {
         handleUserBlock(telegramId);
@@ -662,9 +647,8 @@ function initializeBot(botConfig) {
     }
     await ctx.answerCbQuery();
   });
-  // --- Fim do Handler select_plan_ ---
+  // --- Fim do handler select_plan_
 
-  // Comando para verificar pagamento
   bot.command('status_pagamento', async (ctx) => {
     const chatId = ctx.chat.id;
     const telegramId = chatId.toString();
@@ -674,9 +658,7 @@ function initializeBot(botConfig) {
       return;
     }
     const blockData = userBlockStatus.get(telegramId);
-    if (blockData && (blockData.isBlocked || blockData.isBanned)) {
-      return;
-    }
+    if (blockData && (blockData.isBlocked || blockData.isBanned)) return;
     const rateLimitResult = canAttemptVerification(telegramId);
     if (!rateLimitResult.allowed) {
       handleUserBlock(telegramId);
@@ -698,11 +680,13 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
-          // Exibe o link do grupo VIP, se definido
-          if (botConfig.vipLink) {
-            await ctx.reply(`🎉 Grupo VIP: [Acessar](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          // Envia link do grupo VIP se definido
+          if (botConfig.vipLink && botConfig.vipLink.trim() !== '') {
+            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          } else if (session.selectedPlan && session.selectedPlan.link && session.selectedPlan.link.trim() !== '') {
+            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
-            await ctx.reply('⚠️ Link do grupo VIP não definido.');
+            await ctx.reply('⚠️ Link do produto não definido.');
           }
         }
         delete userSessions[chatId];
@@ -731,7 +715,7 @@ function initializeBot(botConfig) {
 
   bot.action(/check_payment_(.+)/, async (ctx) => {
     const chatId = ctx.chat.id;
-    const telegramId = ctx.chat.id.toString();
+    const telegramId = chatId.toString();
     const chargeId = ctx.match[1];
     const session = userSessions[chatId];
     if (!session || session.chargeId !== chargeId) {
@@ -755,7 +739,7 @@ function initializeBot(botConfig) {
       const paymentStatus = await checkPaymentStatus(chargeId);
       if (paymentStatus.status === 'paid') {
         await ctx.reply('🎉 Pagamento confirmado!');
-        const user = await User.findOne({ where: { telegramId: ctx.chat.id.toString() } });
+        const user = await User.findOne({ where: { telegramId: chatId.toString() } });
         if (user) {
           user.hasPurchased = true;
           await user.save();
@@ -764,18 +748,21 @@ function initializeBot(botConfig) {
               { status: 'paid', purchasedAt: new Date() },
               { where: { id: session.purchaseId } }
             );
-            logger.info(`✅ ${ctx.chat.id} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
+            logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
           }
-          if (botConfig.vipLink) {
-            await ctx.reply(`🎉 Grupo VIP: [Acessar](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          // Envia o link do grupo VIP, se definido, ou do produto se disponível
+          if (botConfig.vipLink && botConfig.vipLink.trim() !== '') {
+            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          } else if (session.selectedPlan && session.selectedPlan.link && session.selectedPlan.link.trim() !== '') {
+            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
-            await ctx.reply('⚠️ Link do grupo VIP não definido.');
+            await ctx.reply('⚠️ Link do produto não definido.');
           }
         }
-        delete userSessions[ctx.chat.id];
+        delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
         await ctx.reply('❌ Cobrança expirou.');
-        delete userSessions[ctx.chat.id];
+        delete userSessions[chatId];
       } else {
         session.paymentCheckCount = (session.paymentCheckCount || 0) + 1;
         const count = session.paymentCheckCount;
@@ -789,7 +776,7 @@ function initializeBot(botConfig) {
       logger.error('❌ Erro ao verificar pagamento:', error);
       if (error.response && error.response.error_code === 403) {
         logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
-        delete userSessions[ctx.chat.id];
+        delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao verificar pagamento.');
       }
@@ -868,7 +855,7 @@ function initializeBot(botConfig) {
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
-  return bot;
+  bots.push(bot);
 }
 
 // =====================================
@@ -876,15 +863,8 @@ function initializeBot(botConfig) {
 // =====================================
 function updateBotInMemory(id, newConfig) {
   logger.info(`Atualizando bot em memória (ID: ${id}).`);
-  // Se já existir uma instância para esse bot, pare-a
-  if (global.botInstances[newConfig.name]) {
-    global.botInstances[newConfig.name].stop('update');
-    logger.info(`Bot ${newConfig.name} parado para atualização.`);
-    delete global.botInstances[newConfig.name];
-  }
-  // Inicializa a nova instância e armazena
-  const newBotInstance = initializeBot(newConfig);
-  global.botInstances[newConfig.name] = newBotInstance;
+  // Para simplificar, reinicia o bot com a nova configuração.
+  initializeBot(newConfig);
 }
 
 module.exports = {
