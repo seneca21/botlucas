@@ -683,11 +683,14 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         if (req.file) {
             videoFilename = req.file.location;
         }
+        // Nova abordagem: se vipLink estiver ausente ou em branco, defina como string vazia
+        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
+
         const newBot = await BotModel.create({
             name,
             token,
             description,
-            vipLink,
+            vipLink: fixedVipLink,
             video: videoFilename,
             buttonsJson,
             remarketingJson: safeRemarketingJson
@@ -789,10 +792,12 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             videoFilename = req.file.location;
         }
         const safeRemarketingJson = remarketingJson || '';
+        // Nova abordagem para o vipLink: se estiver em branco, definir como string vazia
+        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         bot.name = name;
         bot.token = token;
         bot.description = description;
-        bot.vipLink = vipLink;
+        bot.vipLink = fixedVipLink;
         bot.video = videoFilename;
         bot.buttonsJson = buttonsJson;
         bot.remarketingJson = safeRemarketingJson;
