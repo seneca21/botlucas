@@ -31,10 +31,8 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
             tableName: 'Bots',  // Tabela "Bots"
-            // Ativa os timestamps para que os campos createdAt e updatedAt sejam gerados
-            timestamps: true,
-            // Opcional: se desejar que os nomes dos campos sigam o padrão snake_case (created_at, updated_at)
-            underscored: true
+            timestamps: true,     // Ativa createdAt e updatedAt
+            underscored: true     // Cria os campos como created_at e updated_at
         }
     );
 
