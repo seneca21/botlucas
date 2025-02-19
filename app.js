@@ -685,7 +685,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         }
         // Nova abordagem: se vipLink estiver ausente ou em branco, defina como string vazia
         const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
-
         const newBot = await BotModel.create({
             name,
             token,
@@ -839,9 +838,35 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
 });
 
 //------------------------------------------------------
+// Nova abordagem para atualizar a instância do bot em memória
+//------------------------------------------------------
+function updateBotInMemory(id, newConfig) {
+    logger.info(`Atualizando bot em memória (ID: ${id}).`);
+    // Procura uma instância ativa com o mesmo token e a para
+    for (let i = 0; i < bots.length; i++) {
+        // Verifica se o token da instância é igual ao novo
+        if (bots[i].telegram.options.token === newConfig.token) {
+            try {
+                bots[i].stop('update');
+                logger.info(`Bot com token ${newConfig.token} parado com sucesso.`);
+            } catch (err) {
+                logger.error(`Erro ao parar bot com token ${newConfig.token}:`, err);
+            }
+            // Remove a instância da lista
+            bots.splice(i, 1);
+            break;
+        }
+    }
+    // Inicializa o bot com a nova configuração
+    initializeBot(newConfig);
+}
+
+//------------------------------------------------------
 // Sobe servidor
 //------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
 });
+
+module.exports = app;
