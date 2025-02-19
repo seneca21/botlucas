@@ -27,12 +27,16 @@ module.exports = (sequelize, DataTypes) => {
             remarketingJson: {
                 type: DataTypes.TEXT,
                 allowNull: true
+            },
+            createdAt: {
+                type: DataTypes.DATE,
+                allowNull: false,
+                defaultValue: DataTypes.NOW
             }
         },
         {
-            tableName: 'Bots',  // Tabela "Bots"
-            timestamps: true,     // Ativa createdAt e updatedAt
-            underscored: true     // Cria os campos como created_at e updated_at
+            tableName: 'Bots',
+            timestamps: false  // Não ativa os timestamps automáticos, pois estamos definindo manualmente
         }
     );
 
