@@ -39,13 +39,14 @@ const s3Client = new S3Client({
 async function getS3VideoStream(videoUrl) {
   try {
     const urlObj = new URL(videoUrl);
+    // O pathname contém a key com a barra inicial, então removemos o primeiro caractere.
     const key = urlObj.pathname.substring(1);
     const command = new GetObjectCommand({
       Bucket: process.env.BUCKETEER_BUCKET_NAME,
       Key: key
     });
     const response = await s3Client.send(command);
-    return response.Body;
+    return response.Body; // stream do vídeo
   } catch (err) {
     logger.error('Erro ao obter stream do S3:', err);
     throw err;
@@ -313,7 +314,7 @@ async function reloadBotsFromDB() {
         name: botRow.name,
         token: botRow.token,
         description: botRow.description,
-        vipLink: botRow.vipLink,
+        vipLink: botRow.vipLink,  // Campo para o link do grupo VIP
         video: botRow.video,
         buttons: [],
         remarketing: {}
@@ -562,7 +563,7 @@ function initializeBot(botConfig) {
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
         { parse_mode: 'Markdown' }
       );
-      // Sempre exibe o botão "Verificar Pagamento", sem tentar mostrar link de produto
+      // Exibe sempre o botão "Verificar Pagamento" (sem condição de link)
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -633,7 +634,7 @@ function initializeBot(botConfig) {
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
         { parse_mode: 'Markdown' }
       );
-      // Exibe sempre o botão "Verificar Pagamento" sem verificação de link
+      // Exibe sempre o botão "Verificar Pagamento"
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -686,21 +687,12 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
-          if (botConfig.remarketing && botConfig.remarketing.intervals) {
-            const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
-            setTimeout(async () => {
-              try {
-                const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
-                if (currentUser && currentUser.hasPurchased) {
-                  await sendRemarketingMessage(currentUser, 'purchased');
-                  logger.info(`✅ Upsell enviado -> ${chatId}`);
-                }
-              } catch (err) {
-                logger.error(`❌ Erro upsell -> ${chatId}:`, err);
-              }
-            }, purchasedInterval * 1000);
+          // Exibe o link do grupo VIP, se definido
+          if (botConfig.vipLink) {
+            await ctx.reply(`🎉 Grupo VIP: [Acessar](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply('⚠️ Link do grupo VIP não definido.');
           }
-          // Aqui removemos a condição do link do produto e não exibimos mensagem de link não definido
         }
         delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
@@ -763,19 +755,11 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
           }
-          if (botConfig.remarketing && botConfig.remarketing.intervals) {
-            const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
-            setTimeout(async () => {
-              try {
-                const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
-                if (currentUser && currentUser.hasPurchased) {
-                  await sendRemarketingMessage(currentUser, 'purchased');
-                  logger.info(`✅ Upsell enviado -> ${chatId}`);
-                }
-              } catch (err) {
-                logger.error(`❌ Erro upsell -> ${chatId}:`, err);
-              }
-            }, purchasedInterval * 1000);
+          // Exibe o link do grupo VIP, se definido
+          if (botConfig.vipLink) {
+            await ctx.reply(`🎉 Grupo VIP: [Acessar](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply('⚠️ Link do grupo VIP não definido.');
           }
         }
         delete userSessions[chatId];
