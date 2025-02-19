@@ -495,38 +495,41 @@
                             <label for="editBotDescription">Descrição:</label>
                             <textarea id="editBotDescription" class="form-control" rows="2"></textarea>
 
-                            <!-- Novo campo: Link do Grupo VIP -->
-                            <label for="editVipLink">Link do Grupo VIP:</label>
-                            <input type="text" id="editVipLink" class="form-control"
-                                placeholder="Cole o link do grupo VIP aqui" />
+                            <!-- Aqui não usamos o campo vipLink geral, pois os links serão por botão -->
 
                             <label>Vídeo (upload opcional):</label>
                             <input type="file" id="editVideoFile" class="form-control-file" accept="video/*" />
 
                             <hr />
-                            <h6>Botões (até 3)</h6>
+                            <h6>Botões (até 3) – para cada botão informe Nome, Valor e Link</h6>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName1" class="form-control"
                                     placeholder="Nome Botão 1" />
                                 <input type="text" id="editButtonValue1" class="form-control"
                                     placeholder="Valor Pix 1" />
+                                <input type="text" id="editButtonLink1" class="form-control"
+                                    placeholder="Link do Grupo/VIP 1" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName2" class="form-control"
                                     placeholder="Nome Botão 2" />
                                 <input type="text" id="editButtonValue2" class="form-control"
                                     placeholder="Valor Pix 2" />
+                                <input type="text" id="editButtonLink2" class="form-control"
+                                    placeholder="Link do Grupo/VIP 2" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName3" class="form-control"
                                     placeholder="Nome Botão 3" />
                                 <input type="text" id="editButtonValue3" class="form-control"
                                     placeholder="Valor Pix 3" />
+                                <input type="text" id="editButtonLink3" class="form-control"
+                                    placeholder="Link do Grupo/VIP 3" />
                             </div>
                             <hr />
                             <label>Remarketing JSON:</label>
                             <textarea id="editRemarketingJson" class="form-control" rows="3"
-                                placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
+                                placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10, "link": "url"}]}'></textarea>
                             <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
                             <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
                         </form>
@@ -546,32 +549,35 @@
                         <label for="botDescriptionInput">Descrição:</label>
                         <textarea id="botDescriptionInput" class="form-control" rows="2"></textarea>
 
-                        <!-- Novo campo: Link do Grupo VIP -->
-                        <label for="vipLinkInput">Link do Grupo VIP:</label>
-                        <input type="text" id="vipLinkInput" class="form-control"
-                            placeholder="Cole o link do grupo VIP aqui" />
+                        <!-- Não usaremos campo de link geral, pois cada botão terá seu link -->
 
                         <label>Vídeo (upload do PC):</label>
                         <input type="file" id="botVideoFile" class="form-control-file" accept="video/*" />
 
                         <hr />
-                        <h6>Botões (até 3)</h6>
+                        <h6>Botões (até 3) – para cada botão informe Nome, Valor e Link</h6>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName1" placeholder="Nome Botão 1" />
                             <input type="text" class="form-control" id="buttonValue1" placeholder="Valor Pix 1" />
+                            <input type="text" class="form-control" id="buttonLink1"
+                                placeholder="Link do Grupo/VIP 1" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName2" placeholder="Nome Botão 2" />
                             <input type="text" class="form-control" id="buttonValue2" placeholder="Valor Pix 2" />
+                            <input type="text" class="form-control" id="buttonLink2"
+                                placeholder="Link do Grupo/VIP 2" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName3" placeholder="Nome Botão 3" />
                             <input type="text" class="form-control" id="buttonValue3" placeholder="Valor Pix 3" />
+                            <input type="text" class="form-control" id="buttonLink3"
+                                placeholder="Link do Grupo/VIP 3" />
                         </div>
                         <hr />
                         <label for="remarketingInput">Remarketing JSON:</label>
                         <textarea id="remarketingInput" class="form-control" rows="3"
-                            placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
+                            placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10, "link": "url"}]}'></textarea>
                         <small class="text-muted">Exemplo: {"messages":[...],"intervals":{...}}</small>
                         <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                     </form>

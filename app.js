@@ -651,7 +651,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 //------------------------------------------------------
 
 // [POST] Criar Novo Bot (com upload de vídeo opcional)
-// Agora inclui o campo "vipLink" para o grupo VIP
+// Agora os botões terão campos para nome, valor e link (o vipLink do grupo VIP deixa de ser usado)
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -659,37 +659,45 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
+            // O campo vipLink agora não será usado para link geral,
+            // pois cada botão terá seu próprio link.
             vipLink,
             buttonName1,
             buttonValue1,
+            buttonLink1,
             buttonName2,
             buttonValue2,
+            buttonLink2,
             buttonName3,
             buttonValue3,
+            buttonLink3,
             remarketingJson
         } = payload;
         const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
+        function pushButtonIfValid(bName, bValue, bLink) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+                buttons.push({
+                    name: bName.trim(),
+                    value: parseFloat(bValue),
+                    link: bLink && bLink.trim() !== '' ? bLink.trim() : ''
+                });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
+        pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
+        pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
+        pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.location;
         }
-        // Se vipLink estiver ausente ou em branco, definimos como string vazia
-        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
+        // Para criação, mesmo que exista vipLink, vamos ignorá-lo (pois cada botão terá seu link)
         const newBot = await BotModel.create({
             name,
             token,
             description,
-            vipLink: fixedVipLink,
+            vipLink: '', // campo vazio ou poderá ser mantido para outras finalidades
             video: videoFilename,
             buttonsJson,
             remarketingJson: safeRemarketingJson
@@ -755,7 +763,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
 });
 
 // [POST] Editar bot existente (com upload de vídeo opcional)
-// Agora inclui o campo "vipLink"
+// Agora inclui os campos de link para cada botão
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -767,32 +775,39 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name,
             token,
             description,
-            vipLink,
+            vipLink, // ignorado para link geral
             buttonName1,
             buttonValue1,
+            buttonLink1,
             buttonName2,
             buttonValue2,
+            buttonLink2,
             buttonName3,
             buttonValue3,
+            buttonLink3,
             remarketingJson
         } = req.body;
         const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
+        function pushButtonIfValid(bName, bValue, bLink) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+                buttons.push({
+                    name: bName.trim(),
+                    value: parseFloat(bValue),
+                    link: bLink && bLink.trim() !== '' ? bLink.trim() : ''
+                });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
+        pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
+        pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
+        pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
         const buttonsJson = JSON.stringify(buttons);
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
         const safeRemarketingJson = remarketingJson || '';
-        // Se vipLink estiver ausente ou em branco, definimos como string vazia
-        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
+        // Para o vipLink geral, definimos como vazio
+        const fixedVipLink = '';
         bot.name = name;
         bot.token = token;
         bot.description = description;
