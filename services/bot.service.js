@@ -39,14 +39,13 @@ const s3Client = new S3Client({
 async function getS3VideoStream(videoUrl) {
   try {
     const urlObj = new URL(videoUrl);
-    // Remover a barra inicial do pathname para obter a key
     const key = urlObj.pathname.substring(1);
     const command = new GetObjectCommand({
       Bucket: process.env.BUCKETEER_BUCKET_NAME,
       Key: key
     });
     const response = await s3Client.send(command);
-    return response.Body; // stream do vídeo
+    return response.Body;
   } catch (err) {
     logger.error('Erro ao obter stream do S3:', err);
     throw err;
@@ -57,9 +56,8 @@ const bots = [];
 const userSessions = {};
 
 // =====================================
-// Rate Limiting e Proteção (mantidos inalterados)
+// Rate Limiting para Verificações de Pagamento
 // =====================================
-
 const verificationLimits = new Map();
 const MAX_VERIFICATION_ATTEMPTS = 4;
 const VERIFICATION_WINDOW_MS = 60 * 1000;
@@ -126,6 +124,9 @@ function canAttemptVerification(telegramId) {
   }
 }
 
+// =====================================
+// Rate Limiting para /start
+// =====================================
 const startLimits = new Map();
 const MAX_STARTS = 5;
 const START_WAIT_FIRST_MS = 5 * 60 * 1000;
@@ -161,6 +162,9 @@ function canAttemptStart(telegramId) {
   }
 }
 
+// =====================================
+// Rate Limiting para botões select_plan
+// =====================================
 const selectPlanLimits = new Map();
 const MAX_SELECT_PLAN_ATTEMPTS = 2;
 const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
@@ -201,6 +205,9 @@ function canAttemptSelectPlan(telegramId, planId) {
   }
 }
 
+// =====================================
+// Proteção Flood para /start
+// =====================================
 const startFloodProtection = new Map();
 const START_FLOOD_LIMIT = 20;
 const START_FLOOD_WINDOW_MS = 3 * 60 * 1000;
@@ -306,7 +313,7 @@ async function reloadBotsFromDB() {
         name: botRow.name,
         token: botRow.token,
         description: botRow.description,
-        vipLink: botRow.vipLink, // novo campo
+        vipLink: botRow.vipLink,
         video: botRow.video,
         buttons: [],
         remarketing: {}
@@ -410,7 +417,6 @@ function initializeBot(botConfig) {
         logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
         return;
       }
-      // Determina a fonte do vídeo: se for URL (do S3) ou local
       let videoInput;
       if (messageConfig.video && messageConfig.video.startsWith('http')) {
         videoInput = { source: await getS3VideoStream(messageConfig.video) };
@@ -475,7 +481,6 @@ function initializeBot(botConfig) {
         }
         videoInput = { source: fs.createReadStream(videoPath) };
       }
-      // Gera os botões principais
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
         Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
@@ -498,7 +503,7 @@ function initializeBot(botConfig) {
     }
   });
 
-  // Handler para botões de remarketing
+  // Handler para botões de remarketing (prefixo remarketing_select_plan_)
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const planValue = parseFloat(ctx.match[1]);
@@ -557,6 +562,7 @@ function initializeBot(botConfig) {
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
         { parse_mode: 'Markdown' }
       );
+      // Sempre exibe o botão "Verificar Pagamento", sem tentar mostrar link de produto
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -575,7 +581,7 @@ function initializeBot(botConfig) {
     await ctx.answerCbQuery();
   });
 
-  // Handler para botões principais (select_plan_)
+  // --- Handler para botões principais (select_plan_) ---
   bot.action(/^select_plan_(\d+)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const index = parseInt(ctx.match[1]);
@@ -591,7 +597,7 @@ function initializeBot(botConfig) {
       user.botName = botConfig.name;
       await user.save();
     }
-    const telegramId = ctx.chat.id.toString();
+    const telegramId = chatId.toString();
     const canSelect = canAttemptSelectPlan(telegramId, plan.name);
     if (!canSelect) {
       await ctx.answerCbQuery();
@@ -627,14 +633,13 @@ function initializeBot(botConfig) {
         `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
         { parse_mode: 'Markdown' }
       );
-      // Se não houver link específico no plano, tenta usar o vipLink configurado
-      if (plan.link) {
-        await ctx.reply(`🎉 Produto: [Acessar](${plan.link})`, { parse_mode: 'Markdown' });
-      } else if (botConfig.vipLink) {
-        await ctx.reply(`🎉 Produto: [Acessar Grupo VIP](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
-      } else {
-        await ctx.reply('⚠️ Link do produto não definido.');
-      }
+      // Exibe sempre o botão "Verificar Pagamento" sem verificação de link
+      await ctx.reply(
+        '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
+        Markup.inlineKeyboard([
+          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
+        ])
+      );
     } catch (error) {
       logger.error('❌ Erro ao criar cobrança:', error);
       if (error.response && error.response.error_code === 403) {
@@ -647,6 +652,7 @@ function initializeBot(botConfig) {
     await ctx.answerCbQuery();
   });
 
+  // Comando para verificar pagamento
   bot.command('status_pagamento', async (ctx) => {
     const chatId = ctx.chat.id;
     const telegramId = chatId.toString();
@@ -694,13 +700,7 @@ function initializeBot(botConfig) {
               }
             }, purchasedInterval * 1000);
           }
-          if (session.selectedPlan && session.selectedPlan.link) {
-            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
-          } else if (botConfig.vipLink) {
-            await ctx.reply(`🎉 Produto: [Acessar Grupo VIP](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
-          } else {
-            await ctx.reply('⚠️ Link do produto não definido.');
-          }
+          // Aqui removemos a condição do link do produto e não exibimos mensagem de link não definido
         }
         delete userSessions[chatId];
       } else if (paymentStatus.status === 'expired') {
@@ -776,13 +776,6 @@ function initializeBot(botConfig) {
                 logger.error(`❌ Erro upsell -> ${chatId}:`, err);
               }
             }, purchasedInterval * 1000);
-          }
-          if (session.selectedPlan && session.selectedPlan.link) {
-            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
-          } else if (botConfig.vipLink) {
-            await ctx.reply(`🎉 Produto: [Acessar Grupo VIP](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
-          } else {
-            await ctx.reply('⚠️ Link do produto não definido.');
           }
         }
         delete userSessions[chatId];
@@ -884,8 +877,12 @@ function initializeBot(botConfig) {
   bots.push(bot);
 }
 
+// =====================================
+// Função para atualizar a instância do bot em memória
+// =====================================
 function updateBotInMemory(id, newConfig) {
   logger.info(`Atualizando bot em memória (ID: ${id}).`);
+  // Para simplificar, reinicia o bot com a nova configuração.
   initializeBot(newConfig);
 }
 
