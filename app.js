@@ -23,7 +23,7 @@ const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
 // Importa funções para inicializar/editar bots
-const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
+const { initializeBot, reloadBotsFromDB } = require('./services/bot.service');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -838,13 +838,12 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
 });
 
 //------------------------------------------------------
-// Nova abordagem para atualizar a instância do bot em memória
+// Função para atualizar a instância do bot em memória
 //------------------------------------------------------
 function updateBotInMemory(id, newConfig) {
     logger.info(`Atualizando bot em memória (ID: ${id}).`);
     // Procura uma instância ativa com o mesmo token e a para
     for (let i = 0; i < bots.length; i++) {
-        // Verifica se o token da instância é igual ao novo
         if (bots[i].telegram.options.token === newConfig.token) {
             try {
                 bots[i].stop('update');
@@ -852,7 +851,6 @@ function updateBotInMemory(id, newConfig) {
             } catch (err) {
                 logger.error(`Erro ao parar bot com token ${newConfig.token}:`, err);
             }
-            // Remove a instância da lista
             bots.splice(i, 1);
             break;
         }
