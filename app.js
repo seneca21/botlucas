@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js
+// app.js (com horário de Brasília)
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -29,16 +29,20 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Sessão
+// SESSÃO
 app.use(session({
     secret: 'chave-super-secreta',
     resave: false,
     saveUninitialized: false
 }));
 
+// MIDDLEWARE: Checa se usuário está logado
 function checkAuth(req, res, next) {
-    if (req.session.loggedIn) next();
-    else res.redirect('/login');
+    if (req.session.loggedIn) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
 }
 
 //------------------------------------------------------
@@ -190,7 +194,7 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
-// Agora, a rota /api/bots-list usa o BotModel (para o dropdown do painel)
+// A rota /api/bots-list agora usa o BotModel (para o dropdown do painel)
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -205,7 +209,8 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 //=====================================================================
 // ATENÇÃO: Ajuste para as estatísticas do painel
 //=====================================================================
-// Nesta versão, usamos a função makeDay (que zera a data sem conversão de fuso) – a mesma versão que funcionava corretamente.
+// Nesta versão usamos a função makeDay (que zera a data sem conversão de fuso)
+// Essa é a versão que funcionava corretamente para os gráficos.
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -213,7 +218,6 @@ function makeDay(date) {
 }
 
 // A função getDetailedStats permanece conforme sua implementação atual.
-// (Aqui, você mantém a implementação que estava funcionando; este trecho não foi alterado.)
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -341,8 +345,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     };
 }
 
-// Rota /api/bots-stats – agora utilizando makeDay para definir as datas (como na versão que funcionava)
-// Assim, as estatísticas serão consultadas com base em datas "zeradas" sem conversão de fuso.
+// Rota /api/bots-stats – agora utilizando makeDay para definir as datas
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const {
@@ -356,11 +359,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
         }
-
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
-
         let startDate, endDate;
         if (dateRange) {
             switch (dateRange) {
@@ -471,7 +472,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })()
         ]);
 
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -488,7 +488,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -551,7 +550,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             group: ['botName', 'planName'],
             order: [[Sequelize.literal('"salesCount"'), 'DESC']],
         });
-
         const botPlansMap = {};
         planSalesByBot.forEach(row => {
             const bName = row.botName;
@@ -585,7 +583,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
-
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
@@ -596,7 +593,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     conversionRate: planConvRate,
                 });
             }
-
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -635,7 +631,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes('All')) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
-
         const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
             attributes: ['pixGeneratedAt', 'purchasedAt', 'planValue', 'status'],
             where: lastMovementsWhere,
@@ -684,7 +679,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             buttonValue3,
             remarketingJson
         } = payload;
-
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -696,12 +690,10 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
-
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.location;
         }
-
         const newBot = await BotModel.create({
             name,
             token,
@@ -711,7 +703,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             remarketingJson: safeRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
-
         const bc = {
             name: newBot.name,
             token: newBot.token,
@@ -734,7 +725,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
                 bc.remarketing = {};
             }
         }
-
         initializeBot(bc);
         res.send(`
             <div class="alert alert-success">
@@ -778,7 +768,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         if (!bot) {
             return res.status(404).send('Bot não encontrado');
         }
-
         const {
             name,
             token,
@@ -791,7 +780,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             buttonValue3,
             remarketingJson
         } = req.body;
-
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -802,14 +790,11 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         pushButtonIfValid(buttonName2, buttonValue2);
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
-
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
-
         const safeRemarketingJson = remarketingJson || '';
-
         bot.name = name;
         bot.token = token;
         bot.description = description;
@@ -818,7 +803,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         bot.remarketingJson = safeRemarketingJson;
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
-
         const bc = {
             name: bot.name,
             token: bot.token,
@@ -841,9 +825,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
-
         updateBotInMemory(id, bc);
-
         res.send(`
             <div class="alert alert-success">
               Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
@@ -853,6 +835,653 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         logger.error('Erro ao editar bot:', err);
         res.status(500).send('Erro ao editar bot: ' + err.message);
     }
+});
+
+//------------------------------------------------------
+// Atualização do Painel (Dashboard)
+//------------------------------------------------------
+/* Função para preencher os dados do painel – agora inclui também a seção "Stats Detalhadas" */
+function fillDashboardData(data) {
+    // Cards fixos da aba "Estatísticas" (primeira aba)
+    $('#totalUsers').text(data.statsAll.totalUsers);
+    $('#totalPurchases').text(data.statsAll.totalPurchases);
+    $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
+    const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
+    $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
+
+    // Gráfico de Barras
+    const barData = {
+        labels: ['Usuários', 'Compras'],
+        datasets: [
+            {
+                label: 'Quantidade',
+                data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
+                backgroundColor: ['#36A2EB', '#FF0000']
+            },
+        ],
+    };
+    const barCtx = document.getElementById('salesChart').getContext('2d');
+    if (!window.salesChart) {
+        window.salesChart = new Chart(barCtx, {
+            type: 'bar',
+            data: barData,
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } },
+                plugins: { chartBackground: {} }
+            }
+        });
+    } else {
+        window.salesChart.data = barData;
+    }
+    applyChartOptions(window.salesChart);
+    window.salesChart.update();
+
+    // Gráfico de Linha
+    const lineLabels = data.stats7Days.map(item => {
+        const parts = item.date.split('-');
+        return `${parts[2]}/${parts[0]}`;
+    });
+    const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
+    const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
+    const conversionRates = data.stats7Days.map(item => {
+        return item.totalVendasGeradas > 0 ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100 : 0;
+    });
+    const lineData = {
+        labels: lineLabels,
+        datasets: [
+            {
+                label: 'Valor Convertido (R$)',
+                data: convertedValues,
+                fill: false,
+                borderColor: '#ff5c5c',
+                pointBackgroundColor: '#ff5c5c',
+                pointHoverRadius: 6,
+                tension: 0.4,
+                cubicInterpolationMode: 'monotone',
+                yAxisID: 'y-axis-convertido'
+            },
+            {
+                label: 'Valor Gerado (R$)',
+                data: generatedValues,
+                fill: false,
+                borderColor: '#36A2EB',
+                pointBackgroundColor: '#36A2EB',
+                pointHoverRadius: 6,
+                tension: 0.4,
+                cubicInterpolationMode: 'monotone',
+                yAxisID: 'y-axis-gerado'
+            },
+            {
+                label: 'Taxa de Conversão (%)',
+                data: conversionRates,
+                fill: false,
+                borderColor: 'green',
+                pointBackgroundColor: 'green',
+                pointHoverRadius: 6,
+                tension: 0.4,
+                cubicInterpolationMode: 'monotone',
+                yAxisID: 'y-axis-conversion'
+            }
+        ]
+    };
+    const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+    if (!window.lineComparisonChart) {
+        window.lineComparisonChart = new Chart(lineCtx, {
+            type: 'line',
+            data: lineData,
+            options: {
+                responsive: true,
+                scales: {
+                    'y-axis-convertido': { type: 'linear', position: 'left', beginAtZero: true, offset: true },
+                    'y-axis-gerado': { type: 'linear', position: 'right', beginAtZero: true, offset: true, grid: { drawOnChartArea: false } },
+                    'y-axis-conversion': {
+                        type: 'linear', position: 'right', beginAtZero: true, offset: true,
+                        suggestedMax: 100,
+                        grid: { drawOnChartArea: false },
+                        ticks: { callback: value => value + '%' }
+                    },
+                    x: {}
+                },
+                plugins: {
+                    chartBackground: {},
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const value = ctx.parsed.y || 0;
+                                return ctx.dataset.label === 'Taxa de Conversão (%)'
+                                    ? `Taxa: ${value.toFixed(2)}%`
+                                    : `R$ ${value.toFixed(2)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        window.lineComparisonChart.data = lineData;
+    }
+    applyChartOptions(window.lineComparisonChart);
+    window.lineComparisonChart.update();
+
+    // Ranking Simples
+    const botRankingTbody = $('#botRanking');
+    botRankingTbody.empty();
+    if (data.botRanking && data.botRanking.length > 0) {
+        data.botRanking.forEach(bot => {
+            botRankingTbody.append(`
+                <tr>
+                    <td>${bot.botName || 'N/A'}</td>
+                    <td>${bot.vendas}</td>
+                </tr>
+            `);
+        });
+    } else {
+        botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
+    }
+
+    // Ranking Detalhado
+    const detailsTbody = $('#botDetailsBody');
+    detailsTbody.empty();
+    if (data.botDetails && data.botDetails.length > 0) {
+        data.botDetails.forEach(bot => {
+            let plansHtml = '';
+            bot.plans.forEach(plan => {
+                plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
+            });
+            detailsTbody.append(`
+                <tr>
+                    <td>${bot.botName}</td>
+                    <td>R$${bot.valorGerado.toFixed(2)}</td>
+                    <td>${bot.totalPurchases}</td>
+                    <td>${plansHtml}</td>
+                    <td>${bot.conversionRate.toFixed(2)}%</td>
+                    <td>R$${bot.averageValue.toFixed(2)}</td>
+                </tr>
+            `);
+        });
+    } else {
+        detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
+    }
+
+    // Estatísticas Fixas (cards já existentes)
+    $('#cardAllLeads').text(data.statsAll.totalUsers);
+    $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
+    $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
+    $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
+    $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
+
+    $('#cardMainLeads').text(data.statsMain.totalUsers);
+    $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
+    $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
+    $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
+    $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
+
+    $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
+    $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+    $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
+    $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
+    $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+    $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
+    $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+    $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
+    $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
+    $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+    // *** NOVO BLOCO: Preencher a aba "Stats Detalhadas" ***
+    // Caso a aba exista (ex: container com id "statsDetailedSection")
+    if ($('#statsDetailedSection').length) {
+        $('#statsDetailedSection').html(`
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Todos</h5>
+                            <p>Total Leads: ${data.statsAll.totalUsers}</p>
+                            <p>Total Compras: ${data.statsAll.totalPurchases}</p>
+                            <p>Conversão: ${data.statsAll.conversionRate.toFixed(2)}%</p>
+                            <p>Volume Gerado: R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}</p>
+                            <p>Volume Pago: R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Main</h5>
+                            <p>Total Leads: ${data.statsMain.totalUsers}</p>
+                            <p>Total Compras: ${data.statsMain.totalPurchases}</p>
+                            <p>Conversão: ${data.statsMain.conversionRate.toFixed(2)}%</p>
+                            <p>Volume Gerado: R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}</p>
+                            <p>Volume Pago: R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Not Purchased</h5>
+                            <p>Total Leads: ${data.statsNotPurchased.totalUsers}</p>
+                            <p>Total Compras: ${data.statsNotPurchased.totalPurchases}</p>
+                            <p>Conversão: ${data.statsNotPurchased.conversionRate.toFixed(2)}%</p>
+                            <p>Volume Gerado: R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}</p>
+                            <p>Volume Pago: R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Purchased</h5>
+                            <p>Total Leads: ${data.statsPurchased.totalUsers}</p>
+                            <p>Total Compras: ${data.statsPurchased.totalPurchases}</p>
+                            <p>Conversão: ${data.statsPurchased.conversionRate.toFixed(2)}%</p>
+                            <p>Volume Gerado: R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}</p>
+                            <p>Volume Pago: R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+
+    // Movimentações
+    totalMovementsCount = data.totalMovements || 0;
+    renderPagination(totalMovementsCount, currentPage, currentPerPage);
+    const movementsTbody = $('#lastMovementsBody');
+    movementsTbody.empty();
+    if (data.lastMovements && data.lastMovements.length > 0) {
+        data.lastMovements.forEach(mov => {
+            const leadId = mov.User ? mov.User.telegramId : 'N/A';
+            let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
+            let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
+            let statusHtml = '';
+            if (mov.status === 'paid') {
+                statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
+            } else if (mov.status === 'pending') {
+                statusHtml = `<span style="color:#ff9900;font-weight:bold;">Pending</span>`;
+            } else {
+                statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+            }
+            let payDelayHtml = '—';
+            if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
+                if (diffMs >= 0) {
+                    payDelayHtml = formatDuration(diffMs);
+                }
+            }
+            movementsTbody.append(`
+                <tr>
+                    <td>${leadId}</td>
+                    <td>R$ ${mov.planValue.toFixed(2)}</td>
+                    <td>${dtGen}</td>
+                    <td>${dtPaid}</td>
+                    <td>${statusHtml}</td>
+                    <td>${payDelayHtml}</td>
+                </tr>
+            `);
+        });
+    } else {
+        movementsTbody.append(`
+            <tr>
+                <td colspan="6">Nenhuma movimentação encontrada</td>
+            </tr>
+        `);
+    }
+}
+
+//------------------------------------------------------
+// Funções Auxiliares
+//------------------------------------------------------
+function formatDuration(ms) {
+    if (ms <= 0) return '0s';
+    const totalSec = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSec / 60);
+    const seconds = totalSec % 60;
+    return `${minutes}m ${seconds}s`;
+}
+
+function applyChartOptions(chartInstance) {
+    const isDark = $('body').hasClass('dark-mode');
+    const cfg = {
+        backgroundColor: isDark ? '#1e1e1e' : '#fff',
+        axisColor: isDark ? '#fff' : '#000',
+        gridColor: isDark ? '#555' : '#ccc'
+    };
+    chartInstance.options.plugins.chartBackground = { color: cfg.backgroundColor };
+    if (chartInstance.options.scales) {
+        Object.values(chartInstance.options.scales).forEach(scale => {
+            if (scale.ticks) scale.ticks.color = cfg.axisColor;
+            if (scale.grid) scale.grid.color = cfg.gridColor;
+        });
+    }
+}
+
+function renderPagination(total, page, perPage) {
+    totalPages = Math.ceil(total / perPage);
+    const paginationContainer = $('#paginationContainer');
+    paginationContainer.empty();
+    if (totalPages <= 1) return;
+    const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
+    const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
+    if (page > 10) {
+        doubleLeft.on('click', () => { currentPage = Math.max(1, page - 10); refreshDashboard(); });
+    } else {
+        doubleLeft.prop('disabled', true);
+    }
+    group.append(doubleLeft);
+    const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
+    if (page > 1) {
+        singleLeft.on('click', () => { currentPage = page - 1; refreshDashboard(); });
+    } else {
+        singleLeft.prop('disabled', true);
+    }
+    group.append(singleLeft);
+    let startPage = page - 1, endPage = page + 1;
+    if (startPage < 1) { startPage = 1; endPage = 3; }
+    if (endPage > totalPages) { endPage = totalPages; startPage = endPage - 2; if (startPage < 1) startPage = 1; }
+    for (let p = startPage; p <= endPage; p++) {
+        const btn = $(`<button class="btn btn-light">${p}</button>`);
+        if (p === page) { btn.addClass('btn-primary'); }
+        else { btn.on('click', () => { currentPage = p; refreshDashboard(); }); }
+        group.append(btn);
+    }
+    const singleRight = $('<button class="btn btn-light">&raquo;</button>');
+    if (page < totalPages) {
+        singleRight.on('click', () => { currentPage = page + 1; refreshDashboard(); });
+    } else { singleRight.prop('disabled', true); }
+    group.append(singleRight);
+    const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
+    if (page + 10 <= totalPages) {
+        doubleRight.on('click', () => { currentPage = Math.min(totalPages, page + 10); refreshDashboard(); });
+    } else { doubleRight.prop('disabled', true); }
+    group.append(doubleRight);
+    paginationContainer.append(group);
+}
+
+function loadBotList() {
+    fetch('/api/bots-list')
+        .then(res => res.json())
+        .then(botNames => { renderBotCheckboxDropdown(botNames); })
+        .catch(err => console.error('Erro ao carregar bots-list:', err));
+}
+
+function renderBotCheckboxDropdown(botNames) {
+    const container = $('#botFilterContainer');
+    container.empty();
+    const toggleBtn = $(`
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+            Bots
+        </button>
+    `);
+    const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
+    const allId = 'bot_all';
+    const allItem = $(`
+        <div class="form-check pl-2">
+            <input class="form-check-input" type="checkbox" id="${allId}" value="All">
+            <label class="form-check-label" for="${allId}">All</label>
+        </div>
+    `);
+    allItem.find('input').on('change', function () {
+        if ($(this).prop('checked')) {
+            checkList.find('input[type="checkbox"]').not(`#${allId}`).prop('checked', false);
+            selectedBots = ['All'];
+        } else {
+            selectedBots = [];
+        }
+        currentPage = 1;
+        refreshDashboard();
+    });
+    checkList.append(allItem);
+    botNames.forEach(bot => {
+        const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
+        const item = $(`
+            <div class="form-check pl-2">
+                <input class="form-check-input" type="checkbox" id="${safeId}" value="${bot}">
+                <label class="form-check-label" for="${safeId}">${bot}</label>
+            </div>
+        `);
+        item.find('input').on('change', function () {
+            if ($(this).prop('checked')) {
+                checkList.find(`#${allId}`).prop('checked', false);
+                selectedBots = selectedBots.filter(b => b !== 'All');
+                selectedBots.push(bot);
+            } else {
+                selectedBots = selectedBots.filter(b => b !== bot);
+            }
+            currentPage = 1;
+            refreshDashboard();
+        });
+        checkList.append(item);
+    });
+    const dropDiv = $('<div class="dropdown-multi"></div>');
+    dropDiv.append(toggleBtn).append(checkList);
+    toggleBtn.on('click', function (e) { e.stopPropagation(); checkList.toggleClass('show'); });
+    $(document).on('click', function (e) {
+        if (!dropDiv.is(e.target) && dropDiv.has(e.target).length === 0) {
+            checkList.removeClass('show');
+        }
+    });
+    container.append(dropDiv);
+}
+
+function getDateRangeParams() {
+    const rangeValue = $('#dateRangeSelector').val();
+    if (rangeValue === 'custom') {
+        const sDate = $('#startDateInput').val();
+        const eDate = $('#endDateInput').val();
+        return { dateRange: 'custom', startDate: sDate, endDate: eDate };
+    }
+    return { dateRange: rangeValue };
+}
+
+async function updateDashboard(movStatus, page, perPage) {
+    try {
+        const dr = getDateRangeParams();
+        let botFilterParam = '';
+        if (selectedBots.length > 0) {
+            botFilterParam = selectedBots.join(',');
+        }
+        let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
+        if (movStatus) url += `&movStatus=${movStatus}`;
+        if (botFilterParam) url += `&botFilter=${botFilterParam}`;
+        if (dr.dateRange === 'custom') {
+            url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
+        } else {
+            url += `&dateRange=${dr.dateRange}`;
+        }
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Erro ao obter dados da API');
+        const data = await response.json();
+        fillDashboardData(data);
+    } catch (err) {
+        console.error('Erro no updateDashboard:', err);
+    }
+}
+
+function refreshDashboard() {
+    const movStatus = $('#movStatusFilter').val() || '';
+    updateDashboard(movStatus, currentPage, currentPerPage);
+}
+
+//------------------------------------------------------------
+// Inicialização
+//------------------------------------------------------------
+loadBotList();
+refreshDashboard();
+const defaultSection = $('#sidebarNav .nav-link.active').data('section');
+if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
+    $('#botFilterContainer').show();
+} else {
+    $('#botFilterContainer').hide();
+}
+$('#movStatusFilter').on('change', function () { currentPage = 1; refreshDashboard(); });
+$('#movPerPage').on('change', function () {
+    currentPerPage = parseInt($(this).val(), 10);
+    currentPage = 1;
+    refreshDashboard();
+});
+$('#dateRangeSelector').on('change', function () {
+    if ($(this).val() === 'custom') { $('#customDateModal').modal('show'); }
+    else { currentPage = 1; refreshDashboard(); }
+});
+$('#applyCustomDateBtn').on('click', function () {
+    $('#customDateModal').modal('hide');
+    currentPage = 1;
+    refreshDashboard();
+});
+$('#sidebarNav .nav-link').on('click', function (e) {
+    e.preventDefault();
+    $('#sidebarNav .nav-link').removeClass('active clicked');
+    $(this).addClass('active clicked');
+    $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection').addClass('d-none');
+    const targetSection = $(this).data('section');
+    $(`#${targetSection}`).removeClass('d-none');
+    if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
+        targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
+        $('#botFilterContainer').show();
+    } else {
+        $('#botFilterContainer').hide();
+        if (targetSection === 'manageBotsSection') {
+            loadExistingBots();
+        }
+    }
+    currentPage = 1;
+    refreshDashboard();
+});
+$('#toggleSidebarBtn').on('click', function () {
+    $('#sidebar').toggleClass('collapsed');
+    $('main[role="main"]').toggleClass('expanded');
+});
+
+//------------------------------------------------------------
+// Rotas de Gerenciar Bots (Criação, Listagem, Edição)
+//------------------------------------------------------------
+$('#addBotForm').on('submit', function (e) {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('name', $('#botNameInput').val().trim());
+    formData.append('token', $('#botTokenInput').val().trim());
+    formData.append('description', $('#botDescriptionInput').val().trim());
+    formData.append('buttonName1', $('#buttonName1').val().trim());
+    formData.append('buttonValue1', $('#buttonValue1').val().trim());
+    formData.append('buttonName2', $('#buttonName2').val().trim());
+    formData.append('buttonValue2', $('#buttonValue2').val().trim());
+    formData.append('buttonName3', $('#buttonName3').val().trim());
+    formData.append('buttonValue3', $('#buttonValue3').val().trim());
+    formData.append('remarketingJson', $('#remarketingInput').val().trim());
+    const videoFile = $('#botVideoFile')[0].files[0];
+    if (videoFile) { formData.append('videoFile', videoFile); }
+    fetch('/admin/bots', { method: 'POST', body: formData })
+        .then(async (res) => {
+            if (!res.ok) {
+                const textErr = await res.text();
+                throw new Error(textErr);
+            }
+            return res.text();
+        })
+        .then(htmlResponse => {
+            $('#addBotResponse').html(htmlResponse);
+            loadBotList();
+            loadExistingBots();
+            $('#addBotForm')[0].reset();
+        })
+        .catch(err => {
+            $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+        });
+});
+function loadExistingBots() {
+    $('#existingBotsBody').html(`<tr><td colspan="4">Carregando...</td></tr>`);
+    fetch('/admin/bots/list')
+        .then(res => res.json())
+        .then(list => {
+            const tbody = $('#existingBotsBody');
+            tbody.empty();
+            if (!list || list.length === 0) {
+                tbody.html(`<tr><td colspan="4">Nenhum bot cadastrado</td></tr>`);
+                return;
+            }
+            list.forEach(bot => {
+                let videoLabel = bot.video ? bot.video : '—';
+                tbody.append(`
+                    <tr>
+                        <td>${bot.id}</td>
+                        <td>${bot.name}</td>
+                        <td>${videoLabel}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
+                        </td>
+                    </tr>
+                `);
+            });
+        })
+        .catch(err => {
+            console.error('Erro ao carregar bots:', err);
+            $('#existingBotsBody').html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
+        });
+}
+$(document).on('click', '[data-edit-bot]', function () {
+    const botId = $(this).attr('data-edit-bot');
+    editBot(botId);
+});
+function editBot(botId) {
+    $('#editBotForm')[0].reset();
+    $('#editBotResponse').empty();
+    $('#editBotId').val(botId);
+    fetch(`/admin/bots/${botId}`)
+        .then(res => { if (!res.ok) throw new Error('Bot não encontrado'); return res.json(); })
+        .then(bot => {
+            $('#editBotName').val(bot.name);
+            $('#editBotToken').val(bot.token);
+            $('#editBotDescription').val(bot.description || '');
+            let bjson = [];
+            try { bjson = JSON.parse(bot.buttonsJson || '[]'); } catch (e) { }
+            if (bjson[0]) {
+                $('#editButtonName1').val(bjson[0].name);
+                $('#editButtonValue1').val(bjson[0].value);
+            } else { $('#editButtonName1').val(''); $('#editButtonValue1').val(''); }
+            if (bjson[1]) {
+                $('#editButtonName2').val(bjson[1].name);
+                $('#editButtonValue2').val(bjson[1].value);
+            } else { $('#editButtonName2').val(''); $('#editButtonValue2').val(''); }
+            if (bjson[2]) {
+                $('#editButtonName3').val(bjson[2].name);
+                $('#editButtonValue3').val(bjson[2].value);
+            } else { $('#editButtonName3').val(''); $('#editButtonValue3').val(''); }
+            $('#editRemarketingJson').val(bot.remarketingJson || '');
+            $('#editBotContainer').show();
+        })
+        .catch(err => { $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`); });
+}
+$('#cancelEditBotBtn').on('click', function () {
+    $('#editBotContainer').hide();
+});
+$('#editBotForm').on('submit', function (e) {
+    e.preventDefault();
+    const botId = $('#editBotId').val();
+    if (!botId) { $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`); return; }
+    const formData = new FormData();
+    formData.append('name', $('#editBotName').val().trim());
+    formData.append('token', $('#editBotToken').val().trim());
+    formData.append('description', $('#editBotDescription').val().trim());
+    formData.append('buttonName1', $('#editButtonName1').val().trim());
+    formData.append('buttonValue1', $('#editButtonValue1').val().trim());
+    formData.append('buttonName2', $('#editButtonName2').val().trim());
+    formData.append('buttonValue2', $('#editButtonValue2').val().trim());
+    formData.append('buttonName3', $('#editButtonName3').val().trim());
+    formData.append('buttonValue3', $('#editButtonValue3').val().trim());
+    formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
+    const videoFile = $('#editVideoFile')[0].files[0];
+    if (videoFile) { formData.append('videoFile', videoFile); }
+    fetch(`/admin/bots/edit/${botId}`, { method: 'POST', body: formData })
+        .then(async (res) => { if (!res.ok) { const textErr = await res.text(); throw new Error(textErr); } return res.text(); })
+        .then(htmlResp => {
+            $('#editBotResponse').html(htmlResp);
+            loadExistingBots();
+            loadBotList();
+        })
+        .catch(err => { $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`); });
 });
 
 //------------------------------------------------------
