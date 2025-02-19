@@ -190,6 +190,7 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
+// A rota /api/bots-list agora usa o BotModel para preencher o dropdown do painel
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -204,12 +205,15 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 //=====================================================================
 // ATENÇÃO: Ajuste para as estatísticas do painel
 //=====================================================================
+// Nesta versão usamos a função makeDay (que zera a data sem conversão de fuso),
+// que era a versão que funcionava para o painel anteriormente.
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
+// A função getDetailedStats permanece conforme sua implementação atual.
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -326,6 +330,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     } catch (err) {
         logger.error(`Erro interno em getDetailedStats: ${err.message}`);
     }
+
     return {
         totalUsers,
         totalPurchases,
@@ -350,6 +355,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
+
         let startDate, endDate;
         if (dateRange) {
             switch (dateRange) {
@@ -446,6 +452,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             endDate = new Date(todayStart);
             endDate.setHours(23, 59, 59, 999);
         }
+
         // Obtém as estatísticas em paralelo
         const [statsAll, statsMain, statsNotPurchased, statsPurchased, statsYesterday] = await Promise.all([
             getDetailedStats(startDate, endDate, null, botFilters),
@@ -459,13 +466,15 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 return await getDetailedStats(yesterdayStart, yesterdayEnd, null, botFilters);
             })()
         ]);
-        // Dados para a segunda aba (cards de estatísticas detalhadas)
+
+        // Acrescenta dados para a segunda aba (statsDetailedSection)
         const statsDetailed = {
             allPurchases: statsAll.totalPurchases,
             mainPlan: statsMain.totalPurchases,
             remarketing: statsNotPurchased.totalPurchases,
             upsell: statsPurchased.totalPurchases
         };
+
         // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
@@ -480,6 +489,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             botName: item.botName,
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
+
         // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
@@ -493,6 +503,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             },
             group: ['botName'],
         });
+
         const generatedByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -508,6 +519,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
         generatedByBot.forEach(item => {
             generatedMap[item.botName] = parseFloat(item.getDataValue('generatedValue')) || 0;
         });
+
         const botsWithInteractions = await User.findAll({
             attributes: [
                 'botName',
@@ -525,6 +537,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             const uCount = parseInt(item.getDataValue('totalUsers'), 10) || 0;
             botUsersMap[bName] = uCount;
         });
+
         const planSalesByBot = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -549,6 +562,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             if (!botPlansMap[bName]) botPlansMap[bName] = {};
             botPlansMap[bName][pName] = { salesCount: sCount, totalValue: tValue };
         });
+
         const botDetails = [];
         for (const bot of botsWithPurchases) {
             const bName = bot.botName;
@@ -572,6 +586,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })) || 0;
             const conversionRateBot = generatedForBot > 0 ? (totalValueBot / generatedForBot) * 100 : 0;
             const averageValueBot = totalPurchasesBot > 0 ? totalValueBot / totalPurchasesBot : 0;
+
             const plansObj = botPlansMap[bName] || {};
             const plansArray = [];
             for (const [planName, info] of Object.entries(plansObj)) {
@@ -582,6 +597,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                     conversionRate: planConvRate,
                 });
             }
+
             botDetails.push({
                 botName: bName,
                 valorGerado: totalValueBot,
@@ -593,6 +609,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             });
         }
         botDetails.sort((a, b) => b.valorGerado - a.valorGerado);
+
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -607,6 +624,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 totalVendasGeradas: dayStat.totalVendasGeradas || 0
             });
         }
+
         const lastMovementsWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
         if (movStatus === 'pending') {
             lastMovementsWhere.status = 'pending';
@@ -627,13 +645,14 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
                 attributes: ['telegramId']
             }]
         });
+
         res.json({
             statsAll,
             statsYesterday,
             statsMain,
             statsNotPurchased,
             statsPurchased,
-            statsDetailed,
+            statsDetailed, // <-- Dados para a segunda aba (cards de: Todas as Compras, Plano Principal, Remarketing e Upsell)
             botRanking,
             botDetails,
             stats7Days,
@@ -647,11 +666,8 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Rotas de Gerenciar Bots
+// Rotas de Gerenciar Bots (sem alterações na estrutura)
 //------------------------------------------------------
-
-// [POST] Criar Novo Bot (com upload de vídeo opcional)
-// Agora NÃO usa mais o campo global "vipLink" e os botões incluem o link individual
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -659,54 +675,46 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
-            // vipLink removido
             buttonName1,
             buttonValue1,
-            buttonLink1, // novo campo para o link do botão 1
             buttonName2,
             buttonValue2,
-            buttonLink2, // novo campo para o link do botão 2
             buttonName3,
             buttonValue3,
-            buttonLink3, // novo campo para o link do botão 3
             remarketingJson
         } = payload;
+
         const buttons = [];
-        function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' &&
-                bValue && !isNaN(parseFloat(bValue)) &&
-                bLink && bLink.trim() !== '') {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
-        pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
-        pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
-        // Se nenhum botão for definido, retorna erro (bot deve ter pelo menos 1 plano com link)
-        if (buttons.length === 0) {
-            return res.status(400).send('Erro: É necessário definir pelo menos um botão com link do grupo VIP.');
-        }
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
+
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.location;
         }
+
         const newBot = await BotModel.create({
             name,
             token,
             description,
-            // vipLink removido do objeto
             video: videoFilename,
             buttonsJson,
             remarketingJson: safeRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
+
         const bc = {
             name: newBot.name,
             token: newBot.token,
             description: newBot.description,
-            // vipLink não existe mais globalmente
             video: newBot.video,
             buttons: buttons,
             remarketing: {}
@@ -725,6 +733,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
                 bc.remarketing = {};
             }
         }
+
         initializeBot(bc);
         res.send(`
             <div class="alert alert-success">
@@ -761,8 +770,6 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     }
 });
 
-// [POST] Editar bot existente (com upload de vídeo opcional)
-// Agora inclui o campo para os links individuais de cada botão
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -770,42 +777,38 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         if (!bot) {
             return res.status(404).send('Bot não encontrado');
         }
+
         const {
             name,
             token,
             description,
-            // vipLink removido
             buttonName1,
             buttonValue1,
-            buttonLink1,
             buttonName2,
             buttonValue2,
-            buttonLink2,
             buttonName3,
             buttonValue3,
-            buttonLink3,
             remarketingJson
         } = req.body;
+
         const buttons = [];
-        function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' &&
-                bValue && !isNaN(parseFloat(bValue)) &&
-                bLink && bLink.trim() !== '') {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
+        function pushButtonIfValid(bName, bValue) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
-        pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
-        pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
-        if (buttons.length === 0) {
-            return res.status(400).send('Erro: É necessário definir pelo menos um botão com link do grupo VIP.');
-        }
+        pushButtonIfValid(buttonName1, buttonValue1);
+        pushButtonIfValid(buttonName2, buttonValue2);
+        pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
+
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
+
         const safeRemarketingJson = remarketingJson || '';
+
         bot.name = name;
         bot.token = token;
         bot.description = description;
@@ -814,6 +817,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         bot.remarketingJson = safeRemarketingJson;
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
+
         const bc = {
             name: bot.name,
             token: bot.token,
@@ -836,7 +840,9 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
                 bc.remarketing = {};
             }
         }
+
         updateBotInMemory(id, bc);
+
         res.send(`
             <div class="alert alert-success">
               Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!

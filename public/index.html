@@ -13,7 +13,7 @@
             color: #fff;
         }
 
-        /* (Outros estilos mantidos) */
+        /* Estilos para o dropdown de bots */
         .dropdown-multi {
             position: relative;
             display: inline-block;
@@ -43,6 +43,7 @@
             display: block;
         }
 
+        /* Ajustes para a área de Gerenciar Bots */
         #manageBotsSection .form-control {
             margin-bottom: 0.5rem;
         }
@@ -70,11 +71,12 @@
             margin-top: 0.5rem;
         }
 
+        /* Centraliza o conteúdo dos cards da segunda aba de estatísticas */
         .stats-detailed .card-body {
             text-align: center;
         }
 
-        /* Estilização do card de edição de bot (overlay) */
+        /* Estilização do card de edição de bot (aparecendo como um overlay similar ao modal) */
         #editBotContainer {
             position: fixed;
             top: 50%;
@@ -83,10 +85,12 @@
             z-index: 1050;
             width: 90%;
             max-width: 400px;
+            /* Diminuído para 400px */
             background-color: #fff;
             padding: 1.5rem;
             border: 1px solid #ced4da;
             border-radius: 0.5rem;
+            /* Bordas arredondadas */
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             display: none;
         }
@@ -100,7 +104,7 @@
 
 <body>
     <div id="appContainer">
-        <!-- SIDEBAR (mantém igual) -->
+        <!-- SIDEBAR -->
         <nav id="sidebar">
             <div id="sidebarContent">
                 <ul class="nav flex-column" id="sidebarNav">
@@ -120,6 +124,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <!-- Segunda aba de Estatísticas do Dia -->
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             Estatísticas do Dia (Detalhadas)
                         </a>
@@ -133,7 +138,7 @@
             </div>
         </nav>
 
-        <!-- MAIN CONTENT (mantém-se igual) -->
+        <!-- MAIN CONTENT -->
         <div id="mainContent">
             <!-- Top Bar -->
             <div class="d-flex justify-content-between align-items-center pt-3 pb-3">
@@ -155,7 +160,7 @@
             <div class="py-3">
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
 
-                <!-- Filtros e Modal para datas (mantém-se igual) -->
+                <!-- Filtros -->
                 <div class="form-inline mb-3" style="gap: 1rem;">
                     <label style="margin-right: 0.5rem;">Filtro de Data:</label>
                     <select id="dateRangeSelector" class="form-control form-control-sm">
@@ -169,6 +174,7 @@
                     <div id="botFilterContainer" style="margin-left: 1rem; display: none;"></div>
                 </div>
 
+                <!-- Modal para datas personalizadas -->
                 <div class="modal fade" id="customDateModal" tabindex="-1" role="dialog"
                     aria-labelledby="customDateModalLabel" aria-hidden="true">
                     <div class="modal-dialog modal-sm" role="document">
@@ -194,7 +200,264 @@
                 </div>
 
                 <!-- SEÇÃO 1: Estatísticas do Dia (resumo) -->
-                <!-- (Mantém-se igual) -->
+                <section id="statsSection">
+                    <h3>Estatísticas do Dia</h3>
+                    <div class="row text-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Usuários Ativos</h5>
+                                    <p class="card-text display-4 stats-display" id="totalUsers">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total de Compras</h5>
+                                    <p class="card-text display-4 stats-display" id="totalPurchases">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Taxa de Conversão</h5>
+                                    <p class="card-text display-4 stats-display" id="conversionRate">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Tempo médio de pagamento</h5>
+                                    <p class="card-text display-4 stats-display" id="avgPaymentTimeText">0s</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4 class="text-center">Usuários e Compras</h4>
+                            <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h4 class="text-center">Vendas Pagas e Geradas</h4>
+                            <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="d-flex mt-4 align-items-center" style="gap: 1rem; flex-wrap: wrap;">
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right: 0.5rem;">Status:</label>
+                            <select id="movStatusFilter" class="form-control form-control-sm">
+                                <option value="">Todos</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="paid">Pagos</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right: 0.5rem; margin-left: 1rem;">Exibir por página:</label>
+                            <select id="movPerPage" class="form-control form-control-sm">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <table class="table table-bordered table-striped mt-2" id="lastMovementsTable">
+                        <thead>
+                            <tr>
+                                <th>ID Lead (Telegram)</th>
+                                <th>Valor</th>
+                                <th>Gerado em</th>
+                                <th>Pago em</th>
+                                <th>Status</th>
+                                <th>Tempo p/ Pagar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lastMovementsBody"></tbody>
+                    </table>
+                    <div id="paginationContainer" class="mt-2"></div>
+                </section>
+
+                <!-- SEÇÃO 2: Ranking -->
+                <section id="rankingSimplesSection" class="d-none">
+                    <h3>Ranking</h3>
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Vendas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="botRanking"></tbody>
+                    </table>
+                </section>
+
+                <!-- SEÇÃO 3: Dashboard Detalhado -->
+                <section id="rankingDetalhadoSection" class="d-none">
+                    <h3>Dashboard Detalhado</h3>
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Valor Convertido (R$)</th>
+                                <th>Vendas</th>
+                                <th>Planos e Conversão</th>
+                                <th>Conversão (%)</th>
+                                <th>Valor Médio (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="botDetailsBody"></tbody>
+                    </table>
+                </section>
+
+                <!-- SEÇÃO 4: Estatísticas do Dia (Detalhadas) -->
+                <section id="statsDetailedSection" class="d-none">
+                    <h3>Estatísticas do Dia</h3>
+                    <div class="row stats-detailed">
+                        <!-- COLUNA 1: TODAS AS COMPRAS -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">TODAS AS COMPRAS</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Leads Iniciados</h6>
+                                    <p class="card-text" id="cardAllLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardAllPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardAllConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardAllTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardAllTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 2: PLANO PRINCIPAL -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">PLANO PRINCIPAL</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Leads que Geraram Pix</h6>
+                                    <p class="card-text" id="cardMainLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardMainPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardMainConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardMainTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardMainTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 3: REMARKETING -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">REMARKETING</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total de Leads</h6>
+                                    <p class="card-text" id="cardNotPurchasedLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardNotPurchasedPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardNotPurchasedConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardNotPurchasedTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardNotPurchasedTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 4: UPSELL -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">UPSELL</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total de Leads</h6>
+                                    <p class="card-text" id="cardPurchasedLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardPurchasedPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardPurchasedConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardPurchasedTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardPurchasedTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <!-- SEÇÃO 5: Gerenciar Bots -->
                 <section id="manageBotsSection" class="d-none">
@@ -220,7 +483,7 @@
                         </tbody>
                     </table>
 
-                    <!-- Card de Edição de Bot (overlay) -->
+                    <!-- Card de Edição de Bot (estilizado como overlay) -->
                     <div id="editBotContainer">
                         <h5 class="text-center">Editar Bot</h5>
                         <form id="editBotForm" enctype="multipart/form-data">
@@ -234,9 +497,6 @@
                             <label for="editBotDescription">Descrição:</label>
                             <textarea id="editBotDescription" class="form-control" rows="2"></textarea>
 
-                            <!-- NÃO usamos mais um campo global para link -->
-                            <!-- Agora cada botão terá seu link -->
-
                             <label>Vídeo (upload opcional):</label>
                             <input type="file" id="editVideoFile" class="form-control-file" accept="video/*" />
 
@@ -247,29 +507,22 @@
                                     placeholder="Nome Botão 1" />
                                 <input type="text" id="editButtonValue1" class="form-control"
                                     placeholder="Valor Pix 1" />
-                                <input type="text" id="editButtonLink1" class="form-control"
-                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName2" class="form-control"
                                     placeholder="Nome Botão 2" />
                                 <input type="text" id="editButtonValue2" class="form-control"
                                     placeholder="Valor Pix 2" />
-                                <input type="text" id="editButtonLink2" class="form-control"
-                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName3" class="form-control"
                                     placeholder="Nome Botão 3" />
                                 <input type="text" id="editButtonValue3" class="form-control"
                                     placeholder="Valor Pix 3" />
-                                <input type="text" id="editButtonLink3" class="form-control"
-                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <hr />
                             <label>Remarketing JSON:</label>
-                            <textarea id="editRemarketingJson" class="form-control" rows="3"
-                                placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
+                            <textarea id="editRemarketingJson" class="form-control" rows="3"></textarea>
                             <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
                             <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
                         </form>
@@ -289,8 +542,6 @@
                         <label for="botDescriptionInput">Descrição:</label>
                         <textarea id="botDescriptionInput" class="form-control" rows="2"></textarea>
 
-                        <!-- Campo global para VIP removido -->
-
                         <label>Vídeo (upload do PC):</label>
                         <input type="file" id="botVideoFile" class="form-control-file" accept="video/*" />
 
@@ -299,22 +550,18 @@
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName1" placeholder="Nome Botão 1" />
                             <input type="text" class="form-control" id="buttonValue1" placeholder="Valor Pix 1" />
-                            <input type="text" class="form-control" id="buttonLink1" placeholder="Link do Grupo VIP" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName2" placeholder="Nome Botão 2" />
                             <input type="text" class="form-control" id="buttonValue2" placeholder="Valor Pix 2" />
-                            <input type="text" class="form-control" id="buttonLink2" placeholder="Link do Grupo VIP" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName3" placeholder="Nome Botão 3" />
                             <input type="text" class="form-control" id="buttonValue3" placeholder="Valor Pix 3" />
-                            <input type="text" class="form-control" id="buttonLink3" placeholder="Link do Grupo VIP" />
                         </div>
                         <hr />
                         <label for="remarketingInput">Remarketing JSON:</label>
-                        <textarea id="remarketingInput" class="form-control" rows="3"
-                            placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
+                        <textarea id="remarketingInput" class="form-control" rows="3"></textarea>
                         <small class="text-muted">Exemplo: {"messages":[...],"intervals":{...}}</small>
                         <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                     </form>
