@@ -190,7 +190,6 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
-// Agora usamos o BotModel para preencher o dropdown do painel.
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -205,15 +204,12 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 //=====================================================================
 // ATENÇÃO: Ajuste para as estatísticas do painel
 //=====================================================================
-// Nesta versão usamos a função makeDay (que zera a data sem conversão de fuso),
-// que era a versão que funcionava para o painel anteriormente.
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
-// A função getDetailedStats permanece conforme sua implementação atual.
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -467,7 +463,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })()
         ]);
 
-        // Dados para a segunda aba (cards de: Todas as Compras, Plano Principal, Remarketing e Upsell)
+        // Dados para a segunda aba (cards)
         const statsDetailed = {
             allPurchases: statsAll.totalPurchases,
             mainPlan: statsMain.totalPurchases,
@@ -652,7 +648,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             statsMain,
             statsNotPurchased,
             statsPurchased,
-            statsDetailed, // Dados para a segunda aba (cards VIP)
+            statsDetailed, // Dados para a segunda aba
             botRanking,
             botDetails,
             stats7Days,
@@ -668,7 +664,9 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 //------------------------------------------------------
 // Rotas de Gerenciar Bots
 //------------------------------------------------------
+
 // [POST] Criar Novo Bot (com upload de vídeo opcional)
+// Agora inclui o campo "vipLink" para o grupo VIP
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -676,25 +674,16 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
-            vipLink, // Novo campo para link do grupo VIP
+            vipLink,
             buttonName1,
             buttonValue1,
             buttonName2,
             buttonValue2,
             buttonName3,
             buttonValue3,
-            // Campos remarketing
-            remarketingJson,
-            remarketingVideo,
-            remarketingButtonName1,
-            remarketingButtonValue1,
-            remarketingButtonName2,
-            remarketingButtonValue2,
-            remarketingButtonName3,
-            remarketingButtonValue3
+            remarketingJson
         } = payload;
 
-        // Monta array de botões principais
         const buttons = [];
         function pushButtonIfValid(bName, bValue) {
             if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
@@ -705,42 +694,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         pushButtonIfValid(buttonName2, buttonValue2);
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
-
-        // Monta objeto remarketing (junta os dados do remarketing)
-        const remarketingObj = {};
-        if (remarketingVideo && remarketingVideo.trim() !== '') {
-            remarketingObj.video = remarketingVideo.trim();
-        }
-        // Se os botões de remarketing forem informados, monta array
-        const remarketingButtons = [];
-        function pushRemarketingButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                remarketingButtons.push({ name: bName.trim(), value: parseFloat(bValue) });
-            }
-        }
-        pushRemarketingButtonIfValid(remarketingButtonName1, remarketingButtonValue1);
-        pushRemarketingButtonIfValid(remarketingButtonName2, remarketingButtonValue2);
-        pushRemarketingButtonIfValid(remarketingButtonName3, remarketingButtonValue3);
-        if (remarketingButtons.length > 0) {
-            remarketingObj.buttons = remarketingButtons;
-        }
-        // Se o remarketingJson foi informado, mescla (prioriza remarketingJson se válido)
-        let safeRemarketingJson = remarketingJson || '';
-        if (safeRemarketingJson) {
-            try {
-                let trimmed = safeRemarketingJson.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    // Se for válido, substitui o objeto remarketing
-                    remarketingObj.messages = JSON.parse(trimmed);
-                } else {
-                    logger.warn(`Remarketing JSON para o bot ${name} não é válido. Usando objeto padrão.`);
-                }
-            } catch (e) {
-                logger.warn(`Remarketing JSON inválido para o bot ${name}.`, e);
-            }
-        }
-        // Converte o objeto remarketing para JSON
-        const finalRemarketingJson = JSON.stringify(remarketingObj);
+        const safeRemarketingJson = remarketingJson || '';
 
         let videoFilename = '';
         if (req.file) {
@@ -751,10 +705,10 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
-            vipLink, // salva o link do grupo VIP
+            vipLink, // novo campo
             video: videoFilename,
             buttonsJson,
-            remarketingJson: finalRemarketingJson
+            remarketingJson: safeRemarketingJson
         });
         logger.info(`✅ Bot ${name} inserido no BD.`);
 
@@ -762,12 +716,27 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name: newBot.name,
             token: newBot.token,
             description: newBot.description,
-            vipLink: newBot.vipLink, // inclui vipLink na configuração
+            vipLink: newBot.vipLink, // novo campo
             video: newBot.video,
             buttons: buttons,
-            remarketing: remarketingObj
+            remarketing: {}
         };
+        if (safeRemarketingJson) {
+            try {
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    bc.remarketing = JSON.parse(trimmed);
+                } else {
+                    bc.remarketing = {};
+                    logger.warn(`Remarketing JSON para o bot ${newBot.name} não é válido. Usando objeto vazio.`);
+                }
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para o bot ${newBot.name}.`, e);
+                bc.remarketing = {};
+            }
+        }
 
+        // Inicializa o bot com a nova configuração
         initializeBot(bc);
         res.send(`
             <div class="alert alert-success">
@@ -780,7 +749,6 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
     }
 });
 
-// [GET] Lista de bots (JSON)
 app.get('/admin/bots/list', checkAuth, async (req, res) => {
     try {
         const bots = await BotModel.findAll();
@@ -791,7 +759,6 @@ app.get('/admin/bots/list', checkAuth, async (req, res) => {
     }
 });
 
-// [GET] Retorna 1 bot (para edição) em JSON
 app.get('/admin/bots/:id', checkAuth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -807,6 +774,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
 });
 
 // [POST] Editar bot existente (com upload de vídeo opcional)
+// Agora inclui o campo "vipLink"
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -819,21 +787,14 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name,
             token,
             description,
-            vipLink, // novo campo vipLink
+            vipLink,
             buttonName1,
             buttonValue1,
             buttonName2,
             buttonValue2,
             buttonName3,
             buttonValue3,
-            remarketingJson,
-            remarketingVideo,
-            remarketingButtonName1,
-            remarketingButtonValue1,
-            remarketingButtonName2,
-            remarketingButtonValue2,
-            remarketingButtonName3,
-            remarketingButtonValue3
+            remarketingJson
         } = req.body;
 
         const buttons = [];
@@ -847,52 +808,20 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         pushButtonIfValid(buttonName3, buttonValue3);
         const buttonsJson = JSON.stringify(buttons);
 
-        // Monta objeto remarketing
-        const remarketingObj = {};
-        if (remarketingVideo && remarketingVideo.trim() !== '') {
-            remarketingObj.video = remarketingVideo.trim();
-        }
-        const remarketingButtons = [];
-        function pushRemarketingButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                remarketingButtons.push({ name: bName.trim(), value: parseFloat(bValue) });
-            }
-        }
-        pushRemarketingButtonIfValid(remarketingButtonName1, remarketingButtonValue1);
-        pushRemarketingButtonIfValid(remarketingButtonName2, remarketingButtonValue2);
-        pushRemarketingButtonIfValid(remarketingButtonName3, remarketingButtonValue3);
-        if (remarketingButtons.length > 0) {
-            remarketingObj.buttons = remarketingButtons;
-        }
-        let safeRemarketingJson = remarketingJson || '';
-        if (safeRemarketingJson) {
-            try {
-                let trimmed = safeRemarketingJson.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    remarketingObj.messages = JSON.parse(trimmed);
-                } else {
-                    remarketingObj.messages = {};
-                    logger.warn(`Remarketing JSON para o bot ${bot.name} não é válido. Usando objeto vazio.`);
-                }
-            } catch (e) {
-                logger.warn(`Remarketing JSON inválido para o bot ${bot.name}.`, e);
-                remarketingObj.messages = {};
-            }
-        }
-        const finalRemarketingJson = JSON.stringify(remarketingObj);
-
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
 
+        const safeRemarketingJson = remarketingJson || '';
+
         bot.name = name;
         bot.token = token;
         bot.description = description;
-        bot.vipLink = vipLink; // atualiza vipLink
+        bot.vipLink = vipLink; // novo campo
         bot.video = videoFilename;
         bot.buttonsJson = buttonsJson;
-        bot.remarketingJson = finalRemarketingJson;
+        bot.remarketingJson = safeRemarketingJson;
         await bot.save();
         logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
 
@@ -900,12 +829,27 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name: bot.name,
             token: bot.token,
             description: bot.description,
-            vipLink: bot.vipLink,
+            vipLink: bot.vipLink, // novo campo
             video: bot.video,
             buttons: buttons,
-            remarketing: remarketingObj
+            remarketing: {}
         };
+        if (safeRemarketingJson) {
+            try {
+                let trimmed = safeRemarketingJson.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    bc.remarketing = JSON.parse(trimmed);
+                } else {
+                    bc.remarketing = {};
+                    logger.warn(`Remarketing JSON para o bot ${bot.name} não é válido. Usando objeto vazio.`);
+                }
+            } catch (e) {
+                logger.warn(`Remarketing JSON inválido para o bot ${bot.name}.`, e);
+                bc.remarketing = {};
+            }
+        }
 
+        // Atualiza a instância em memória
         updateBotInMemory(id, bc);
 
         res.send(`
