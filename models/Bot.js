@@ -1,5 +1,4 @@
 // models/Bot.js
-
 module.exports = (sequelize, DataTypes) => {
     const Bot = sequelize.define(
         'Bot',
@@ -27,11 +26,23 @@ module.exports = (sequelize, DataTypes) => {
             remarketingJson: {
                 type: DataTypes.TEXT,
                 allowNull: true
+            },
+            vipLink: {
+                type: DataTypes.STRING,
+                allowNull: true
+            },
+            remarketingVideo: {
+                type: DataTypes.STRING,
+                allowNull: true
+            },
+            remarketingButtonsJson: {
+                type: DataTypes.TEXT,
+                allowNull: true
             }
         },
         {
-            tableName: 'Bots',  // Tabela "Bots"
-            timestamps: false   // Se quiser createdAt/updatedAt, remova esta linha
+            tableName: 'Bots',
+            timestamps: false
         }
     );
 
