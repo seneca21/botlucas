@@ -13,7 +13,7 @@
             color: #fff;
         }
 
-        /* Estilos para o dropdown de bots */
+        /* (Outros estilos mantidos) */
         .dropdown-multi {
             position: relative;
             display: inline-block;
@@ -43,7 +43,6 @@
             display: block;
         }
 
-        /* Ajustes para a área de Gerenciar Bots */
         #manageBotsSection .form-control {
             margin-bottom: 0.5rem;
         }
@@ -71,7 +70,6 @@
             margin-top: 0.5rem;
         }
 
-        /* Centraliza o conteúdo dos cards da segunda aba de estatísticas */
         .stats-detailed .card-body {
             text-align: center;
         }
@@ -102,7 +100,7 @@
 
 <body>
     <div id="appContainer">
-        <!-- SIDEBAR -->
+        <!-- SIDEBAR (mantém igual) -->
         <nav id="sidebar">
             <div id="sidebarContent">
                 <ul class="nav flex-column" id="sidebarNav">
@@ -122,7 +120,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <!-- Segunda aba: Estatísticas Detalhadas -->
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             Estatísticas do Dia (Detalhadas)
                         </a>
@@ -135,7 +132,8 @@
                 </ul>
             </div>
         </nav>
-        <!-- MAIN CONTENT -->
+
+        <!-- MAIN CONTENT (mantém-se igual) -->
         <div id="mainContent">
             <!-- Top Bar -->
             <div class="d-flex justify-content-between align-items-center pt-3 pb-3">
@@ -153,9 +151,11 @@
                     </span>
                 </div>
             </div>
+
             <div class="py-3">
                 <h1 class="text-center mb-4">Dashboard de Vendas</h1>
-                <!-- Filtros -->
+
+                <!-- Filtros e Modal para datas (mantém-se igual) -->
                 <div class="form-inline mb-3" style="gap: 1rem;">
                     <label style="margin-right: 0.5rem;">Filtro de Data:</label>
                     <select id="dateRangeSelector" class="form-control form-control-sm">
@@ -168,7 +168,7 @@
                     </select>
                     <div id="botFilterContainer" style="margin-left: 1rem; display: none;"></div>
                 </div>
-                <!-- Modal para datas personalizadas -->
+
                 <div class="modal fade" id="customDateModal" tabindex="-1" role="dialog"
                     aria-labelledby="customDateModalLabel" aria-hidden="true">
                     <div class="modal-dialog modal-sm" role="document">
@@ -192,29 +192,17 @@
                         </div>
                     </div>
                 </div>
+
                 <!-- SEÇÃO 1: Estatísticas do Dia (resumo) -->
-                <section id="statsSection">
-                    <!-- (Conteúdo dos cards e gráficos permanece inalterado) -->
-                    <!-- ... -->
-                </section>
-                <!-- SEÇÃO 2: Ranking -->
-                <section id="rankingSimplesSection" class="d-none">
-                    <!-- (Conteúdo inalterado) -->
-                </section>
-                <!-- SEÇÃO 3: Dashboard Detalhado -->
-                <section id="rankingDetalhadoSection" class="d-none">
-                    <!-- (Conteúdo inalterado) -->
-                </section>
-                <!-- SEÇÃO 4: Estatísticas do Dia (Detalhadas) -->
-                <section id="statsDetailedSection" class="d-none">
-                    <!-- (Conteúdo inalterado) -->
-                </section>
+                <!-- (Mantém-se igual) -->
+
                 <!-- SEÇÃO 5: Gerenciar Bots -->
                 <section id="manageBotsSection" class="d-none">
                     <h3>Gerenciar Bots</h3>
                     <p>Aqui você pode cadastrar novos bots ou editar os já existentes, enviando um arquivo de vídeo
                         direto do seu PC.</p>
                     <hr />
+
                     <h5>Bots Existentes</h5>
                     <table class="table table-bordered table-striped" id="existingBotsTable">
                         <thead>
@@ -231,6 +219,7 @@
                             </tr>
                         </tbody>
                     </table>
+
                     <!-- Card de Edição de Bot (overlay) -->
                     <div id="editBotContainer">
                         <h5 class="text-center">Editar Bot</h5>
@@ -238,26 +227,28 @@
                             <input type="hidden" id="editBotId" />
                             <label for="editBotName">Nome:</label>
                             <input type="text" id="editBotName" class="form-control" required />
+
                             <label for="editBotToken">Token:</label>
                             <input type="text" id="editBotToken" class="form-control" required />
+
                             <label for="editBotDescription">Descrição:</label>
                             <textarea id="editBotDescription" class="form-control" rows="2"></textarea>
-                            <!-- Novo campo: Link do Grupo VIP (opcional, fallback) -->
-                            <label for="editVipLink">Link do Grupo VIP:</label>
-                            <input type="text" id="editVipLink" class="form-control"
-                                placeholder="(Opcional) Cole o link do grupo VIP aqui" />
+
+                            <!-- NÃO usamos mais um campo global para link -->
+                            <!-- Agora cada botão terá seu link -->
+
                             <label>Vídeo (upload opcional):</label>
                             <input type="file" id="editVideoFile" class="form-control-file" accept="video/*" />
+
                             <hr />
                             <h6>Botões (até 3)</h6>
-                            <!-- Para cada botão, agora temos três campos: Nome, Valor e Link -->
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName1" class="form-control"
                                     placeholder="Nome Botão 1" />
                                 <input type="text" id="editButtonValue1" class="form-control"
                                     placeholder="Valor Pix 1" />
                                 <input type="text" id="editButtonLink1" class="form-control"
-                                    placeholder="Link Botão 1" />
+                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName2" class="form-control"
@@ -265,7 +256,7 @@
                                 <input type="text" id="editButtonValue2" class="form-control"
                                     placeholder="Valor Pix 2" />
                                 <input type="text" id="editButtonLink2" class="form-control"
-                                    placeholder="Link Botão 2" />
+                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <div class="bot-buttons-row">
                                 <input type="text" id="editButtonName3" class="form-control"
@@ -273,54 +264,57 @@
                                 <input type="text" id="editButtonValue3" class="form-control"
                                     placeholder="Valor Pix 3" />
                                 <input type="text" id="editButtonLink3" class="form-control"
-                                    placeholder="Link Botão 3" />
+                                    placeholder="Link do Grupo VIP" />
                             </div>
                             <hr />
                             <label>Remarketing JSON:</label>
                             <textarea id="editRemarketingJson" class="form-control" rows="3"
-                                placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10, "link": "url"}, ...]}'></textarea>
+                                placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
                             <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
                             <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
                         </form>
                         <div id="editBotResponse" class="mt-2"></div>
                     </div>
+
                     <hr />
+
                     <h5>Cadastrar Novo Bot</h5>
                     <form id="addBotForm" style="max-width:600px;" enctype="multipart/form-data">
                         <label for="botNameInput">Nome do Bot:</label>
                         <input type="text" id="botNameInput" class="form-control" required />
+
                         <label for="botTokenInput">Token do Bot:</label>
                         <input type="text" id="botTokenInput" class="form-control" required />
+
                         <label for="botDescriptionInput">Descrição:</label>
                         <textarea id="botDescriptionInput" class="form-control" rows="2"></textarea>
-                        <!-- Novo campo: Link do Grupo VIP (opcional, fallback) -->
-                        <label for="vipLinkInput">Link do Grupo VIP:</label>
-                        <input type="text" id="vipLinkInput" class="form-control"
-                            placeholder="(Opcional) Cole o link do grupo VIP aqui" />
+
+                        <!-- Campo global para VIP removido -->
+
                         <label>Vídeo (upload do PC):</label>
                         <input type="file" id="botVideoFile" class="form-control-file" accept="video/*" />
+
                         <hr />
                         <h6>Botões (até 3)</h6>
-                        <!-- Para cada botão, três campos: Nome, Valor e Link -->
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName1" placeholder="Nome Botão 1" />
                             <input type="text" class="form-control" id="buttonValue1" placeholder="Valor Pix 1" />
-                            <input type="text" class="form-control" id="buttonLink1" placeholder="Link Botão 1" />
+                            <input type="text" class="form-control" id="buttonLink1" placeholder="Link do Grupo VIP" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName2" placeholder="Nome Botão 2" />
                             <input type="text" class="form-control" id="buttonValue2" placeholder="Valor Pix 2" />
-                            <input type="text" class="form-control" id="buttonLink2" placeholder="Link Botão 2" />
+                            <input type="text" class="form-control" id="buttonLink2" placeholder="Link do Grupo VIP" />
                         </div>
                         <div class="bot-buttons-row">
                             <input type="text" class="form-control" id="buttonName3" placeholder="Nome Botão 3" />
                             <input type="text" class="form-control" id="buttonValue3" placeholder="Valor Pix 3" />
-                            <input type="text" class="form-control" id="buttonLink3" placeholder="Link Botão 3" />
+                            <input type="text" class="form-control" id="buttonLink3" placeholder="Link do Grupo VIP" />
                         </div>
                         <hr />
                         <label for="remarketingInput">Remarketing JSON:</label>
                         <textarea id="remarketingInput" class="form-control" rows="3"
-                            placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10, "link": "url"}, ...]}'></textarea>
+                            placeholder='Ex: {"video": "url_do_video", "buttons": [{"name": "Botão 1", "value": 10}, ...]}'></textarea>
                         <small class="text-muted">Exemplo: {"messages":[...],"intervals":{...}}</small>
                         <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                     </form>
@@ -329,6 +323,7 @@
             </div>
         </div>
     </div>
+
     <!-- SCRIPTS -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>

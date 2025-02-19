@@ -227,7 +227,7 @@ function checkStartFlood(botName) {
       floodData.isPaused = false;
       floodData.startTimestamps = [];
       startFloodProtection.set(botName, floodData);
-      logger.info(`Proteção Flood: ${botName} - Pausa encerrada.`);
+      logger.info(`Proteção Flood: ${botName} - pausa encerrada.`);
     } else {
       return true;
     }
@@ -315,7 +315,7 @@ async function reloadBotsFromDB() {
         video: botRow.video,
         buttons: [],
         remarketing: {},
-        vipLink: botRow.vipLink || ''
+        // Não usamos vipLink globalmente
       };
       if (botRow.buttonsJson) {
         try {
@@ -593,7 +593,7 @@ function initializeBot(botConfig) {
       user.botName = botConfig.name;
       await user.save();
     }
-    const telegramId = chatId.toString();
+    const telegramId = ctx.chat.id.toString();
     const canSelect = canAttemptSelectPlan(telegramId, plan.name);
     if (!canSelect) {
       await ctx.answerCbQuery();
@@ -677,13 +677,11 @@ function initializeBot(botConfig) {
               { status: 'paid', purchasedAt: new Date() },
               { where: { id: session.purchaseId } }
             );
-            logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
+            logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
-          // Primeiro tenta usar o link do plano; se não houver, usa o vipLink geral
+          // Envia o link definido no botão selecionado
           if (session.selectedPlan && session.selectedPlan.link && session.selectedPlan.link.trim() !== '') {
-            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
-          } else if (botConfig.vipLink && botConfig.vipLink.trim() !== '') {
-            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
             await ctx.reply('⚠️ Link do produto não definido.');
           }
@@ -750,9 +748,7 @@ function initializeBot(botConfig) {
             logger.info(`✅ ${chatId} -> comprou plano: ${session.selectedPlan.name} R$${session.selectedPlan.value}.`);
           }
           if (session.selectedPlan && session.selectedPlan.link && session.selectedPlan.link.trim() !== '') {
-            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
-          } else if (botConfig.vipLink && botConfig.vipLink.trim() !== '') {
-            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${botConfig.vipLink})`, { parse_mode: 'Markdown' });
+            await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
             await ctx.reply('⚠️ Link do produto não definido.');
           }

@@ -211,7 +211,6 @@ function makeDay(date) {
 }
 
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    // ... (mesmo código atual, sem alterações)
     let totalUsers = 0;
     let totalPurchases = 0;
     let sumGerado = 0;
@@ -652,7 +651,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 //------------------------------------------------------
 
 // [POST] Criar Novo Bot (com upload de vídeo opcional)
-// Agora os campos de botões incluem também o link do botão (por plano)
+// Agora NÃO usa mais o campo global "vipLink" e os botões incluem o link individual
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const payload = req.body;
@@ -660,44 +659,44 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name,
             token,
             description,
-            vipLink,
+            // vipLink removido
             buttonName1,
             buttonValue1,
-            buttonLink1,
+            buttonLink1, // novo campo para o link do botão 1
             buttonName2,
             buttonValue2,
-            buttonLink2,
+            buttonLink2, // novo campo para o link do botão 2
             buttonName3,
             buttonValue3,
-            buttonLink3,
+            buttonLink3, // novo campo para o link do botão 3
             remarketingJson
         } = payload;
         const buttons = [];
         function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({
-                    name: bName.trim(),
-                    value: parseFloat(bValue),
-                    link: bLink && bLink.trim() !== '' ? bLink.trim() : ''
-                });
+            if (bName && bName.trim() !== '' &&
+                bValue && !isNaN(parseFloat(bValue)) &&
+                bLink && bLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
             }
         }
         pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
         pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
         pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
+        // Se nenhum botão for definido, retorna erro (bot deve ter pelo menos 1 plano com link)
+        if (buttons.length === 0) {
+            return res.status(400).send('Erro: É necessário definir pelo menos um botão com link do grupo VIP.');
+        }
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
         let videoFilename = '';
         if (req.file) {
             videoFilename = req.file.location;
         }
-        // Para o vipLink, mantemos-o (caso seja útil como fallback)
-        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         const newBot = await BotModel.create({
             name,
             token,
             description,
-            vipLink: fixedVipLink,
+            // vipLink removido do objeto
             video: videoFilename,
             buttonsJson,
             remarketingJson: safeRemarketingJson
@@ -707,7 +706,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             name: newBot.name,
             token: newBot.token,
             description: newBot.description,
-            vipLink: newBot.vipLink,
+            // vipLink não existe mais globalmente
             video: newBot.video,
             buttons: buttons,
             remarketing: {}
@@ -763,7 +762,7 @@ app.get('/admin/bots/:id', checkAuth, async (req, res) => {
 });
 
 // [POST] Editar bot existente (com upload de vídeo opcional)
-// Agora inclui os campos de botões com link (por plano) e o vipLink geral
+// Agora inclui o campo para os links individuais de cada botão
 app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -775,7 +774,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name,
             token,
             description,
-            vipLink,
+            // vipLink removido
             buttonName1,
             buttonValue1,
             buttonLink1,
@@ -789,29 +788,27 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
         } = req.body;
         const buttons = [];
         function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({
-                    name: bName.trim(),
-                    value: parseFloat(bValue),
-                    link: bLink && bLink.trim() !== '' ? bLink.trim() : ''
-                });
+            if (bName && bName.trim() !== '' &&
+                bValue && !isNaN(parseFloat(bValue)) &&
+                bLink && bLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
             }
         }
         pushButtonIfValid(buttonName1, buttonValue1, buttonLink1);
         pushButtonIfValid(buttonName2, buttonValue2, buttonLink2);
         pushButtonIfValid(buttonName3, buttonValue3, buttonLink3);
+        if (buttons.length === 0) {
+            return res.status(400).send('Erro: É necessário definir pelo menos um botão com link do grupo VIP.');
+        }
         const buttonsJson = JSON.stringify(buttons);
         let videoFilename = bot.video;
         if (req.file) {
             videoFilename = req.file.location;
         }
         const safeRemarketingJson = remarketingJson || '';
-        // Nova abordagem para o vipLink
-        const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         bot.name = name;
         bot.token = token;
         bot.description = description;
-        bot.vipLink = fixedVipLink;
         bot.video = videoFilename;
         bot.buttonsJson = buttonsJson;
         bot.remarketingJson = safeRemarketingJson;
@@ -821,7 +818,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             name: bot.name,
             token: bot.token,
             description: bot.description,
-            vipLink: bot.vipLink,
             video: bot.video,
             buttons: buttons,
             remarketing: {}
