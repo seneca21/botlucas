@@ -190,7 +190,6 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
-// A rota /api/bots-list agora usa o BotModel para preencher o dropdown do painel
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -680,6 +679,8 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             remarketingJson
         } = payload;
 
+        console.log("Valor recebido de buttonLinkVip1:", buttonLinkVip1);
+
         // Validação dos campos obrigatórios de Link VIP
         if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
             return res.status(400).send('O campo Link VIP é obrigatório para o Botão 1.');
@@ -800,6 +801,8 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             buttonLinkVip3,
             remarketingJson
         } = req.body;
+
+        console.log("Valor recebido de buttonLinkVip1 (edição):", buttonLinkVip1);
 
         // Validação dos campos obrigatórios de Link VIP
         if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
