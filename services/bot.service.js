@@ -1,4 +1,5 @@
 // services/bot.service.js
+
 const { Telegraf, Markup } = require('telegraf');
 const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
@@ -31,7 +32,7 @@ const s3Client = new S3Client({
 /**
  * Obtém o stream do vídeo a partir do Bucketeer (S3) utilizando a URL.
  * Extrai a key (nome do arquivo) a partir da URL.
- * @param {string} videoUrl URL completa do vídeo
+ * @param {string} videoUrl - URL completa do vídeo
  * @returns {Promise<Stream>}
  */
 async function getS3VideoStream(videoUrl) {
@@ -314,8 +315,9 @@ async function reloadBotsFromDB() {
         description: botRow.description,
         video: botRow.video,
         buttons: [],
-        remarketing: {},
-        // Não usamos vipLink globalmente
+        remarketing: {}
+        // Note que não usamos mais um campo global vipLink;
+        // cada botão deverá ter sua própria propriedade "link"
       };
       if (botRow.buttonsJson) {
         try {
@@ -450,7 +452,7 @@ function initializeBot(botConfig) {
     }
   });
 
-  // Rota /start com envio do vídeo atualizado
+  // Rota /start com envio do vídeo e botões
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -481,14 +483,11 @@ function initializeBot(botConfig) {
       const buttonMarkup = (botConfig.buttons || []).map((btn, idx) =>
         Markup.button.callback(btn.name, `select_plan_${idx}`)
       );
-      await ctx.replyWithVideo(
-        videoInput,
-        {
-          caption: botConfig.description || 'Sem descrição',
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
-        }
-      );
+      await ctx.replyWithVideo(videoInput, {
+        caption: botConfig.description || 'Sem descrição',
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
+      });
       logger.info(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
     } catch (error) {
       logger.error('❌ Erro /start:', error);
@@ -562,7 +561,7 @@ function initializeBot(botConfig) {
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
-          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
+          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`)
         ])
       );
     } catch (error) {
@@ -632,7 +631,7 @@ function initializeBot(botConfig) {
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
-          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
+          Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`)
         ])
       );
     } catch (error) {
@@ -679,7 +678,7 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
-          // Envia o link definido no botão selecionado
+          // Agora utiliza o link definido no botão selecionado
           if (session.selectedPlan && session.selectedPlan.link && session.selectedPlan.link.trim() !== '') {
             await ctx.reply(`🔗 Acesse o Grupo VIP: [Clique aqui](${session.selectedPlan.link})`, { parse_mode: 'Markdown' });
           } else {
@@ -857,7 +856,7 @@ function initializeBot(botConfig) {
 // =====================================
 function updateBotInMemory(id, newConfig) {
   logger.info(`Atualizando bot em memória (ID: ${id}).`);
-  // Para simplificar, reinicia o bot com a nova configuração.
+  // Reinicia o bot com a nova configuração
   initializeBot(newConfig);
 }
 
