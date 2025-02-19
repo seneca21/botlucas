@@ -205,15 +205,12 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 //=====================================================================
 // ATENÇÃO: Ajuste para as estatísticas do painel
 //=====================================================================
-// Nesta versão usamos a função makeDay (que zera a data sem conversão de fuso),
-// que era a versão que funcionava para o painel anteriormente.
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
-// A função getDetailedStats permanece conforme sua implementação atual.
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -453,7 +450,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             endDate.setHours(23, 59, 59, 999);
         }
 
-        // Obtém as estatísticas em paralelo
         const [statsAll, statsMain, statsNotPurchased, statsPurchased, statsYesterday] = await Promise.all([
             getDetailedStats(startDate, endDate, null, botFilters),
             getDetailedStats(startDate, endDate, 'main', botFilters),
@@ -467,7 +463,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             })()
         ]);
 
-        // Acrescenta dados para a segunda aba (statsDetailedSection)
         const statsDetailed = {
             allPurchases: statsAll.totalPurchases,
             mainPlan: statsMain.totalPurchases,
@@ -475,7 +470,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             upsell: statsPurchased.totalPurchases
         };
 
-        // Ranking simples
         const botRankingRaw = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -490,7 +484,6 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue('vendas'), 10) || 0,
         }));
 
-        // Ranking detalhado
         const botsWithPurchases = await Purchase.findAll({
             attributes: [
                 'botName',
@@ -652,7 +645,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
             statsMain,
             statsNotPurchased,
             statsPurchased,
-            statsDetailed, // <-- Dados para a segunda aba (cards de: Todas as Compras, Plano Principal, Remarketing e Upsell)
+            statsDetailed,
             botRanking,
             botDetails,
             stats7Days,
@@ -666,7 +659,7 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
-// Rotas de Gerenciar Bots (sem alterações na estrutura)
+// Rotas de Gerenciar Bots
 //------------------------------------------------------
 app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) => {
     try {
@@ -677,22 +670,36 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             description,
             buttonName1,
             buttonValue1,
+            buttonLinkVip1,
             buttonName2,
             buttonValue2,
+            buttonLinkVip2,
             buttonName3,
             buttonValue3,
+            buttonLinkVip3,
             remarketingJson
         } = payload;
 
+        // Validação dos campos obrigatórios de Link VIP
+        if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 1.');
+        }
+        if (!buttonLinkVip2 || buttonLinkVip2.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 2.');
+        }
+        if (!buttonLinkVip3 || buttonLinkVip3.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 3.');
+        }
+
         const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+        function pushButtonIfValid(bName, bValue, bLink) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink.trim() });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
+        pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
+        pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
+        pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
 
@@ -784,22 +791,36 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             description,
             buttonName1,
             buttonValue1,
+            buttonLinkVip1,
             buttonName2,
             buttonValue2,
+            buttonLinkVip2,
             buttonName3,
             buttonValue3,
+            buttonLinkVip3,
             remarketingJson
         } = req.body;
 
+        // Validação dos campos obrigatórios de Link VIP
+        if (!buttonLinkVip1 || buttonLinkVip1.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 1.');
+        }
+        if (!buttonLinkVip2 || buttonLinkVip2.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 2.');
+        }
+        if (!buttonLinkVip3 || buttonLinkVip3.trim() === '') {
+            return res.status(400).send('O campo Link VIP é obrigatório para o Botão 3.');
+        }
+
         const buttons = [];
-        function pushButtonIfValid(bName, bValue) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue) });
+        function pushButtonIfValid(bName, bValue, bLink) {
+            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink.trim() });
             }
         }
-        pushButtonIfValid(buttonName1, buttonValue1);
-        pushButtonIfValid(buttonName2, buttonValue2);
-        pushButtonIfValid(buttonName3, buttonValue3);
+        pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
+        pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
+        pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
         const buttonsJson = JSON.stringify(buttons);
 
         let videoFilename = bot.video;
