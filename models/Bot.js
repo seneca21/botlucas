@@ -30,19 +30,9 @@ module.exports = (sequelize, DataTypes) => {
             }
         },
         {
-            tableName: 'Bots', // Tabela "Bots"
-            timestamps: true,  // Ativa createdAt e updatedAt
-            underscored: true, // Cria as colunas como created_at e updated_at
-            createdAt: {
-                type: DataTypes.DATE,
-                allowNull: false,
-                defaultValue: DataTypes.NOW
-            },
-            updatedAt: {
-                type: DataTypes.DATE,
-                allowNull: false,
-                defaultValue: DataTypes.NOW
-            }
+            tableName: 'Bots',   // Tabela "Bots"
+            timestamps: true,      // Cria automaticamente as colunas created_at e updated_at
+            underscored: true      // Nomeia as colunas com underscore (created_at, updated_at)
         }
     );
 
