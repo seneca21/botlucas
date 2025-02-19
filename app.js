@@ -23,7 +23,7 @@ const ConfigService = require('./services/config.service');
 const config = ConfigService.loadConfig(); // carrega config.json
 
 // Importa funções para inicializar/editar bots
-const { initializeBot, reloadBotsFromDB } = require('./services/bot.service');
+const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require('./services/bot.service');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -683,7 +683,7 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
         if (req.file) {
             videoFilename = req.file.location;
         }
-        // Nova abordagem: se vipLink estiver ausente ou em branco, defina como string vazia
+        // Se vipLink estiver ausente ou em branco, definimos como string vazia
         const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         const newBot = await BotModel.create({
             name,
@@ -791,7 +791,7 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             videoFilename = req.file.location;
         }
         const safeRemarketingJson = remarketingJson || '';
-        // Nova abordagem para o vipLink: se estiver em branco, definir como string vazia
+        // Se vipLink estiver ausente ou em branco, definimos como string vazia
         const fixedVipLink = vipLink && vipLink.trim() !== '' ? vipLink.trim() : '';
         bot.name = name;
         bot.token = token;
@@ -838,33 +838,9 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
 });
 
 //------------------------------------------------------
-// Função para atualizar a instância do bot em memória
-//------------------------------------------------------
-function updateBotInMemory(id, newConfig) {
-    logger.info(`Atualizando bot em memória (ID: ${id}).`);
-    // Procura uma instância ativa com o mesmo token e a para
-    for (let i = 0; i < bots.length; i++) {
-        if (bots[i].telegram.options.token === newConfig.token) {
-            try {
-                bots[i].stop('update');
-                logger.info(`Bot com token ${newConfig.token} parado com sucesso.`);
-            } catch (err) {
-                logger.error(`Erro ao parar bot com token ${newConfig.token}:`, err);
-            }
-            bots.splice(i, 1);
-            break;
-        }
-    }
-    // Inicializa o bot com a nova configuração
-    initializeBot(newConfig);
-}
-
-//------------------------------------------------------
 // Sobe servidor
 //------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     logger.info(`🌐 Servidor web iniciado na porta ${PORT}`);
 });
-
-module.exports = app;
