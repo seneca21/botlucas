@@ -30,8 +30,19 @@ module.exports = (sequelize, DataTypes) => {
             }
         },
         {
-            tableName: 'Bots',  // Tabela "Bots"
-            timestamps: false   // Se quiser createdAt/updatedAt, remova esta linha
+            tableName: 'Bots', // Tabela "Bots"
+            timestamps: true,  // Ativa createdAt e updatedAt
+            underscored: true, // Cria as colunas como created_at e updated_at
+            createdAt: {
+                type: DataTypes.DATE,
+                allowNull: false,
+                defaultValue: DataTypes.NOW
+            },
+            updatedAt: {
+                type: DataTypes.DATE,
+                allowNull: false,
+                defaultValue: DataTypes.NOW
+            }
         }
     );
 
