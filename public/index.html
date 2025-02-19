@@ -13,7 +13,7 @@
             color: #fff;
         }
 
-        /* Estilos para o dropdown de bots */
+        /* Dropdown de checkboxes do filtro de bots */
         .dropdown-multi {
             position: relative;
             display: inline-block;
@@ -43,40 +43,7 @@
             display: block;
         }
 
-        /* Ajustes para a área de Gerenciar Bots */
-        #manageBotsSection .form-control {
-            margin-bottom: 0.5rem;
-        }
-
-        #manageBotsSection label {
-            margin-top: 0.5rem;
-            font-weight: 600;
-        }
-
-        .bot-buttons-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .bot-buttons-row input {
-            flex: 1;
-        }
-
-        #existingBotsTable td {
-            vertical-align: middle;
-        }
-
-        #editBotForm label {
-            margin-top: 0.5rem;
-        }
-
-        /* Centraliza o conteúdo dos cards da segunda aba de estatísticas */
-        .stats-detailed .card-body {
-            text-align: center;
-        }
-
-        /* Estilização do card de edição de bot (aparecendo como um overlay) */
+        /* Estilização do card de edição de bot */
         #editBotContainer {
             position: fixed;
             top: 50%;
@@ -84,11 +51,11 @@
             transform: translate(-50%, -50%);
             z-index: 1050;
             width: 90%;
-            max-width: 600px;
+            max-width: 400px;
             background-color: #fff;
             padding: 1.5rem;
             border: 1px solid #ced4da;
-            border-radius: 0.25rem;
+            border-radius: 0.5rem;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             display: none;
         }
@@ -96,6 +63,18 @@
         body.dark-mode #editBotContainer {
             background-color: #1e1e1e;
             color: #fff;
+        }
+
+        /* Tabela de Bots Existentes */
+        #existingBotsTable td.video-cell {
+            max-width: 150px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        /* Centralização dos conteúdos dos cards da segunda aba de estatísticas */
+        .stats-detailed .card-body {
+            text-align: center;
         }
     </style>
 </head>
@@ -197,7 +176,7 @@
                     </div>
                 </div>
 
-                <!-- SEÇÃO 1: Estatísticas do Dia (resumo) -->
+                <!-- SEÇÃO 1: Estatísticas do Dia (Resumo) -->
                 <section id="statsSection">
                     <h3>Estatísticas do Dia</h3>
                     <div class="row text-center">
@@ -322,31 +301,31 @@
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">TODAS AS COMPRAS</h5>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Leads Iniciados</h6>
                                     <p class="card-text" id="cardAllLeads">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Pagamentos Confirmados</h6>
                                     <p class="card-text" id="cardAllPaymentsConfirmed">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Taxa de Conversão</h6>
                                     <p class="card-text" id="cardAllConversionRateDetailed">0%</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Volume Gerado (R$)</h6>
                                     <p class="card-text" id="cardAllTotalVolume">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Vendas Convertidas (R$)</h6>
                                     <p class="card-text" id="cardAllTotalPaidVolume">0</p>
                                 </div>
@@ -356,31 +335,31 @@
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">PLANO PRINCIPAL</h5>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Leads que Geraram Pix</h6>
                                     <p class="card-text" id="cardMainLeads">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Pagamentos Confirmados</h6>
                                     <p class="card-text" id="cardMainPaymentsConfirmed">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Taxa de Conversão</h6>
                                     <p class="card-text" id="cardMainConversionRateDetailed">0%</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Volume Gerado (R$)</h6>
                                     <p class="card-text" id="cardMainTotalVolume">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Vendas Convertidas (R$)</h6>
                                     <p class="card-text" id="cardMainTotalPaidVolume">0</p>
                                 </div>
@@ -390,31 +369,31 @@
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">REMARKETING</h5>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Total de Leads</h6>
                                     <p class="card-text" id="cardNotPurchasedLeads">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Pagamentos Confirmados</h6>
                                     <p class="card-text" id="cardNotPurchasedPaymentsConfirmed">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Taxa de Conversão</h6>
                                     <p class="card-text" id="cardNotPurchasedConversionRateDetailed">0%</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Volume Gerado (R$)</h6>
                                     <p class="card-text" id="cardNotPurchasedTotalVolume">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Vendas Convertidas (R$)</h6>
                                     <p class="card-text" id="cardNotPurchasedTotalPaidVolume">0</p>
                                 </div>
@@ -424,31 +403,31 @@
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">UPSELL</h5>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Total de Leads</h6>
                                     <p class="card-text" id="cardPurchasedLeads">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Pagamentos Confirmados</h6>
                                     <p class="card-text" id="cardPurchasedPaymentsConfirmed">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Taxa de Conversão</h6>
                                     <p class="card-text" id="cardPurchasedConversionRateDetailed">0%</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Volume Gerado (R$)</h6>
                                     <p class="card-text" id="cardPurchasedTotalVolume">0</p>
                                 </div>
                             </div>
                             <div class="card shadow-sm mb-3">
-                                <div class="card-body text-center">
+                                <div class="card-body">
                                     <h6 class="card-title">Vendas Convertidas (R$)</h6>
                                     <p class="card-text" id="cardPurchasedTotalPaidVolume">0</p>
                                 </div>
@@ -470,18 +449,19 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Nome</th>
-                                <th>Vídeo</th>
+                                <th style="max-width: 150px;">Vídeo</th>
+                                <th>Data de Cadastro</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="existingBotsBody">
                             <tr>
-                                <td colspan="4">Carregando...</td>
+                                <td colspan="5">Carregando...</td>
                             </tr>
                         </tbody>
                     </table>
 
-                    <!-- Card de Edição de Bot (estilizado como overlay similar ao modal) -->
+                    <!-- Card de Edição de Bot -->
                     <div id="editBotContainer">
                         <h5 class="text-center">Editar Bot</h5>
                         <form id="editBotForm" enctype="multipart/form-data">
@@ -521,6 +501,7 @@
                             <hr />
                             <label>Remarketing JSON:</label>
                             <textarea id="editRemarketingJson" class="form-control" rows="3"></textarea>
+
                             <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
                             <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
                         </form>
