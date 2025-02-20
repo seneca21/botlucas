@@ -122,6 +122,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <!-- Segunda aba de Estatísticas do Dia -->
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             Estatísticas do Dia (Detalhadas)
                         </a>
@@ -484,51 +485,49 @@
                     <div id="editBotContainer">
                         <h5 class="text-center">Editar Bot</h5>
                         <form id="editBotForm" enctype="multipart/form-data">
-                            <input type="hidden" id="editBotId" name="id" />
+                            <input type="hidden" id="editBotId" />
                             <label for="editBotName">Nome:</label>
-                            <input type="text" id="editBotName" name="name" class="form-control" required />
+                            <input type="text" id="editBotName" class="form-control" required />
 
                             <label for="editBotToken">Token:</label>
-                            <input type="text" id="editBotToken" name="token" class="form-control" required />
+                            <input type="text" id="editBotToken" class="form-control" required />
 
                             <label for="editBotDescription">Descrição:</label>
-                            <textarea id="editBotDescription" name="description" class="form-control"
-                                rows="2"></textarea>
+                            <textarea id="editBotDescription" class="form-control" rows="2"></textarea>
 
                             <label>Vídeo (upload opcional):</label>
-                            <input type="file" id="editVideoFile" name="videoFile" class="form-control-file"
-                                accept="video/*" />
+                            <input type="file" id="editVideoFile" class="form-control-file" accept="video/*" />
 
                             <hr />
                             <h6>Botões (até 3)</h6>
                             <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName1" name="buttonName1" class="form-control"
+                                <input type="text" id="editButtonName1" class="form-control"
                                     placeholder="Nome Botão 1" />
-                                <input type="text" id="editButtonValue1" name="buttonValue1" class="form-control"
+                                <input type="text" id="editButtonValue1" class="form-control"
                                     placeholder="Valor Pix 1" />
-                                <input type="text" id="editButtonLinkVip1" name="buttonLinkVip1" class="form-control"
-                                    placeholder="Link VIP 1" required />
+                                <input type="text" id="editButtonVipLink1" class="form-control" placeholder="Link VIP"
+                                    required />
                             </div>
                             <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName2" name="buttonName2" class="form-control"
+                                <input type="text" id="editButtonName2" class="form-control"
                                     placeholder="Nome Botão 2" />
-                                <input type="text" id="editButtonValue2" name="buttonValue2" class="form-control"
+                                <input type="text" id="editButtonValue2" class="form-control"
                                     placeholder="Valor Pix 2" />
-                                <input type="text" id="editButtonLinkVip2" name="buttonLinkVip2" class="form-control"
-                                    placeholder="Link VIP 2" required />
+                                <input type="text" id="editButtonVipLink2" class="form-control" placeholder="Link VIP"
+                                    required />
                             </div>
                             <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName3" name="buttonName3" class="form-control"
+                                <input type="text" id="editButtonName3" class="form-control"
                                     placeholder="Nome Botão 3" />
-                                <input type="text" id="editButtonValue3" name="buttonValue3" class="form-control"
+                                <input type="text" id="editButtonValue3" class="form-control"
                                     placeholder="Valor Pix 3" />
-                                <input type="text" id="editButtonLinkVip3" name="buttonLinkVip3" class="form-control"
-                                    placeholder="Link VIP 3" required />
+                                <input type="text" id="editButtonVipLink3" class="form-control" placeholder="Link VIP"
+                                    required />
                             </div>
+
                             <hr />
                             <label>Remarketing JSON:</label>
-                            <textarea id="editRemarketingJson" name="remarketingJson" class="form-control"
-                                rows="3"></textarea>
+                            <textarea id="editRemarketingJson" class="form-control" rows="3"></textarea>
                             <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
                             <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
                         </form>
@@ -540,47 +539,40 @@
                     <h5>Cadastrar Novo Bot</h5>
                     <form id="addBotForm" style="max-width:600px;" enctype="multipart/form-data">
                         <label for="botNameInput">Nome do Bot:</label>
-                        <input type="text" id="botNameInput" name="name" class="form-control" required />
+                        <input type="text" id="botNameInput" class="form-control" required />
 
                         <label for="botTokenInput">Token do Bot:</label>
-                        <input type="text" id="botTokenInput" name="token" class="form-control" required />
+                        <input type="text" id="botTokenInput" class="form-control" required />
 
                         <label for="botDescriptionInput">Descrição:</label>
-                        <textarea id="botDescriptionInput" name="description" class="form-control" rows="2"></textarea>
+                        <textarea id="botDescriptionInput" class="form-control" rows="2"></textarea>
 
                         <label>Vídeo (upload do PC):</label>
-                        <input type="file" id="botVideoFile" name="videoFile" class="form-control-file"
-                            accept="video/*" />
+                        <input type="file" id="botVideoFile" class="form-control-file" accept="video/*" />
 
                         <hr />
                         <h6>Botões (até 3)</h6>
                         <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName1" name="buttonName1"
-                                placeholder="Nome Botão 1" />
-                            <input type="text" class="form-control" id="buttonValue1" name="buttonValue1"
-                                placeholder="Valor Pix 1" />
-                            <input type="text" class="form-control" id="buttonLinkVip1" name="buttonLinkVip1"
-                                placeholder="Link VIP 1" required />
+                            <input type="text" class="form-control" id="buttonName1" placeholder="Nome Botão 1" />
+                            <input type="text" class="form-control" id="buttonValue1" placeholder="Valor Pix 1" />
+                            <input type="text" class="form-control" id="buttonVipLink1" placeholder="Link VIP"
+                                required />
                         </div>
                         <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName2" name="buttonName2"
-                                placeholder="Nome Botão 2" />
-                            <input type="text" class="form-control" id="buttonValue2" name="buttonValue2"
-                                placeholder="Valor Pix 2" />
-                            <input type="text" class="form-control" id="buttonLinkVip2" name="buttonLinkVip2"
-                                placeholder="Link VIP 2" required />
+                            <input type="text" class="form-control" id="buttonName2" placeholder="Nome Botão 2" />
+                            <input type="text" class="form-control" id="buttonValue2" placeholder="Valor Pix 2" />
+                            <input type="text" class="form-control" id="buttonVipLink2" placeholder="Link VIP"
+                                required />
                         </div>
                         <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName3" name="buttonName3"
-                                placeholder="Nome Botão 3" />
-                            <input type="text" class="form-control" id="buttonValue3" name="buttonValue3"
-                                placeholder="Valor Pix 3" />
-                            <input type="text" class="form-control" id="buttonLinkVip3" name="buttonLinkVip3"
-                                placeholder="Link VIP 3" required />
+                            <input type="text" class="form-control" id="buttonName3" placeholder="Nome Botão 3" />
+                            <input type="text" class="form-control" id="buttonValue3" placeholder="Valor Pix 3" />
+                            <input type="text" class="form-control" id="buttonVipLink3" placeholder="Link VIP"
+                                required />
                         </div>
                         <hr />
                         <label for="remarketingInput">Remarketing JSON:</label>
-                        <textarea id="remarketingInput" name="remarketingJson" class="form-control" rows="3"></textarea>
+                        <textarea id="remarketingInput" class="form-control" rows="3"></textarea>
                         <small class="text-muted">Exemplo: {"messages":[...],"intervals":{...}}</small>
                         <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                     </form>

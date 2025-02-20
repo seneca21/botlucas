@@ -190,6 +190,8 @@ app.use(checkAuth, express.static(path.join(__dirname, 'public')));
 //------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
+// (Rotas de estatísticas e de lista de bots permanecem inalteradas)
+
 app.get('/api/bots-list', checkAuth, async (req, res) => {
     try {
         const botRows = await BotModel.findAll();
@@ -343,7 +345,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
-        let { date } = req.query; // compatibilidade com param antigo
+        let { date } = req.query;
         let botFilters = [];
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(',');
@@ -669,28 +671,31 @@ app.post('/admin/bots', checkAuth, upload.single('videoFile'), async (req, res) 
             description,
             buttonName1,
             buttonValue1,
-            buttonLinkVip1,
+            buttonVipLink1,
             buttonName2,
             buttonValue2,
-            buttonLinkVip2,
+            buttonVipLink2,
             buttonName3,
             buttonValue3,
-            buttonLinkVip3,
+            buttonVipLink3,
             remarketingJson
         } = payload;
 
-        console.log("Valor recebido de buttonLinkVip1:", buttonLinkVip1);
-
-        // Função para empacotar os botões; o link VIP será salvo mesmo se vazio.
-        function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink ? bLink.trim() : "" });
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue, bVipLink) {
+            if (bName && bName.trim() !== '' &&
+                bValue && !isNaN(parseFloat(bValue)) &&
+                bVipLink && bVipLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bVipLink.trim() });
             }
         }
-        const buttons = [];
-        pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
-        pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
-        pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
+        pushButtonIfValid(buttonName1, buttonValue1, buttonVipLink1);
+        pushButtonIfValid(buttonName2, buttonValue2, buttonVipLink2);
+        pushButtonIfValid(buttonName3, buttonValue3, buttonVipLink3);
+        if (buttons.length === 0) {
+            return res.status(400).send('Erro: é obrigatório definir pelo menos um botão com Link VIP.');
+        }
+
         const buttonsJson = JSON.stringify(buttons);
         const safeRemarketingJson = remarketingJson || '';
 
@@ -782,27 +787,31 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.single('videoFile'), async (r
             description,
             buttonName1,
             buttonValue1,
-            buttonLinkVip1,
+            editButtonVipLink1,
             buttonName2,
             buttonValue2,
-            buttonLinkVip2,
+            editButtonVipLink2,
             buttonName3,
             buttonValue3,
-            buttonLinkVip3,
+            editButtonVipLink3,
             remarketingJson
         } = req.body;
 
-        console.log("Valor recebido de buttonLinkVip1 (edição):", buttonLinkVip1);
-
-        function pushButtonIfValid(bName, bValue, bLink) {
-            if (bName && bName.trim() !== '' && bValue && !isNaN(parseFloat(bValue))) {
-                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bLink ? bLink.trim() : "" });
+        const buttons = [];
+        function pushButtonIfValid(bName, bValue, bVipLink) {
+            if (bName && bName.trim() !== '' &&
+                bValue && !isNaN(parseFloat(bValue)) &&
+                bVipLink && bVipLink.trim() !== '') {
+                buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bVipLink.trim() });
             }
         }
-        const buttons = [];
-        pushButtonIfValid(buttonName1, buttonValue1, buttonLinkVip1);
-        pushButtonIfValid(buttonName2, buttonValue2, buttonLinkVip2);
-        pushButtonIfValid(buttonName3, buttonValue3, buttonLinkVip3);
+        pushButtonIfValid(buttonName1, buttonValue1, editButtonVipLink1);
+        pushButtonIfValid(buttonName2, buttonValue2, editButtonVipLink2);
+        pushButtonIfValid(buttonName3, buttonValue3, editButtonVipLink3);
+        if (buttons.length === 0) {
+            return res.status(400).send('Erro: é obrigatório definir pelo menos um botão com Link VIP.');
+        }
+
         const buttonsJson = JSON.stringify(buttons);
 
         let videoFilename = bot.video;

@@ -661,10 +661,13 @@ $(document).ready(function () {
         formData.append('description', $('#botDescriptionInput').val().trim());
         formData.append('buttonName1', $('#buttonName1').val().trim());
         formData.append('buttonValue1', $('#buttonValue1').val().trim());
+        formData.append('buttonVipLink1', $('#buttonVipLink1').val().trim());
         formData.append('buttonName2', $('#buttonName2').val().trim());
         formData.append('buttonValue2', $('#buttonValue2').val().trim());
+        formData.append('buttonVipLink2', $('#buttonVipLink2').val().trim());
         formData.append('buttonName3', $('#buttonName3').val().trim());
         formData.append('buttonValue3', $('#buttonValue3').val().trim());
+        formData.append('buttonVipLink3', $('#buttonVipLink3').val().trim());
         formData.append('remarketingJson', $('#remarketingInput').val().trim());
 
         const videoFile = $('#botVideoFile')[0].files[0];
@@ -754,23 +757,29 @@ $(document).ready(function () {
                 if (bjson[0]) {
                     $('#editButtonName1').val(bjson[0].name);
                     $('#editButtonValue1').val(bjson[0].value);
+                    $('#editButtonVipLink1').val(bjson[0].vipLink);
                 } else {
                     $('#editButtonName1').val('');
                     $('#editButtonValue1').val('');
+                    $('#editButtonVipLink1').val('');
                 }
                 if (bjson[1]) {
                     $('#editButtonName2').val(bjson[1].name);
                     $('#editButtonValue2').val(bjson[1].value);
+                    $('#editButtonVipLink2').val(bjson[1].vipLink);
                 } else {
                     $('#editButtonName2').val('');
                     $('#editButtonValue2').val('');
+                    $('#editButtonVipLink2').val('');
                 }
                 if (bjson[2]) {
                     $('#editButtonName3').val(bjson[2].name);
                     $('#editButtonValue3').val(bjson[2].value);
+                    $('#editButtonVipLink3').val(bjson[2].vipLink);
                 } else {
                     $('#editButtonName3').val('');
                     $('#editButtonValue3').val('');
+                    $('#editButtonVipLink3').val('');
                 }
 
                 $('#editRemarketingJson').val(bot.remarketingJson || '');
@@ -799,10 +808,13 @@ $(document).ready(function () {
         formData.append('description', $('#editBotDescription').val().trim());
         formData.append('buttonName1', $('#editButtonName1').val().trim());
         formData.append('buttonValue1', $('#editButtonValue1').val().trim());
+        formData.append('editButtonVipLink1', $('#editButtonVipLink1').val().trim());
         formData.append('buttonName2', $('#editButtonName2').val().trim());
         formData.append('buttonValue2', $('#editButtonValue2').val().trim());
+        formData.append('editButtonVipLink2', $('#editButtonVipLink2').val().trim());
         formData.append('buttonName3', $('#editButtonName3').val().trim());
         formData.append('buttonValue3', $('#editButtonValue3').val().trim());
+        formData.append('editButtonVipLink3', $('#editButtonVipLink3').val().trim());
         formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
 
         const videoFile = $('#editVideoFile')[0].files[0];
