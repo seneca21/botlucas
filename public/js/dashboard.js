@@ -655,43 +655,7 @@ $(document).ready(function () {
     $('#addBotForm').on('submit', function (e) {
         e.preventDefault();
 
-        const formData = new FormData();
-        formData.append('name', $('#botNameInput').val().trim());
-        formData.append('token', $('#botTokenInput').val().trim());
-        formData.append('description', $('#botDescriptionInput').val().trim());
-        formData.append('buttonName1', $('#buttonName1').val().trim());
-        formData.append('buttonValue1', $('#buttonValue1').val().trim());
-        formData.append('buttonVipLink1', $('#buttonVipLink1').val().trim());
-        formData.append('buttonName2', $('#buttonName2').val().trim());
-        formData.append('buttonValue2', $('#buttonValue2').val().trim());
-        formData.append('buttonVipLink2', $('#buttonVipLink2').val().trim());
-        formData.append('buttonName3', $('#buttonName3').val().trim());
-        formData.append('buttonValue3', $('#buttonValue3').val().trim());
-        formData.append('buttonVipLink3', $('#buttonVipLink3').val().trim());
-        // Processa o remarketing: junta o conteúdo do textarea com os novos intervalos
-        let remarketingJson = $('#remarketingInput').val().trim();
-        let intervals = {
-            not_purchased_minutes: $('#remarketingNotPurchasedDelay').val().trim(),
-            purchased_seconds: $('#remarketingPurchasedDelay').val().trim()
-        };
-        try {
-            if (remarketingJson) {
-                let parsed = JSON.parse(remarketingJson);
-                parsed.intervals = intervals;
-                remarketingJson = JSON.stringify(parsed);
-            } else {
-                remarketingJson = JSON.stringify({ intervals });
-            }
-        } catch (e) {
-            remarketingJson = JSON.stringify({ intervals });
-        }
-        formData.append('remarketingJson', remarketingJson);
-
-        const videoFile = $('#botVideoFile')[0].files[0];
-        if (videoFile) {
-            formData.append('videoFile', videoFile);
-        }
-
+        const formData = new FormData(this);
         fetch('/admin/bots', {
             method: 'POST',
             body: formData
@@ -798,22 +762,22 @@ $(document).ready(function () {
                     $('#editButtonValue3').val('');
                     $('#editButtonVipLink3').val('');
                 }
-                // Processa o remarketing
-                let remarketingData = {};
-                try {
-                    remarketingData = JSON.parse(bot.remarketingJson || '{}');
-                } catch (e) {
-                    remarketingData = {};
+                // Preencher os campos de remarketing a partir do remarketingJson armazenado
+                if (bot.remarketingJson) {
+                    try {
+                        const remarketing = JSON.parse(bot.remarketingJson);
+                        if (remarketing.not_purchased) {
+                            $('#remarketing_not_purchased_description').val(remarketing.not_purchased.description || '');
+                            $('#remarketing_not_purchased_delay').val(remarketing.not_purchased.delay || 5);
+                        }
+                        if (remarketing.purchased) {
+                            $('#remarketing_purchased_description').val(remarketing.purchased.description || '');
+                            $('#remarketing_purchased_delay').val(remarketing.purchased.delay || 30);
+                        }
+                    } catch (e) {
+                        console.error("Erro ao parse remarketingJson", e);
+                    }
                 }
-                // Se houver uma propriedade "intervals", popula os campos
-                if (remarketingData.intervals) {
-                    $('#remarketingNotPurchasedDelay').val(remarketingData.intervals.not_purchased_minutes || '');
-                    $('#remarketingPurchasedDelay').val(remarketingData.intervals.purchased_seconds || '');
-                } else {
-                    $('#remarketingNotPurchasedDelay').val('');
-                    $('#remarketingPurchasedDelay').val('');
-                }
-                $('#editRemarketingJson').val(JSON.stringify(remarketingData, null, 2));
                 $('#editBotContainer').show();
             })
             .catch(err => {
@@ -832,44 +796,7 @@ $(document).ready(function () {
             $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`);
             return;
         }
-
-        const formData = new FormData();
-        formData.append('name', $('#editBotName').val().trim());
-        formData.append('token', $('#editBotToken').val().trim());
-        formData.append('description', $('#editBotDescription').val().trim());
-        formData.append('buttonName1', $('#editButtonName1').val().trim());
-        formData.append('buttonValue1', $('#editButtonValue1').val().trim());
-        formData.append('editButtonVipLink1', $('#editButtonVipLink1').val().trim());
-        formData.append('buttonName2', $('#editButtonName2').val().trim());
-        formData.append('buttonValue2', $('#editButtonValue2').val().trim());
-        formData.append('editButtonVipLink2', $('#editButtonVipLink2').val().trim());
-        formData.append('buttonName3', $('#editButtonName3').val().trim());
-        formData.append('buttonValue3', $('#editButtonValue3').val().trim());
-        formData.append('editButtonVipLink3', $('#editButtonVipLink3').val().trim());
-        // Processa remarketing
-        let remarketingJson = $('#editRemarketingJson').val().trim();
-        let intervals = {
-            not_purchased_minutes: $('#remarketingNotPurchasedDelay').val().trim(),
-            purchased_seconds: $('#remarketingPurchasedDelay').val().trim()
-        };
-        try {
-            if (remarketingJson) {
-                let parsed = JSON.parse(remarketingJson);
-                parsed.intervals = intervals;
-                remarketingJson = JSON.stringify(parsed);
-            } else {
-                remarketingJson = JSON.stringify({ intervals });
-            }
-        } catch (e) {
-            remarketingJson = JSON.stringify({ intervals });
-        }
-        formData.append('remarketingJson', remarketingJson);
-
-        const videoFile = $('#editVideoFile')[0].files[0];
-        if (videoFile) {
-            formData.append('videoFile', videoFile);
-        }
-
+        const formData = new FormData(this);
         fetch(`/admin/bots/edit/${botId}`, {
             method: 'POST',
             body: formData

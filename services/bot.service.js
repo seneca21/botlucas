@@ -57,11 +57,6 @@ const userSessions = {};
 // =====================================
 // Rate Limiting para Verificações de Pagamento
 // =====================================
-// (Código de rate limiting permanece inalterado)
-// =====================================
-// Outras funções de controle permanecem inalteradas
-// =====================================
-
 const verificationLimits = new Map();
 const MAX_VERIFICATION_ATTEMPTS = 4;
 const VERIFICATION_WINDOW_MS = 60 * 1000;
@@ -369,8 +364,9 @@ function initializeBot(botConfig) {
       } else {
         logger.info(`🔄 Usuário atualizado: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
       }
-      if (botConfig.remarketing && botConfig.remarketing.intervals) {
-        const notPurchasedInterval = botConfig.remarketing.intervals.not_purchased_minutes || 5;
+      // Para remarketing not purchased, usa o delay definido no remarketing
+      if (botConfig.remarketing && botConfig.remarketing.not_purchased) {
+        const delayNotPurchased = botConfig.remarketing.not_purchased.delay || 5;
         setTimeout(async () => {
           try {
             const currentUser = await User.findOne({ where: { telegramId } });
@@ -378,12 +374,12 @@ function initializeBot(botConfig) {
               await sendRemarketingMessage(currentUser, 'not_purchased');
               currentUser.remarketingSent = true;
               await currentUser.save();
-              logger.info(`✅ Mensagem de remarketing enviada para ${telegramId}`);
+              logger.info(`✅ Mensagem de remarketing (not purchased) enviada para ${telegramId}`);
             }
           } catch (err) {
             logger.error(`❌ Erro ao enviar remarketing para ${telegramId}:`, err);
           }
-        }, notPurchasedInterval * 60 * 1000);
+        }, delayNotPurchased * 60 * 1000);
       }
     } catch (error) {
       logger.error('❌ Erro ao registrar usuário:', error);
@@ -396,13 +392,18 @@ function initializeBot(botConfig) {
         userSessions[user.telegramId] = {};
       }
       userSessions[user.telegramId].remarketingCondition = condition;
-      if (!botConfig.remarketing || !botConfig.remarketing.messages) {
-        logger.error(`Sem config remarketing.messages no bot ${botConfig.name}`);
+      if (!botConfig.remarketing) {
+        logger.error(`Sem configuração de remarketing no bot ${botConfig.name}`);
         return;
       }
-      const messageConfig = botConfig.remarketing.messages.find(msg => msg.condition === condition);
+      let messageConfig;
+      if (condition === 'not_purchased') {
+        messageConfig = botConfig.remarketing.not_purchased;
+      } else if (condition === 'purchased') {
+        messageConfig = botConfig.remarketing.purchased;
+      }
       if (!messageConfig) {
-        logger.error(`❌ Sem mensagem de remarketing para condição: ${condition}`);
+        logger.error(`❌ Não existe configuração de remarketing para a condição: ${condition}`);
         return;
       }
       let videoInput;
@@ -411,7 +412,7 @@ function initializeBot(botConfig) {
       } else {
         let videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
         if (!fs.existsSync(videoPath)) {
-          logger.error(`❌ Vídeo não encontrado: ${videoPath}`);
+          logger.error(`❌ Vídeo do remarketing não encontrado: ${videoPath}`);
           return;
         }
         videoInput = { source: fs.createReadStream(videoPath) };
@@ -420,12 +421,12 @@ function initializeBot(botConfig) {
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
       await bot.telegram.sendVideo(user.telegramId, videoInput, {
-        caption: messageConfig.text,
+        caption: messageConfig.description,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
       });
     } catch (error) {
-      logger.error(`❌ Erro remarketing:`, error);
+      logger.error(`❌ Erro no remarketing (${condition}):`, error);
     }
   }
 
@@ -582,8 +583,8 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
-          if (botConfig.remarketing && botConfig.remarketing.intervals) {
-            const purchasedInterval = botConfig.remarketing.intervals.purchased_seconds || 30;
+          if (botConfig.remarketing && botConfig.remarketing.purchased) {
+            const delayPurchased = botConfig.remarketing.purchased.delay || 30;
             setTimeout(async () => {
               try {
                 const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
@@ -594,7 +595,7 @@ function initializeBot(botConfig) {
               } catch (err) {
                 logger.error(`❌ Erro upsell -> ${chatId}:`, err);
               }
-            }, purchasedInterval * 1000);
+            }, delayPurchased * 60 * 1000);
           }
           if (session.selectedPlan && session.selectedPlan.vipLink) {
             await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.vipLink})`, { parse_mode: 'Markdown' });
@@ -632,10 +633,8 @@ function initializeBot(botConfig) {
     const planValue = parseFloat(ctx.match[1]);
     const mainPlan = (botConfig.buttons || []).find(btn => btn.value === planValue);
     let remarketingPlan = null;
-    if (botConfig.remarketing && botConfig.remarketing.messages) {
-      remarketingPlan = botConfig.remarketing.messages
-        .flatMap(msg => msg.buttons || [])
-        .find(btn => btn.value === planValue);
+    if (botConfig.remarketing && botConfig.remarketing.not_purchased && botConfig.remarketing.not_purchased.buttons) {
+      remarketingPlan = botConfig.remarketing.not_purchased.buttons.find(btn => btn.value === planValue);
     }
     const plan = mainPlan || remarketingPlan;
     if (!plan) {
