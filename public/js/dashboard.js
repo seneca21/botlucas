@@ -668,7 +668,24 @@ $(document).ready(function () {
         formData.append('buttonName3', $('#buttonName3').val().trim());
         formData.append('buttonValue3', $('#buttonValue3').val().trim());
         formData.append('buttonVipLink3', $('#buttonVipLink3').val().trim());
-        formData.append('remarketingJson', $('#remarketingInput').val().trim());
+        // Processa o remarketing: junta o conteúdo do textarea com os novos intervalos
+        let remarketingJson = $('#remarketingInput').val().trim();
+        let intervals = {
+            not_purchased_minutes: $('#remarketingNotPurchasedDelay').val().trim(),
+            purchased_seconds: $('#remarketingPurchasedDelay').val().trim()
+        };
+        try {
+            if (remarketingJson) {
+                let parsed = JSON.parse(remarketingJson);
+                parsed.intervals = intervals;
+                remarketingJson = JSON.stringify(parsed);
+            } else {
+                remarketingJson = JSON.stringify({ intervals });
+            }
+        } catch (e) {
+            remarketingJson = JSON.stringify({ intervals });
+        }
+        formData.append('remarketingJson', remarketingJson);
 
         const videoFile = $('#botVideoFile')[0].files[0];
         if (videoFile) {
@@ -781,8 +798,22 @@ $(document).ready(function () {
                     $('#editButtonValue3').val('');
                     $('#editButtonVipLink3').val('');
                 }
-
-                $('#editRemarketingJson').val(bot.remarketingJson || '');
+                // Processa o remarketing
+                let remarketingData = {};
+                try {
+                    remarketingData = JSON.parse(bot.remarketingJson || '{}');
+                } catch (e) {
+                    remarketingData = {};
+                }
+                // Se houver uma propriedade "intervals", popula os campos
+                if (remarketingData.intervals) {
+                    $('#remarketingNotPurchasedDelay').val(remarketingData.intervals.not_purchased_minutes || '');
+                    $('#remarketingPurchasedDelay').val(remarketingData.intervals.purchased_seconds || '');
+                } else {
+                    $('#remarketingNotPurchasedDelay').val('');
+                    $('#remarketingPurchasedDelay').val('');
+                }
+                $('#editRemarketingJson').val(JSON.stringify(remarketingData, null, 2));
                 $('#editBotContainer').show();
             })
             .catch(err => {
@@ -815,7 +846,24 @@ $(document).ready(function () {
         formData.append('buttonName3', $('#editButtonName3').val().trim());
         formData.append('buttonValue3', $('#editButtonValue3').val().trim());
         formData.append('editButtonVipLink3', $('#editButtonVipLink3').val().trim());
-        formData.append('remarketingJson', $('#editRemarketingJson').val().trim());
+        // Processa remarketing
+        let remarketingJson = $('#editRemarketingJson').val().trim();
+        let intervals = {
+            not_purchased_minutes: $('#remarketingNotPurchasedDelay').val().trim(),
+            purchased_seconds: $('#remarketingPurchasedDelay').val().trim()
+        };
+        try {
+            if (remarketingJson) {
+                let parsed = JSON.parse(remarketingJson);
+                parsed.intervals = intervals;
+                remarketingJson = JSON.stringify(parsed);
+            } else {
+                remarketingJson = JSON.stringify({ intervals });
+            }
+        } catch (e) {
+            remarketingJson = JSON.stringify({ intervals });
+        }
+        formData.append('remarketingJson', remarketingJson);
 
         const videoFile = $('#editVideoFile')[0].files[0];
         if (videoFile) {
