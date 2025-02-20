@@ -13,92 +13,204 @@
             color: #fff;
         }
 
-        /* Estilos para o dropdown de bots */
-        .dropdown-multi {
+        /* LAYOUT PRINCIPAL */
+        #appContainer {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* SIDEBAR */
+        #sidebar {
+            width: 230px;
+            transition: width 0.4s ease;
+            background-color: #f8f9fa;
+            border-right: 1px solid #ddd;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #sidebarContent {
+            transition: opacity 0.3s ease;
+            padding: 1rem;
+        }
+
+        #sidebar.collapsed {
+            width: 0;
+        }
+
+        #sidebar.collapsed #sidebarContent {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* MAIN CONTENT */
+        #mainContent {
+            flex: 1;
+            padding: 0 1.5rem;
+            transition: all 0.4s ease;
+        }
+
+        /* ========== HAMBURGER ICON ========== */
+        .hamburger-icon {
+            width: 24px;
+            height: 18px;
             position: relative;
             display: inline-block;
+            cursor: pointer;
         }
 
-        .dropdown-multi .dropdown-toggle {
-            background-color: #fff;
-            border: 1px solid #ced4da;
-            border-radius: 0.25rem;
-        }
-
-        .dropdown-multi .dropdown-menu {
-            display: none;
+        .hamburger-icon span {
+            background-color: #000;
+            display: block;
+            height: 2px;
+            width: 100%;
             position: absolute;
             left: 0;
-            z-index: 999;
-            background-color: #fff;
-            border: 1px solid #ced4da;
-            border-radius: 0.25rem;
-            padding: 0.5rem;
-            min-width: 200px;
-            max-height: 250px;
-            overflow-y: auto;
+            transition: all 0.3s;
         }
 
-        .dropdown-multi .dropdown-menu.show {
+        .hamburger-icon span:nth-child(1) {
+            top: 0;
+        }
+
+        .hamburger-icon span:nth-child(2) {
+            top: 8px;
+        }
+
+        .hamburger-icon span:nth-child(3) {
+            top: 16px;
+        }
+
+        /* ========== BORDAS ARREDONDADAS ========== */
+        .card,
+        .table,
+        .form-control,
+        .btn,
+        .nav-link {
+            border-radius: 8px !important;
+        }
+
+        /* NAV LINKS no sidebar */
+        #sidebarNav .nav-link {
+            color: #000 !important;
+            transition: box-shadow 0.3s;
+            padding: 0.75rem 1rem;
             display: block;
         }
 
-        /* Ajustes para a área de Gerenciar Bots */
-        #manageBotsSection .form-control {
-            margin-bottom: 0.5rem;
+        .nav-link.clicked {
+            animation: highlight 0.8s forwards;
         }
 
-        #manageBotsSection label {
-            margin-top: 0.5rem;
+        @keyframes highlight {
+            0% {
+                box-shadow: 0 0 12px 4px rgba(0, 123, 255, 0.7);
+            }
+
+            100% {
+                box-shadow: none;
+            }
+        }
+
+        #sidebarNav .nav-link.active {
+            background-color: transparent !important;
+            color: #000 !important;
+        }
+
+        .card-title {
+            color: #000 !important;
             font-weight: 600;
+            font-size: 1.1rem;
         }
 
-        .bot-buttons-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
+        .card-text {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #0000ff !important;
         }
 
-        .bot-buttons-row input {
-            flex: 1;
-        }
-
-        #existingBotsTable td {
-            vertical-align: middle;
-        }
-
-        #editBotForm label {
-            margin-top: 0.5rem;
-        }
-
-        /* Centraliza o conteúdo dos cards da segunda aba de estatísticas */
-        .stats-detailed .card-body {
-            text-align: center;
-        }
-
-        /* Estilização do card de edição de bot (aparecendo como um overlay similar ao modal) */
-        #editBotContainer {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1050;
-            width: 90%;
-            max-width: 400px;
-            background-color: #fff;
-            padding: 1.5rem;
-            border: 1px solid #ced4da;
-            border-radius: 0.5rem;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-            display: none;
-        }
-
-        body.dark-mode #editBotContainer {
-            background-color: #1e1e1e;
+        body.dark-mode {
+            background-color: #121212;
             color: #fff;
         }
 
-        /* Estilo para os grupos de remarketing */
+        body.dark-mode #sidebar {
+            background-color: #1e1e1e !important;
+            border-right: 1px solid #444;
+        }
+
+        body.dark-mode #sidebarNav .nav-link {
+            color: #fff !important;
+        }
+
+        body.dark-mode .nav-link.active {
+            color: #fff !important;
+            background-color: transparent !important;
+        }
+
+        body.dark-mode .table {
+            background-color: #2a2a2a;
+            color: #fff;
+        }
+
+        body.dark-mode .table.table-striped tbody tr:nth-of-type(odd) {
+            background-color: #272727;
+        }
+
+        body.dark-mode .form-control {
+            background-color: #2a2a2a;
+            color: #fff;
+            border-color: #555;
+        }
+
+        body.dark-mode .btn {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+        }
+
+        body.dark-mode .hamburger-icon span {
+            background-color: #fff;
+        }
+
+        body.dark-mode .card {
+            background-color: #1e1e1e !important;
+            color: #fff !important;
+            border-color: #444 !important;
+        }
+
+        body.dark-mode .card .card-title {
+            color: #fff !important;
+        }
+
+        body.dark-mode .card .card-text {
+            color: #40a8ff !important;
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #1e1e1e !important;
+            color: #fff !important;
+            border: 1px solid #444 !important;
+        }
+
+        body.dark-mode .modal-header,
+        body.dark-mode .modal-footer {
+            background-color: #1e1e1e !important;
+            color: #fff !important;
+            border-bottom: 1px solid #444 !important;
+            border-top: none !important;
+        }
+
+        body.dark-mode .modal-header .close span {
+            color: #fff !important;
+        }
+
+        body.dark-mode .modal-body .form-control {
+            background-color: #2a2a2a;
+            color: #fff;
+            border-color: #555;
+        }
+
         .remarketing-group {
             border: 1px solid #ced4da;
             border-radius: 8px;
@@ -161,9 +273,8 @@
                     </div>
                 </button>
                 <div>
-                    <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;" title="Alternar tema">
-                        🌙
-                    </span>
+                    <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;"
+                        title="Alternar tema">🌙</span>
                 </div>
             </div>
 
@@ -211,26 +322,262 @@
 
                 <!-- SEÇÃO 1: Estatísticas do Dia (resumo) -->
                 <section id="statsSection">
-                    <!-- (Conteúdo das estatísticas permanece inalterado) -->
-                    <!-- ... -->
+                    <h3>Estatísticas do Dia</h3>
+                    <div class="row text-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Usuários Ativos</h5>
+                                    <p class="card-text display-4 stats-display" id="totalUsers">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total de Compras</h5>
+                                    <p class="card-text display-4 stats-display" id="totalPurchases">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Taxa de Conversão</h5>
+                                    <p class="card-text display-4 stats-display" id="conversionRate">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Tempo médio de pagamento</h5>
+                                    <p class="card-text display-4 stats-display" id="avgPaymentTimeText">0s</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4 class="text-center">Usuários e Compras</h4>
+                            <canvas id="salesChart" style="width:100%; height:300px;"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h4 class="text-center">Vendas Pagas e Geradas</h4>
+                            <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="d-flex mt-4 align-items-center" style="gap: 1rem; flex-wrap: wrap;">
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right: 0.5rem;">Status:</label>
+                            <select id="movStatusFilter" class="form-control form-control-sm">
+                                <option value="">Todos</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="paid">Pagos</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <label style="margin-right: 0.5rem; margin-left: 1rem;">Exibir por página:</label>
+                            <select id="movPerPage" class="form-control form-control-sm">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <table class="table table-bordered table-striped mt-2" id="lastMovementsTable">
+                        <thead>
+                            <tr>
+                                <th>ID Lead (Telegram)</th>
+                                <th>Valor</th>
+                                <th>Gerado em</th>
+                                <th>Pago em</th>
+                                <th>Status</th>
+                                <th>Tempo p/ Pagar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lastMovementsBody"></tbody>
+                    </table>
+                    <div id="paginationContainer" class="mt-2"></div>
                 </section>
 
                 <!-- SEÇÃO 2: Ranking -->
                 <section id="rankingSimplesSection" class="d-none">
-                    <!-- (Conteúdo permanece inalterado) -->
-                    <!-- ... -->
+                    <h3>Ranking</h3>
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Vendas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="botRanking"></tbody>
+                    </table>
                 </section>
 
                 <!-- SEÇÃO 3: Dashboard Detalhado -->
                 <section id="rankingDetalhadoSection" class="d-none">
-                    <!-- (Conteúdo permanece inalterado) -->
-                    <!-- ... -->
+                    <h3>Dashboard Detalhado</h3>
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Valor Convertido (R$)</th>
+                                <th>Vendas</th>
+                                <th>Planos e Conversão</th>
+                                <th>Conversão (%)</th>
+                                <th>Valor Médio (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="botDetailsBody"></tbody>
+                    </table>
                 </section>
 
                 <!-- SEÇÃO 4: Estatísticas do Dia (Detalhadas) -->
                 <section id="statsDetailedSection" class="d-none">
-                    <!-- (Conteúdo permanece inalterado) -->
-                    <!-- ... -->
+                    <h3>Estatísticas do Dia</h3>
+                    <div class="row stats-detailed">
+                        <!-- COLUNA 1: TODAS AS COMPRAS -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">TODAS AS COMPRAS</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Leads Iniciados</h6>
+                                    <p class="card-text" id="cardAllLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardAllPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardAllConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardAllTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardAllTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 2: PLANO PRINCIPAL -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">PLANO PRINCIPAL</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Leads que Geraram Pix</h6>
+                                    <p class="card-text" id="cardMainLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardMainPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardMainConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardMainTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardMainTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 3: REMARKETING -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">REMARKETING</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total de Leads</h6>
+                                    <p class="card-text" id="cardNotPurchasedLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardNotPurchasedPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardNotPurchasedConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardNotPurchasedTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardNotPurchasedTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- COLUNA 4: UPSELL -->
+                        <div class="col-md-3 mb-3">
+                            <h5 class="text-center">UPSELL</h5>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total de Leads</h6>
+                                    <p class="card-text" id="cardPurchasedLeads">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pagamentos Confirmados</h6>
+                                    <p class="card-text" id="cardPurchasedPaymentsConfirmed">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Taxa de Conversão</h6>
+                                    <p class="card-text" id="cardPurchasedConversionRateDetailed">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Volume Gerado (R$)</h6>
+                                    <p class="card-text" id="cardPurchasedTotalVolume">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Vendas Convertidas (R$)</h6>
+                                    <p class="card-text" id="cardPurchasedTotalPaidVolume">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- SEÇÃO 5: Gerenciar Bots -->
