@@ -13,204 +13,92 @@
             color: #fff;
         }
 
-        /* LAYOUT PRINCIPAL */
-        #appContainer {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* SIDEBAR */
-        #sidebar {
-            width: 230px;
-            transition: width 0.4s ease;
-            background-color: #f8f9fa;
-            border-right: 1px solid #ddd;
-            overflow: hidden;
-            position: relative;
-        }
-
-        #sidebarContent {
-            transition: opacity 0.3s ease;
-            padding: 1rem;
-        }
-
-        #sidebar.collapsed {
-            width: 0;
-        }
-
-        #sidebar.collapsed #sidebarContent {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* MAIN CONTENT */
-        #mainContent {
-            flex: 1;
-            padding: 0 1.5rem;
-            transition: all 0.4s ease;
-        }
-
-        /* ========== HAMBURGER ICON ========== */
-        .hamburger-icon {
-            width: 24px;
-            height: 18px;
+        /* Estilos para o dropdown de bots */
+        .dropdown-multi {
             position: relative;
             display: inline-block;
-            cursor: pointer;
         }
 
-        .hamburger-icon span {
-            background-color: #000;
-            display: block;
-            height: 2px;
-            width: 100%;
+        .dropdown-multi .dropdown-toggle {
+            background-color: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 0.25rem;
+        }
+
+        .dropdown-multi .dropdown-menu {
+            display: none;
             position: absolute;
             left: 0;
-            transition: all 0.3s;
+            z-index: 999;
+            background-color: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 0.25rem;
+            padding: 0.5rem;
+            min-width: 200px;
+            max-height: 250px;
+            overflow-y: auto;
         }
 
-        .hamburger-icon span:nth-child(1) {
-            top: 0;
-        }
-
-        .hamburger-icon span:nth-child(2) {
-            top: 8px;
-        }
-
-        .hamburger-icon span:nth-child(3) {
-            top: 16px;
-        }
-
-        /* ========== BORDAS ARREDONDADAS ========== */
-        .card,
-        .table,
-        .form-control,
-        .btn,
-        .nav-link {
-            border-radius: 8px !important;
-        }
-
-        /* NAV LINKS no sidebar */
-        #sidebarNav .nav-link {
-            color: #000 !important;
-            transition: box-shadow 0.3s;
-            padding: 0.75rem 1rem;
+        .dropdown-multi .dropdown-menu.show {
             display: block;
         }
 
-        .nav-link.clicked {
-            animation: highlight 0.8s forwards;
+        /* Ajustes para a área de Gerenciar Bots */
+        #manageBotsSection .form-control {
+            margin-bottom: 0.5rem;
         }
 
-        @keyframes highlight {
-            0% {
-                box-shadow: 0 0 12px 4px rgba(0, 123, 255, 0.7);
-            }
-
-            100% {
-                box-shadow: none;
-            }
-        }
-
-        #sidebarNav .nav-link.active {
-            background-color: transparent !important;
-            color: #000 !important;
-        }
-
-        .card-title {
-            color: #000 !important;
+        #manageBotsSection label {
+            margin-top: 0.5rem;
             font-weight: 600;
-            font-size: 1.1rem;
         }
 
-        .card-text {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #0000ff !important;
+        .bot-buttons-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
-        body.dark-mode {
-            background-color: #121212;
-            color: #fff;
+        .bot-buttons-row input {
+            flex: 1;
         }
 
-        body.dark-mode #sidebar {
-            background-color: #1e1e1e !important;
-            border-right: 1px solid #444;
+        #existingBotsTable td {
+            vertical-align: middle;
         }
 
-        body.dark-mode #sidebarNav .nav-link {
-            color: #fff !important;
+        #editBotForm label {
+            margin-top: 0.5rem;
         }
 
-        body.dark-mode .nav-link.active {
-            color: #fff !important;
-            background-color: transparent !important;
+        /* Centraliza o conteúdo dos cards da segunda aba de estatísticas */
+        .stats-detailed .card-body {
+            text-align: center;
         }
 
-        body.dark-mode .table {
-            background-color: #2a2a2a;
-            color: #fff;
-        }
-
-        body.dark-mode .table.table-striped tbody tr:nth-of-type(odd) {
-            background-color: #272727;
-        }
-
-        body.dark-mode .form-control {
-            background-color: #2a2a2a;
-            color: #fff;
-            border-color: #555;
-        }
-
-        body.dark-mode .btn {
-            background-color: #333;
-            color: #fff;
-            border: 1px solid #555;
-        }
-
-        body.dark-mode .hamburger-icon span {
+        /* Estilização do card de edição de bot (aparecendo como um overlay similar ao modal) */
+        #editBotContainer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+            width: 90%;
+            max-width: 400px;
             background-color: #fff;
+            padding: 1.5rem;
+            border: 1px solid #ced4da;
+            border-radius: 0.5rem;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            display: none;
         }
 
-        body.dark-mode .card {
-            background-color: #1e1e1e !important;
-            color: #fff !important;
-            border-color: #444 !important;
-        }
-
-        body.dark-mode .card .card-title {
-            color: #fff !important;
-        }
-
-        body.dark-mode .card .card-text {
-            color: #40a8ff !important;
-        }
-
-        body.dark-mode .modal-content {
-            background-color: #1e1e1e !important;
-            color: #fff !important;
-            border: 1px solid #444 !important;
-        }
-
-        body.dark-mode .modal-header,
-        body.dark-mode .modal-footer {
-            background-color: #1e1e1e !important;
-            color: #fff !important;
-            border-bottom: 1px solid #444 !important;
-            border-top: none !important;
-        }
-
-        body.dark-mode .modal-header .close span {
-            color: #fff !important;
-        }
-
-        body.dark-mode .modal-body .form-control {
-            background-color: #2a2a2a;
+        body.dark-mode #editBotContainer {
+            background-color: #1e1e1e;
             color: #fff;
-            border-color: #555;
         }
 
+        /* Estilo para os grupos de remarketing */
         .remarketing-group {
             border: 1px solid #ced4da;
             border-radius: 8px;
@@ -273,8 +161,9 @@
                     </div>
                 </button>
                 <div>
-                    <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;"
-                        title="Alternar tema">🌙</span>
+                    <span id="themeToggleBtn" style="cursor: pointer; font-size: 1.5rem;" title="Alternar tema">
+                        🌙
+                    </span>
                 </div>
             </div>
 
@@ -439,9 +328,8 @@
 
                 <!-- SEÇÃO 4: Estatísticas do Dia (Detalhadas) -->
                 <section id="statsDetailedSection" class="d-none">
-                    <h3>Estatísticas do Dia</h3>
+                    <h3>Estatísticas do Dia (Detalhadas)</h3>
                     <div class="row stats-detailed">
-                        <!-- COLUNA 1: TODAS AS COMPRAS -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">TODAS AS COMPRAS</h5>
                             <div class="card shadow-sm mb-3">
@@ -475,7 +363,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- COLUNA 2: PLANO PRINCIPAL -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">PLANO PRINCIPAL</h5>
                             <div class="card shadow-sm mb-3">
@@ -509,7 +396,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- COLUNA 3: REMARKETING -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">REMARKETING</h5>
                             <div class="card shadow-sm mb-3">
@@ -543,7 +429,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- COLUNA 4: UPSELL -->
                         <div class="col-md-3 mb-3">
                             <h5 class="text-center">UPSELL</h5>
                             <div class="card shadow-sm mb-3">
