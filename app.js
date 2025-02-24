@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js
+// app.js (ATUALIZADO)
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -197,7 +197,7 @@ app.get('/api/bots-list', checkAuth, async (req, res) => {
 });
 
 //=====================================================================
-// ATENÇÃO: Ajuste para as estatísticas do painel
+// Funções auxiliares para estatísticas
 //=====================================================================
 function makeDay(date) {
     const d = new Date(date);
@@ -232,6 +232,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
             })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...mainWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -266,6 +267,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: 'paid' }
             })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, status: 'paid', purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -300,6 +302,7 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             sumGerado = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido = (await Purchase.sum('planValue', { where: { ...baseWhere, originCondition, status: 'paid' } })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, originCondition, status: 'paid' },
                 attributes: ['pixGeneratedAt', 'purchasedAt']
@@ -652,6 +655,18 @@ app.get('/api/bots-stats', checkAuth, async (req, res) => {
     } catch (error) {
         logger.error('❌ Erro ao obter estatísticas:', error);
         res.status(500).json({ error: 'Erro ao obter estatísticas' });
+    }
+});
+
+//------------------------------------------------------
+// Nova rota para listar bots (usada no JavaScript do front)
+app.get('/admin/bots/list', checkAuth, async (req, res) => {
+    try {
+        const allBots = await BotModel.findAll();
+        res.json(allBots);
+    } catch (err) {
+        logger.error('Erro ao listar bots:', err);
+        res.status(500).json({ error: 'Erro ao listar bots' });
     }
 });
 
