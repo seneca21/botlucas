@@ -307,12 +307,14 @@ $(document).ready(function () {
             }
             const data = await response.json();
 
+            // Preenche cards do resumo principal
             $('#totalUsers').text(data.statsAll.totalUsers);
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
+            // Atualiza chart de barras (Usuários e Compras)
             const barData = {
                 labels: ['Usuários', 'Compras'],
                 datasets: [
@@ -344,6 +346,7 @@ $(document).ready(function () {
             applyChartOptions(salesChart);
             salesChart.update();
 
+            // Atualiza chart de linhas (Valor pago/gerado e taxa)
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[0]}`;
@@ -458,6 +461,7 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
+            // Ranking simples
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -473,6 +477,7 @@ $(document).ready(function () {
                 botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
 
+            // Dashboard Detalhado
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -496,6 +501,7 @@ $(document).ready(function () {
                 detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
 
+            // Estatísticas Detalhadas
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
@@ -520,6 +526,7 @@ $(document).ready(function () {
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
 
+            // Movimentações + Paginação
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
 
@@ -717,6 +724,9 @@ $(document).ready(function () {
         editBot(botId);
     });
 
+    // -------------------------------------------------------
+    // FUNÇÃO PRINCIPAL DE EDIÇÃO
+    // -------------------------------------------------------
     function editBot(botId) {
         $('#editBotForm')[0].reset();
         $('#editBotResponse').empty();
@@ -728,13 +738,21 @@ $(document).ready(function () {
                 return res.json();
             })
             .then(bot => {
+                // ---------------------------
+                // Campos básicos (nome/token)
+                // ---------------------------
                 $('#editBotName').val(bot.name);
                 $('#editBotToken').val(bot.token);
                 $('#editBotDescription').val(bot.description || '');
+
+                // ---------------------------
+                // Botões "main" (buttonsJson)
+                // ---------------------------
                 let bjson = [];
                 try {
                     bjson = JSON.parse(bot.buttonsJson || '[]');
-                } catch (e) { }
+                } catch (e) { /* ignore */ }
+
                 if (bjson[0]) {
                     $('#editButtonName1').val(bjson[0].name);
                     $('#editButtonValue1').val(bjson[0].value);
@@ -762,22 +780,73 @@ $(document).ready(function () {
                     $('#editButtonValue3').val('');
                     $('#editButtonVipLink3').val('');
                 }
-                // Preencher os campos de remarketing a partir do remarketingJson armazenado
+
+                // ---------------------------
+                // Campos de remarketing
+                // ---------------------------
                 if (bot.remarketingJson) {
                     try {
                         const remarketing = JSON.parse(bot.remarketingJson);
+
+                        // ---------- not_purchased ----------
                         if (remarketing.not_purchased) {
+                            // descrição
                             $('#remarketing_not_purchased_description').val(remarketing.not_purchased.description || '');
-                            $('#remarketing_not_purchased_delay').val(remarketing.not_purchased.delay || 5);
+                            // delay (campo único, se for o caso)
+                            if (typeof remarketing.not_purchased.delay === 'number') {
+                                $('#remarketing_not_purchased_delay').val(remarketing.not_purchased.delay);
+                            }
+                            // Botões do not_purchased
+                            const npButtons = remarketing.not_purchased.buttons || [];
+                            if (npButtons[0]) {
+                                $('#remarketing_not_purchased_buttonName1').val(npButtons[0].name);
+                                $('#remarketing_not_purchased_buttonValue1').val(npButtons[0].value);
+                                $('#remarketing_not_purchased_buttonLink1').val(npButtons[0].link);
+                            }
+                            if (npButtons[1]) {
+                                $('#remarketing_not_purchased_buttonName2').val(npButtons[1].name);
+                                $('#remarketing_not_purchased_buttonValue2').val(npButtons[1].value);
+                                $('#remarketing_not_purchased_buttonLink2').val(npButtons[1].link);
+                            }
+                            if (npButtons[2]) {
+                                $('#remarketing_not_purchased_buttonName3').val(npButtons[2].name);
+                                $('#remarketing_not_purchased_buttonValue3').val(npButtons[2].value);
+                                $('#remarketing_not_purchased_buttonLink3').val(npButtons[2].link);
+                            }
                         }
+
+                        // ---------- purchased ----------
                         if (remarketing.purchased) {
+                            // descrição
                             $('#remarketing_purchased_description').val(remarketing.purchased.description || '');
-                            $('#remarketing_purchased_delay').val(remarketing.purchased.delay || 30);
+                            // delay
+                            if (typeof remarketing.purchased.delay === 'number') {
+                                $('#remarketing_purchased_delay').val(remarketing.purchased.delay);
+                            }
+                            // Botões do purchased
+                            const pButtons = remarketing.purchased.buttons || [];
+                            if (pButtons[0]) {
+                                $('#remarketing_purchased_buttonName1').val(pButtons[0].name);
+                                $('#remarketing_purchased_buttonValue1').val(pButtons[0].value);
+                                $('#remarketing_purchased_buttonLink1').val(pButtons[0].link);
+                            }
+                            if (pButtons[1]) {
+                                $('#remarketing_purchased_buttonName2').val(pButtons[1].name);
+                                $('#remarketing_purchased_buttonValue2').val(pButtons[1].value);
+                                $('#remarketing_purchased_buttonLink2').val(pButtons[1].link);
+                            }
+                            if (pButtons[2]) {
+                                $('#remarketing_purchased_buttonName3').val(pButtons[2].name);
+                                $('#remarketing_purchased_buttonValue3').val(pButtons[2].value);
+                                $('#remarketing_purchased_buttonLink3').val(pButtons[2].link);
+                            }
                         }
+
                     } catch (e) {
                         console.error("Erro ao parse remarketingJson", e);
                     }
                 }
+                // Apresenta o overlay
                 $('#editBotContainer').show();
             })
             .catch(err => {
