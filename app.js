@@ -668,6 +668,24 @@ app.get('/admin/bots/list', checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
+// NOVA ROTA GET /admin/bots/:id (necessária p/ editar)
+//------------------------------------------------------
+app.get('/admin/bots/:id', checkAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot não encontrado' });
+        }
+        // Retorna o bot em JSON para o front
+        res.json(bot);
+    } catch (err) {
+        logger.error('Erro ao obter bot:', err);
+        res.status(500).json({ error: 'Erro ao obter bot' });
+    }
+});
+
+//------------------------------------------------------
 // Rotas de Gerenciar Bots
 //------------------------------------------------------
 app.post('/admin/bots', checkAuth, upload.fields([
