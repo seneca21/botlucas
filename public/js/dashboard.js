@@ -712,12 +712,14 @@ $(document).ready(function () {
             });
     }
 
+    // Ao clicar em "Editar"
     $(document).on('click', '[data-edit-bot]', function () {
         const botId = $(this).attr('data-edit-bot');
         editBot(botId);
     });
 
     function editBot(botId) {
+        // Limpamos e abrimos a area de edição
         $('#editBotForm')[0].reset();
         $('#editBotResponse').empty();
         $('#editBotId').val(botId);
@@ -728,22 +730,23 @@ $(document).ready(function () {
                 return res.json();
             })
             .then(bot => {
-                // =========== Preenche campos básicos ===========
+                // Preenche form
                 $('#editBotName').val(bot.name);
                 $('#editBotToken').val(bot.token);
                 $('#editBotDescription').val(bot.description || '');
 
-                // Exibir nome do vídeo (pois input file não pode ser preenchido)
-                // Crie um elemento <span id="editVideoInfo"></span> no HTML, se quiser exibir
-                // EXEMPLO (caso queria exibir):
-                // $('#editVideoInfo').text(bot.video ? `Vídeo atual: ${bot.video}` : 'Sem vídeo anterior');
+                // Exibir nome do vídeo atual
+                if (bot.video) {
+                    $('#editVideoInfo').text(`Vídeo atual: ${bot.video}`);
+                } else {
+                    $('#editVideoInfo').text('Sem vídeo anterior');
+                }
 
-                // =========== Botões "principais" ===========
+                // Botões "main"
                 let bjson = [];
                 try {
                     bjson = JSON.parse(bot.buttonsJson || '[]');
-                } catch (e) { /* ignore parse error */ }
-
+                } catch (e) { /* ignore */ }
                 if (bjson[0]) {
                     $('#editButtonName1').val(bjson[0].name);
                     $('#editButtonValue1').val(bjson[0].value);
@@ -772,15 +775,14 @@ $(document).ready(function () {
                     $('#editButtonVipLink3').val('');
                 }
 
-                // =========== Remarketing ===========
+                // remarketing
                 if (bot.remarketingJson) {
                     try {
                         const remarketing = JSON.parse(bot.remarketingJson);
 
-                        // ---------- not_purchased ----------
+                        // not_purchased
                         if (remarketing.not_purchased) {
                             $('#remarketing_not_purchased_description').val(remarketing.not_purchased.description || '');
-
                             const npDelay = remarketing.not_purchased.delay || 0;
                             const npMin = Math.floor(npDelay / 60);
                             const npSec = npDelay % 60;
@@ -805,10 +807,9 @@ $(document).ready(function () {
                             }
                         }
 
-                        // ---------- purchased ----------
+                        // purchased
                         if (remarketing.purchased) {
                             $('#remarketing_purchased_description').val(remarketing.purchased.description || '');
-
                             const pDelay = remarketing.purchased.delay || 0;
                             const pMin = Math.floor(pDelay / 60);
                             const pSec = pDelay % 60;
@@ -837,8 +838,8 @@ $(document).ready(function () {
                     }
                 }
 
-                // Exibe overlay de edição
-                $('#editBotContainer').show();
+                // Exibe form de edição
+                $('#editBotArea').removeClass('d-none');
             })
             .catch(err => {
                 $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
@@ -846,7 +847,8 @@ $(document).ready(function () {
     }
 
     $('#cancelEditBotBtn').on('click', function () {
-        $('#editBotContainer').hide();
+        // Oculta form de edição
+        $('#editBotArea').addClass('d-none');
     });
 
     $('#editBotForm').on('submit', function (e) {
@@ -856,14 +858,7 @@ $(document).ready(function () {
             $('#editBotResponse').html(`<div class="alert alert-danger">ID não encontrado</div>`);
             return;
         }
-
-        // Precisamos renomear alguns campos se necessário,
-        // mas aparentemente você já está usando ex:
-        // name="remarketing_not_purchased_delay_minutes" ...
-        // com ID="edit_remarketing_not_purchased_delay_minutes" etc.
-        // Então iremos apenas enviar tudo:
         const formData = new FormData(this);
-
         fetch(`/admin/bots/edit/${botId}`, {
             method: 'POST',
             body: formData

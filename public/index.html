@@ -76,28 +76,6 @@
             text-align: center;
         }
 
-        /* Estilização do card de edição de bot (aparecendo como um overlay similar ao modal) */
-        #editBotContainer {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1050;
-            width: 90%;
-            max-width: 400px;
-            background-color: #fff;
-            padding: 1.5rem;
-            border: 1px solid #ced4da;
-            border-radius: 0.5rem;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-            display: none;
-        }
-
-        body.dark-mode #editBotContainer {
-            background-color: #1e1e1e;
-            color: #fff;
-        }
-
         /* Estilo para os grupos de remarketing */
         .remarketing-group {
             border: 1px solid #ced4da;
@@ -478,323 +456,390 @@
                 <!-- SEÇÃO 5: Gerenciar Bots -->
                 <section id="manageBotsSection" class="d-none">
                     <h3>Gerenciar Bots</h3>
-                    <p>Aqui você pode cadastrar novos bots ou editar os já existentes, enviando um arquivo de vídeo
-                        direto do seu PC.</p>
+                    <p>Aqui você pode cadastrar novos bots ou editar os já existentes.</p>
                     <hr />
 
-                    <h5>Bots Existentes</h5>
-                    <table class="table table-bordered table-striped" id="existingBotsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nome</th>
-                                <th>Vídeo</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="existingBotsBody">
-                            <tr>
-                                <td colspan="4">Carregando...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- Abas -->
+                    <ul class="nav nav-tabs" id="manageBotsTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="existingBotsTab-link" data-toggle="tab"
+                                href="#existingBotsTab" role="tab" aria-controls="existingBotsTab" aria-selected="true">
+                                Bots Existentes
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="newBotTab-link" data-toggle="tab" href="#newBotTab" role="tab"
+                                aria-controls="newBotTab" aria-selected="false">
+                                Cadastrar Novo Bot
+                            </a>
+                        </li>
+                    </ul>
 
-                    <!-- Card de Edição de Bot (overlay) -->
-                    <div id="editBotContainer">
-                        <h5 class="text-center">Editar Bot</h5>
-                        <form id="editBotForm" enctype="multipart/form-data">
-                            <input type="hidden" id="editBotId" name="id" />
+                    <div class="tab-content" id="manageBotsTabsContent">
+                        <!-- TAB 1: BOTS EXISTENTES -->
+                        <div class="tab-pane fade show active" id="existingBotsTab" role="tabpanel"
+                            aria-labelledby="existingBotsTab-link">
+                            <h5 class="mt-3">Bots Existentes</h5>
+                            <table class="table table-bordered table-striped" id="existingBotsTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nome</th>
+                                        <th>Vídeo</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="existingBotsBody">
+                                    <tr>
+                                        <td colspan="4">Carregando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
 
-                            <label for="editBotName">Nome:</label>
-                            <input type="text" id="editBotName" name="name" class="form-control" required />
+                            <!-- Form de Edição (inline) -->
+                            <div id="editBotArea" class="d-none">
+                                <h5 class="text-center">Editar Bot</h5>
+                                <form id="editBotForm" enctype="multipart/form-data">
+                                    <input type="hidden" id="editBotId" name="id" />
 
-                            <label for="editBotToken">Token:</label>
-                            <input type="text" id="editBotToken" name="token" class="form-control" required />
+                                    <label for="editBotName">Nome:</label>
+                                    <input type="text" id="editBotName" name="name" class="form-control" required />
 
-                            <label for="editBotDescription">Descrição:</label>
-                            <textarea id="editBotDescription" name="description" class="form-control"
-                                rows="2"></textarea>
+                                    <label for="editBotToken">Token:</label>
+                                    <input type="text" id="editBotToken" name="token" class="form-control" required />
 
-                            <label>Vídeo (upload opcional):</label>
-                            <input type="file" id="editVideoFile" name="videoFile" class="form-control-file"
-                                accept="video/*" />
+                                    <label for="editBotDescription">Descrição:</label>
+                                    <textarea id="editBotDescription" name="description" class="form-control"
+                                        rows="2"></textarea>
 
-                            <hr />
-                            <h6>Botões (até 3)</h6>
-                            <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName1" name="buttonName1" class="form-control"
-                                    placeholder="Nome Botão 1" />
-                                <input type="text" id="editButtonValue1" name="buttonValue1" class="form-control"
-                                    placeholder="Valor Pix 1" />
-                                <input type="text" id="editButtonVipLink1" name="editButtonVipLink1"
-                                    class="form-control" placeholder="Link VIP" required />
+                                    <!-- Exibir nome do vídeo atual (opcional) -->
+                                    <label id="editVideoInfo"
+                                        style="font-weight: 600; display: block; margin-top: 0.5rem;"></label>
+
+                                    <label>Vídeo (upload opcional):</label>
+                                    <input type="file" id="editVideoFile" name="videoFile" class="form-control-file"
+                                        accept="video/*" />
+
+                                    <hr />
+                                    <h6>Botões (até 3)</h6>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" id="editButtonName1" name="buttonName1" class="form-control"
+                                            placeholder="Nome Botão 1" />
+                                        <input type="text" id="editButtonValue1" name="buttonValue1"
+                                            class="form-control" placeholder="Valor Pix 1" />
+                                        <input type="text" id="editButtonVipLink1" name="editButtonVipLink1"
+                                            class="form-control" placeholder="Link VIP" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" id="editButtonName2" name="buttonName2" class="form-control"
+                                            placeholder="Nome Botão 2" />
+                                        <input type="text" id="editButtonValue2" name="buttonValue2"
+                                            class="form-control" placeholder="Valor Pix 2" />
+                                        <input type="text" id="editButtonVipLink2" name="editButtonVipLink2"
+                                            class="form-control" placeholder="Link VIP" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" id="editButtonName3" name="buttonName3" class="form-control"
+                                            placeholder="Nome Botão 3" />
+                                        <input type="text" id="editButtonValue3" name="buttonValue3"
+                                            class="form-control" placeholder="Valor Pix 3" />
+                                        <input type="text" id="editButtonVipLink3" name="editButtonVipLink3"
+                                            class="form-control" placeholder="Link VIP" required />
+                                    </div>
+
+                                    <hr />
+                                    <!-- Grupo de Remarketing Not Purchased -->
+                                    <div class="remarketing-group">
+                                        <h6>Remarketing - Not Purchased</h6>
+                                        <label for="remarketing_not_purchased_description">Descrição:</label>
+                                        <textarea id="remarketing_not_purchased_description" class="form-control"
+                                            rows="2"></textarea>
+
+                                        <label>Delay (min e seg):</label>
+                                        <div class="delay-container">
+                                            <input type="number" id="edit_remarketing_not_purchased_delay_minutes"
+                                                name="remarketing_not_purchased_delay_minutes" class="form-control"
+                                                min="0" value="5" />
+                                            <input type="number" id="edit_remarketing_not_purchased_delay_seconds"
+                                                name="remarketing_not_purchased_delay_seconds" class="form-control"
+                                                min="0" max="59" value="0" />
+                                        </div>
+
+                                        <label>Vídeo (upload opcional):</label>
+                                        <input type="file" id="remarketing_not_purchased_video"
+                                            name="remarketing_not_purchased_video" class="form-control-file"
+                                            accept="video/*" />
+
+                                        <h6 class="mt-2">Botões (até 3)</h6>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonName1"
+                                                name="remarketing_not_purchased_buttonName1"
+                                                placeholder="Nome Botão 1" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonValue1"
+                                                name="remarketing_not_purchased_buttonValue1"
+                                                placeholder="Valor Pix 1" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonLink1"
+                                                name="remarketing_not_purchased_buttonLink1" placeholder="Link"
+                                                required />
+                                        </div>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonName2"
+                                                name="remarketing_not_purchased_buttonName2"
+                                                placeholder="Nome Botão 2" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonValue2"
+                                                name="remarketing_not_purchased_buttonValue2"
+                                                placeholder="Valor Pix 2" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonLink2"
+                                                name="remarketing_not_purchased_buttonLink2" placeholder="Link"
+                                                required />
+                                        </div>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonName3"
+                                                name="remarketing_not_purchased_buttonName3"
+                                                placeholder="Nome Botão 3" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonValue3"
+                                                name="remarketing_not_purchased_buttonValue3"
+                                                placeholder="Valor Pix 3" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_not_purchased_buttonLink3"
+                                                name="remarketing_not_purchased_buttonLink3" placeholder="Link"
+                                                required />
+                                        </div>
+                                    </div>
+
+                                    <!-- Grupo de Remarketing Purchased -->
+                                    <div class="remarketing-group">
+                                        <h6>Remarketing - Purchased (Upsell)</h6>
+                                        <label for="remarketing_purchased_description">Descrição:</label>
+                                        <textarea id="remarketing_purchased_description" class="form-control"
+                                            rows="2"></textarea>
+
+                                        <label>Delay (min e seg):</label>
+                                        <div class="delay-container">
+                                            <input type="number" id="edit_remarketing_purchased_delay_minutes"
+                                                name="remarketing_purchased_delay_minutes" class="form-control" min="0"
+                                                value="30" />
+                                            <input type="number" id="edit_remarketing_purchased_delay_seconds"
+                                                name="remarketing_purchased_delay_seconds" class="form-control" min="0"
+                                                max="59" value="0" />
+                                        </div>
+
+                                        <label>Vídeo (upload opcional):</label>
+                                        <input type="file" id="remarketing_purchased_video"
+                                            name="remarketing_purchased_video" class="form-control-file"
+                                            accept="video/*" />
+
+                                        <h6 class="mt-2">Botões (até 3)</h6>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonName1"
+                                                name="remarketing_purchased_buttonName1" placeholder="Nome Botão 1" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonValue1"
+                                                name="remarketing_purchased_buttonValue1" placeholder="Valor Pix 1" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonLink1"
+                                                name="remarketing_purchased_buttonLink1" placeholder="Link" required />
+                                        </div>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonName2"
+                                                name="remarketing_purchased_buttonName2" placeholder="Nome Botão 2" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonValue2"
+                                                name="remarketing_purchased_buttonValue2" placeholder="Valor Pix 2" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonLink2"
+                                                name="remarketing_purchased_buttonLink2" placeholder="Link" required />
+                                        </div>
+                                        <div class="bot-buttons-row">
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonName3"
+                                                name="remarketing_purchased_buttonName3" placeholder="Nome Botão 3" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonValue3"
+                                                name="remarketing_purchased_buttonValue3" placeholder="Valor Pix 3" />
+                                            <input type="text" class="form-control"
+                                                id="remarketing_purchased_buttonLink3"
+                                                name="remarketing_purchased_buttonLink3" placeholder="Link" required />
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
+                                    <button type="button" class="btn btn-secondary mt-2"
+                                        id="cancelEditBotBtn">Cancelar</button>
+                                </form>
+                                <div id="editBotResponse" class="mt-2"></div>
                             </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName2" name="buttonName2" class="form-control"
-                                    placeholder="Nome Botão 2" />
-                                <input type="text" id="editButtonValue2" name="buttonValue2" class="form-control"
-                                    placeholder="Valor Pix 2" />
-                                <input type="text" id="editButtonVipLink2" name="editButtonVipLink2"
-                                    class="form-control" placeholder="Link VIP" required />
-                            </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" id="editButtonName3" name="buttonName3" class="form-control"
-                                    placeholder="Nome Botão 3" />
-                                <input type="text" id="editButtonValue3" name="buttonValue3" class="form-control"
-                                    placeholder="Valor Pix 3" />
-                                <input type="text" id="editButtonVipLink3" name="editButtonVipLink3"
-                                    class="form-control" placeholder="Link VIP" required />
-                            </div>
+                        </div>
 
-                            <hr />
-                            <!-- Grupo de Remarketing Not Purchased -->
-                            <div class="remarketing-group">
-                                <h6>Remarketing - Not Purchased</h6>
+                        <!-- TAB 2: CADASTRAR NOVO BOT -->
+                        <div class="tab-pane fade" id="newBotTab" role="tabpanel" aria-labelledby="newBotTab-link">
+                            <h5 class="mt-3">Cadastrar Novo Bot</h5>
+                            <form id="addBotForm" style="max-width:600px;" enctype="multipart/form-data">
+                                <label for="botNameInput">Nome do Bot:</label>
+                                <input type="text" id="botNameInput" name="name" class="form-control" required />
 
-                                <label for="remarketing_not_purchased_description">Descrição:</label>
-                                <textarea id="remarketing_not_purchased_description" class="form-control"
+                                <label for="botTokenInput">Token do Bot:</label>
+                                <input type="text" id="botTokenInput" name="token" class="form-control" required />
+
+                                <label for="botDescriptionInput">Descrição:</label>
+                                <textarea id="botDescriptionInput" name="description" class="form-control"
                                     rows="2"></textarea>
 
-                                <label>Delay (min e seg):</label>
-                                <div class="delay-container">
-                                    <input type="number" id="edit_remarketing_not_purchased_delay_minutes"
-                                        name="remarketing_not_purchased_delay_minutes" class="form-control" min="0"
-                                        value="5" />
-                                    <input type="number" id="edit_remarketing_not_purchased_delay_seconds"
-                                        name="remarketing_not_purchased_delay_seconds" class="form-control" min="0"
-                                        max="59" value="0" />
-                                </div>
+                                <label>Vídeo (upload do PC):</label>
+                                <input type="file" id="botVideoFile" name="videoFile" class="form-control-file"
+                                    accept="video/*" />
 
-                                <label>Vídeo (upload opcional):</label>
-                                <input type="file" id="remarketing_not_purchased_video"
-                                    name="remarketing_not_purchased_video" class="form-control-file" accept="video/*" />
-
-                                <h6 class="mt-2">Botões (até 3)</h6>
+                                <hr />
+                                <h6>Botões (até 3)</h6>
                                 <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonName1"
-                                        name="remarketing_not_purchased_buttonName1" placeholder="Nome Botão 1" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue1"
-                                        name="remarketing_not_purchased_buttonValue1" placeholder="Valor Pix 1" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink1"
-                                        name="remarketing_not_purchased_buttonLink1" placeholder="Link" required />
+                                    <input type="text" class="form-control" id="buttonName1" name="buttonName1"
+                                        placeholder="Nome Botão 1" />
+                                    <input type="text" class="form-control" id="buttonValue1" name="buttonValue1"
+                                        placeholder="Valor Pix 1" />
+                                    <input type="text" class="form-control" id="buttonVipLink1" name="buttonVipLink1"
+                                        placeholder="Link VIP" required />
                                 </div>
                                 <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonName2"
-                                        name="remarketing_not_purchased_buttonName2" placeholder="Nome Botão 2" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue2"
-                                        name="remarketing_not_purchased_buttonValue2" placeholder="Valor Pix 2" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink2"
-                                        name="remarketing_not_purchased_buttonLink2" placeholder="Link" required />
+                                    <input type="text" class="form-control" id="buttonName2" name="buttonName2"
+                                        placeholder="Nome Botão 2" />
+                                    <input type="text" class="form-control" id="buttonValue2" name="buttonValue2"
+                                        placeholder="Valor Pix 2" />
+                                    <input type="text" class="form-control" id="buttonVipLink2" name="buttonVipLink2"
+                                        placeholder="Link VIP" required />
                                 </div>
                                 <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonName3"
-                                        name="remarketing_not_purchased_buttonName3" placeholder="Nome Botão 3" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue3"
-                                        name="remarketing_not_purchased_buttonValue3" placeholder="Valor Pix 3" />
-                                    <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink3"
-                                        name="remarketing_not_purchased_buttonLink3" placeholder="Link" required />
-                                </div>
-                            </div>
-
-                            <!-- Grupo de Remarketing Purchased -->
-                            <div class="remarketing-group">
-                                <h6>Remarketing - Purchased (Upsell)</h6>
-
-                                <label for="remarketing_purchased_description">Descrição:</label>
-                                <textarea id="remarketing_purchased_description" class="form-control"
-                                    rows="2"></textarea>
-
-                                <label>Delay (min e seg):</label>
-                                <div class="delay-container">
-                                    <input type="number" id="edit_remarketing_purchased_delay_minutes"
-                                        name="remarketing_purchased_delay_minutes" class="form-control" min="0"
-                                        value="30" />
-                                    <input type="number" id="edit_remarketing_purchased_delay_seconds"
-                                        name="remarketing_purchased_delay_seconds" class="form-control" min="0" max="59"
-                                        value="0" />
+                                    <input type="text" class="form-control" id="buttonName3" name="buttonName3"
+                                        placeholder="Nome Botão 3" />
+                                    <input type="text" class="form-control" id="buttonValue3" name="buttonValue3"
+                                        placeholder="Valor Pix 3" />
+                                    <input type="text" class="form-control" id="buttonVipLink3" name="buttonVipLink3"
+                                        placeholder="Link VIP" required />
                                 </div>
 
-                                <label>Vídeo (upload opcional):</label>
-                                <input type="file" id="remarketing_purchased_video" name="remarketing_purchased_video"
-                                    class="form-control-file" accept="video/*" />
+                                <hr />
+                                <!-- Grupo de Remarketing Not Purchased -->
+                                <div class="remarketing-group">
+                                    <h6>Remarketing - Not Purchased</h6>
+                                    <label for="remarketing_not_purchased_description">Descrição:</label>
+                                    <textarea id="remarketing_not_purchased_description"
+                                        name="remarketing_not_purchased_description" class="form-control"
+                                        rows="2"></textarea>
 
-                                <h6 class="mt-2">Botões (até 3)</h6>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonName1"
-                                        name="remarketing_purchased_buttonName1" placeholder="Nome Botão 1" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonValue1"
-                                        name="remarketing_purchased_buttonValue1" placeholder="Valor Pix 1" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonLink1"
-                                        name="remarketing_purchased_buttonLink1" placeholder="Link" required />
-                                </div>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonName2"
-                                        name="remarketing_purchased_buttonName2" placeholder="Nome Botão 2" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonValue2"
-                                        name="remarketing_purchased_buttonValue2" placeholder="Valor Pix 2" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonLink2"
-                                        name="remarketing_purchased_buttonLink2" placeholder="Link" required />
-                                </div>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonName3"
-                                        name="remarketing_purchased_buttonName3" placeholder="Nome Botão 3" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonValue3"
-                                        name="remarketing_purchased_buttonValue3" placeholder="Valor Pix 3" />
-                                    <input type="text" class="form-control" id="remarketing_purchased_buttonLink3"
-                                        name="remarketing_purchased_buttonLink3" placeholder="Link" required />
-                                </div>
-                            </div>
+                                    <label>Delay (min e seg):</label>
+                                    <div class="delay-container">
+                                        <input type="number" id="remarketing_not_purchased_delay_minutes"
+                                            name="remarketing_not_purchased_delay_minutes" class="form-control" min="0"
+                                            value="5" />
+                                        <input type="number" id="remarketing_not_purchased_delay_seconds"
+                                            name="remarketing_not_purchased_delay_seconds" class="form-control" min="0"
+                                            max="59" value="0" />
+                                    </div>
 
-                            <button type="submit" class="btn btn-primary mt-2">Salvar Edição</button>
-                            <button type="button" class="btn btn-secondary mt-2" id="cancelEditBotBtn">Cancelar</button>
-                        </form>
-                        <div id="editBotResponse" class="mt-2"></div>
+                                    <label>Vídeo (upload opcional):</label>
+                                    <input type="file" id="remarketing_not_purchased_video"
+                                        name="remarketing_not_purchased_video" class="form-control-file"
+                                        accept="video/*" />
+
+                                    <h6 class="mt-2">Botões (até 3)</h6>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonName1"
+                                            name="remarketing_not_purchased_buttonName1" placeholder="Nome Botão 1" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonValue1"
+                                            name="remarketing_not_purchased_buttonValue1" placeholder="Valor Pix 1" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonLink1"
+                                            name="remarketing_not_purchased_buttonLink1" placeholder="Link" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonName2"
+                                            name="remarketing_not_purchased_buttonName2" placeholder="Nome Botão 2" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonValue2"
+                                            name="remarketing_not_purchased_buttonValue2" placeholder="Valor Pix 2" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonLink2"
+                                            name="remarketing_not_purchased_buttonLink2" placeholder="Link" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonName3"
+                                            name="remarketing_not_purchased_buttonName3" placeholder="Nome Botão 3" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonValue3"
+                                            name="remarketing_not_purchased_buttonValue3" placeholder="Valor Pix 3" />
+                                        <input type="text" class="form-control"
+                                            id="remarketing_not_purchased_buttonLink3"
+                                            name="remarketing_not_purchased_buttonLink3" placeholder="Link" required />
+                                    </div>
+                                </div>
+
+                                <!-- Grupo de Remarketing Purchased -->
+                                <div class="remarketing-group">
+                                    <h6>Remarketing - Purchased (Upsell)</h6>
+                                    <label for="remarketing_purchased_description">Descrição:</label>
+                                    <textarea id="remarketing_purchased_description"
+                                        name="remarketing_purchased_description" class="form-control"
+                                        rows="2"></textarea>
+
+                                    <label>Delay (min e seg):</label>
+                                    <div class="delay-container">
+                                        <input type="number" id="remarketing_purchased_delay_minutes"
+                                            name="remarketing_purchased_delay_minutes" class="form-control" min="0"
+                                            value="30" />
+                                        <input type="number" id="remarketing_purchased_delay_seconds"
+                                            name="remarketing_purchased_delay_seconds" class="form-control" min="0"
+                                            max="59" value="0" />
+                                    </div>
+
+                                    <label>Vídeo (upload opcional):</label>
+                                    <input type="file" id="remarketing_purchased_video"
+                                        name="remarketing_purchased_video" class="form-control-file" accept="video/*" />
+
+                                    <h6 class="mt-2">Botões (até 3)</h6>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonName1"
+                                            name="remarketing_purchased_buttonName1" placeholder="Nome Botão 1" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonValue1"
+                                            name="remarketing_purchased_buttonValue1" placeholder="Valor Pix 1" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonLink1"
+                                            name="remarketing_purchased_buttonLink1" placeholder="Link" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonName2"
+                                            name="remarketing_purchased_buttonName2" placeholder="Nome Botão 2" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonValue2"
+                                            name="remarketing_purchased_buttonValue2" placeholder="Valor Pix 2" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonLink2"
+                                            name="remarketing_purchased_buttonLink2" placeholder="Link" required />
+                                    </div>
+                                    <div class="bot-buttons-row">
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonName3"
+                                            name="remarketing_purchased_buttonName3" placeholder="Nome Botão 3" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonValue3"
+                                            name="remarketing_purchased_buttonValue3" placeholder="Valor Pix 3" />
+                                        <input type="text" class="form-control" id="remarketing_purchased_buttonLink3"
+                                            name="remarketing_purchased_buttonLink3" placeholder="Link" required />
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
+                            </form>
+                            <div id="addBotResponse" class="mt-3"></div>
+                        </div>
                     </div>
-
-                    <hr />
-
-                    <h5>Cadastrar Novo Bot</h5>
-                    <form id="addBotForm" style="max-width:600px;" enctype="multipart/form-data">
-                        <label for="botNameInput">Nome do Bot:</label>
-                        <input type="text" id="botNameInput" name="name" class="form-control" required />
-
-                        <label for="botTokenInput">Token do Bot:</label>
-                        <input type="text" id="botTokenInput" name="token" class="form-control" required />
-
-                        <label for="botDescriptionInput">Descrição:</label>
-                        <textarea id="botDescriptionInput" name="description" class="form-control" rows="2"></textarea>
-
-                        <label>Vídeo (upload do PC):</label>
-                        <input type="file" id="botVideoFile" name="videoFile" class="form-control-file"
-                            accept="video/*" />
-
-                        <hr />
-                        <h6>Botões (até 3)</h6>
-                        <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName1" name="buttonName1"
-                                placeholder="Nome Botão 1" />
-                            <input type="text" class="form-control" id="buttonValue1" name="buttonValue1"
-                                placeholder="Valor Pix 1" />
-                            <input type="text" class="form-control" id="buttonVipLink1" name="buttonVipLink1"
-                                placeholder="Link VIP" required />
-                        </div>
-                        <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName2" name="buttonName2"
-                                placeholder="Nome Botão 2" />
-                            <input type="text" class="form-control" id="buttonValue2" name="buttonValue2"
-                                placeholder="Valor Pix 2" />
-                            <input type="text" class="form-control" id="buttonVipLink2" name="buttonVipLink2"
-                                placeholder="Link VIP" required />
-                        </div>
-                        <div class="bot-buttons-row">
-                            <input type="text" class="form-control" id="buttonName3" name="buttonName3"
-                                placeholder="Nome Botão 3" />
-                            <input type="text" class="form-control" id="buttonValue3" name="buttonValue3"
-                                placeholder="Valor Pix 3" />
-                            <input type="text" class="form-control" id="buttonVipLink3" name="buttonVipLink3"
-                                placeholder="Link VIP" required />
-                        </div>
-
-                        <hr />
-                        <!-- Grupo de Remarketing Not Purchased -->
-                        <div class="remarketing-group">
-                            <h6>Remarketing - Not Purchased</h6>
-                            <label for="remarketing_not_purchased_description">Descrição:</label>
-                            <textarea id="remarketing_not_purchased_description"
-                                name="remarketing_not_purchased_description" class="form-control" rows="2"></textarea>
-
-                            <label>Delay (min e seg):</label>
-                            <div class="delay-container">
-                                <input type="number" id="remarketing_not_purchased_delay_minutes"
-                                    name="remarketing_not_purchased_delay_minutes" class="form-control" min="0"
-                                    value="5" />
-                                <input type="number" id="remarketing_not_purchased_delay_seconds"
-                                    name="remarketing_not_purchased_delay_seconds" class="form-control" min="0" max="59"
-                                    value="0" />
-                            </div>
-
-                            <label>Vídeo (upload opcional):</label>
-                            <input type="file" id="remarketing_not_purchased_video"
-                                name="remarketing_not_purchased_video" class="form-control-file" accept="video/*" />
-
-                            <h6 class="mt-2">Botões (até 3)</h6>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonName1"
-                                    name="remarketing_not_purchased_buttonName1" placeholder="Nome Botão 1" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue1"
-                                    name="remarketing_not_purchased_buttonValue1" placeholder="Valor Pix 1" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink1"
-                                    name="remarketing_not_purchased_buttonLink1" placeholder="Link" required />
-                            </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonName2"
-                                    name="remarketing_not_purchased_buttonName2" placeholder="Nome Botão 2" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue2"
-                                    name="remarketing_not_purchased_buttonValue2" placeholder="Valor Pix 2" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink2"
-                                    name="remarketing_not_purchased_buttonLink2" placeholder="Link" required />
-                            </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonName3"
-                                    name="remarketing_not_purchased_buttonName3" placeholder="Nome Botão 3" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonValue3"
-                                    name="remarketing_not_purchased_buttonValue3" placeholder="Valor Pix 3" />
-                                <input type="text" class="form-control" id="remarketing_not_purchased_buttonLink3"
-                                    name="remarketing_not_purchased_buttonLink3" placeholder="Link" required />
-                            </div>
-                        </div>
-
-                        <!-- Grupo de Remarketing Purchased -->
-                        <div class="remarketing-group">
-                            <h6>Remarketing - Purchased (Upsell)</h6>
-                            <label for="remarketing_purchased_description">Descrição:</label>
-                            <textarea id="remarketing_purchased_description" name="remarketing_purchased_description"
-                                class="form-control" rows="2"></textarea>
-
-                            <label>Delay (min e seg):</label>
-                            <div class="delay-container">
-                                <input type="number" id="remarketing_purchased_delay_minutes"
-                                    name="remarketing_purchased_delay_minutes" class="form-control" min="0"
-                                    value="30" />
-                                <input type="number" id="remarketing_purchased_delay_seconds"
-                                    name="remarketing_purchased_delay_seconds" class="form-control" min="0" max="59"
-                                    value="0" />
-                            </div>
-
-                            <label>Vídeo (upload opcional):</label>
-                            <input type="file" id="remarketing_purchased_video" name="remarketing_purchased_video"
-                                class="form-control-file" accept="video/*" />
-
-                            <h6 class="mt-2">Botões (até 3)</h6>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonName1"
-                                    name="remarketing_purchased_buttonName1" placeholder="Nome Botão 1" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonValue1"
-                                    name="remarketing_purchased_buttonValue1" placeholder="Valor Pix 1" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonLink1"
-                                    name="remarketing_purchased_buttonLink1" placeholder="Link" required />
-                            </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonName2"
-                                    name="remarketing_purchased_buttonName2" placeholder="Nome Botão 2" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonValue2"
-                                    name="remarketing_purchased_buttonValue2" placeholder="Valor Pix 2" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonLink2"
-                                    name="remarketing_purchased_buttonLink2" placeholder="Link" required />
-                            </div>
-                            <div class="bot-buttons-row">
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonName3"
-                                    name="remarketing_purchased_buttonName3" placeholder="Nome Botão 3" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonValue3"
-                                    name="remarketing_purchased_buttonValue3" placeholder="Valor Pix 3" />
-                                <input type="text" class="form-control" id="remarketing_purchased_buttonLink3"
-                                    name="remarketing_purchased_buttonLink3" placeholder="Link" required />
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
-                    </form>
-                    <div id="addBotResponse" class="mt-3"></div>
                 </section>
             </div>
         </div>

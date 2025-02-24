@@ -186,8 +186,7 @@ body.dark-mode .card .card-text {
     color: #40a8ff !important;
 }
 
-/* Adicione no seu style.css, ao final, para modal dark-mode */
-
+/* Modal no modo escuro */
 body.dark-mode .modal-content {
     background-color: #1e1e1e !important;
     color: #fff !important;
@@ -220,3 +219,24 @@ body.dark-mode .modal-backdrop {
   opacity: 0.6 !important;
 }
 */
+
+/* ========== ABAS (Tabs) ========== */
+.nav-tabs .nav-link {
+    border-radius: 0 !important;
+    border: 1px solid transparent;
+    color: #000 !important;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #fff !important;
+    border-color: #ddd #ddd #fff;
+    color: #000 !important;
+}
+
+/* Container de edição do bot inline (não overlay) */
+#editBotArea {
+    border: 1px solid #ccc;
+    padding: 1rem;
+    margin-top: 1rem;
+    border-radius: 6px;
+}
