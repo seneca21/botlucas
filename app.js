@@ -1,5 +1,5 @@
 //------------------------------------------------------
-// app.js (ATUALIZADO)
+// app.js
 //------------------------------------------------------
 const express = require('express');
 const path = require('path');
@@ -335,9 +335,6 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     };
 }
 
-//------------------------------------------------------
-// Rota /api/bots-stats – estatísticas do painel
-//------------------------------------------------------
 app.get('/api/bots-stats', checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
@@ -695,6 +692,7 @@ app.post('/admin/bots', checkAuth, upload.fields([
             buttonVipLink3
         } = payload;
 
+        // Monta array de botões
         const buttons = [];
         function pushButtonIfValid(bName, bValue, bVipLink) {
             if (bName && bName.trim() !== '' &&
@@ -706,6 +704,7 @@ app.post('/admin/bots', checkAuth, upload.fields([
         pushButtonIfValid(buttonName1, buttonValue1, buttonVipLink1);
         pushButtonIfValid(buttonName2, buttonValue2, buttonVipLink2);
         pushButtonIfValid(buttonName3, buttonValue3, buttonVipLink3);
+
         if (buttons.length === 0) {
             return res.status(400).send('Erro: é obrigatório definir pelo menos um botão com Link VIP.');
         }
@@ -717,10 +716,16 @@ app.post('/admin/bots', checkAuth, upload.fields([
         }
 
         // Constrói remarketing para not_purchased
+        const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
+        const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
+        const npTotalSeconds = npMin * 60 + npSec;
+
         const remarketingNotPurchased = {
             description: req.body.remarketing_not_purchased_description || "",
-            delay: req.body.remarketing_not_purchased_delay ? parseInt(req.body.remarketing_not_purchased_delay) : 5,
-            video: (req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0]) ? req.files.remarketing_not_purchased_video[0].location : "",
+            delay: npTotalSeconds,
+            video: (req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0])
+                ? req.files.remarketing_not_purchased_video[0].location
+                : "",
             buttons: []
         };
         for (let i = 1; i <= 3; i++) {
@@ -735,11 +740,17 @@ app.post('/admin/bots', checkAuth, upload.fields([
             return res.status(400).send('Erro: é obrigatório definir pelo menos um botão no remarketing (not purchased).');
         }
 
-        // Constrói remarketing para purchased (upsell)
+        // Constrói remarketing para purchased
+        const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
+        const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
+        const pTotalSeconds = pMin * 60 + pSec;
+
         const remarketingPurchased = {
             description: req.body.remarketing_purchased_description || "",
-            delay: req.body.remarketing_purchased_delay ? parseInt(req.body.remarketing_purchased_delay) : 30,
-            video: (req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0]) ? req.files.remarketing_purchased_video[0].location : "",
+            delay: pTotalSeconds,
+            video: (req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0])
+                ? req.files.remarketing_purchased_video[0].location
+                : "",
             buttons: []
         };
         for (let i = 1; i <= 3; i++) {
@@ -758,7 +769,6 @@ app.post('/admin/bots', checkAuth, upload.fields([
             not_purchased: remarketingNotPurchased,
             purchased: remarketingPurchased
         };
-
         const remarketingJson = JSON.stringify(remarketing);
 
         const newBot = await BotModel.create({
@@ -792,7 +802,6 @@ app.post('/admin/bots', checkAuth, upload.fields([
     }
 });
 
-// Rota de edição de bot
 app.post('/admin/bots/edit/:id', checkAuth, upload.fields([
     { name: 'videoFile', maxCount: 1 },
     { name: 'remarketing_not_purchased_video', maxCount: 1 },
@@ -841,11 +850,16 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.fields([
             videoFilename = req.files.videoFile[0].location;
         }
 
-        // Constrói remarketing para not_purchased
+        const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
+        const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
+        const npTotalSeconds = npMin * 60 + npSec;
+
         const remarketingNotPurchased = {
             description: req.body.remarketing_not_purchased_description || "",
-            delay: req.body.remarketing_not_purchased_delay ? parseInt(req.body.remarketing_not_purchased_delay) : 5,
-            video: (req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0]) ? req.files.remarketing_not_purchased_video[0].location : "",
+            delay: npTotalSeconds,
+            video: (req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0])
+                ? req.files.remarketing_not_purchased_video[0].location
+                : "",
             buttons: []
         };
         for (let i = 1; i <= 3; i++) {
@@ -860,11 +874,16 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.fields([
             return res.status(400).send('Erro: é obrigatório definir pelo menos um botão no remarketing (not purchased).');
         }
 
-        // Constrói remarketing para purchased
+        const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
+        const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
+        const pTotalSeconds = pMin * 60 + pSec;
+
         const remarketingPurchased = {
             description: req.body.remarketing_purchased_description || "",
-            delay: req.body.remarketing_purchased_delay ? parseInt(req.body.remarketing_purchased_delay) : 30,
-            video: (req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0]) ? req.files.remarketing_purchased_video[0].location : "",
+            delay: pTotalSeconds,
+            video: (req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0])
+                ? req.files.remarketing_purchased_video[0].location
+                : "",
             buttons: []
         };
         for (let i = 1; i <= 3; i++) {
@@ -883,7 +902,6 @@ app.post('/admin/bots/edit/:id', checkAuth, upload.fields([
             not_purchased: remarketingNotPurchased,
             purchased: remarketingPurchased
         };
-
         const safeRemarketingJson = JSON.stringify(remarketing);
 
         bot.name = name;

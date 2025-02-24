@@ -110,6 +110,16 @@
             margin-bottom: 0.5rem;
             font-weight: bold;
         }
+
+        /* Ajuste rápido para colocar inputs de delay (min & seg) lado a lado */
+        .delay-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        .delay-container input {
+            width: 50%;
+        }
     </style>
 </head>
 
@@ -494,6 +504,7 @@
                         <h5 class="text-center">Editar Bot</h5>
                         <form id="editBotForm" enctype="multipart/form-data">
                             <input type="hidden" id="editBotId" name="id" />
+
                             <label for="editBotName">Nome:</label>
                             <input type="text" id="editBotName" name="name" class="form-control" required />
 
@@ -539,15 +550,25 @@
                             <!-- Grupo de Remarketing Not Purchased -->
                             <div class="remarketing-group">
                                 <h6>Remarketing - Not Purchased</h6>
+
                                 <label for="remarketing_not_purchased_description">Descrição:</label>
                                 <textarea id="remarketing_not_purchased_description" class="form-control"
                                     rows="2"></textarea>
-                                <label for="remarketing_not_purchased_delay">Delay (minutos):</label>
-                                <input type="number" id="remarketing_not_purchased_delay" class="form-control"
-                                    value="5" />
+
+                                <label>Delay (min e seg):</label>
+                                <div class="delay-container">
+                                    <input type="number" id="edit_remarketing_not_purchased_delay_minutes"
+                                        name="remarketing_not_purchased_delay_minutes" class="form-control" min="0"
+                                        value="5" />
+                                    <input type="number" id="edit_remarketing_not_purchased_delay_seconds"
+                                        name="remarketing_not_purchased_delay_seconds" class="form-control" min="0"
+                                        max="59" value="0" />
+                                </div>
+
                                 <label>Vídeo (upload opcional):</label>
                                 <input type="file" id="remarketing_not_purchased_video"
                                     name="remarketing_not_purchased_video" class="form-control-file" accept="video/*" />
+
                                 <h6 class="mt-2">Botões (até 3)</h6>
                                 <div class="bot-buttons-row">
                                     <input type="text" class="form-control" id="remarketing_not_purchased_buttonName1"
@@ -578,14 +599,25 @@
                             <!-- Grupo de Remarketing Purchased -->
                             <div class="remarketing-group">
                                 <h6>Remarketing - Purchased (Upsell)</h6>
+
                                 <label for="remarketing_purchased_description">Descrição:</label>
                                 <textarea id="remarketing_purchased_description" class="form-control"
                                     rows="2"></textarea>
-                                <label for="remarketing_purchased_delay">Delay (minutos):</label>
-                                <input type="number" id="remarketing_purchased_delay" class="form-control" value="30" />
+
+                                <label>Delay (min e seg):</label>
+                                <div class="delay-container">
+                                    <input type="number" id="edit_remarketing_purchased_delay_minutes"
+                                        name="remarketing_purchased_delay_minutes" class="form-control" min="0"
+                                        value="30" />
+                                    <input type="number" id="edit_remarketing_purchased_delay_seconds"
+                                        name="remarketing_purchased_delay_seconds" class="form-control" min="0" max="59"
+                                        value="0" />
+                                </div>
+
                                 <label>Vídeo (upload opcional):</label>
                                 <input type="file" id="remarketing_purchased_video" name="remarketing_purchased_video"
                                     class="form-control-file" accept="video/*" />
+
                                 <h6 class="mt-2">Botões (até 3)</h6>
                                 <div class="bot-buttons-row">
                                     <input type="text" class="form-control" id="remarketing_purchased_buttonName1"
@@ -670,12 +702,21 @@
                             <label for="remarketing_not_purchased_description">Descrição:</label>
                             <textarea id="remarketing_not_purchased_description"
                                 name="remarketing_not_purchased_description" class="form-control" rows="2"></textarea>
-                            <label for="remarketing_not_purchased_delay">Delay (minutos):</label>
-                            <input type="number" id="remarketing_not_purchased_delay"
-                                name="remarketing_not_purchased_delay" class="form-control" value="5" />
+
+                            <label>Delay (min e seg):</label>
+                            <div class="delay-container">
+                                <input type="number" id="remarketing_not_purchased_delay_minutes"
+                                    name="remarketing_not_purchased_delay_minutes" class="form-control" min="0"
+                                    value="5" />
+                                <input type="number" id="remarketing_not_purchased_delay_seconds"
+                                    name="remarketing_not_purchased_delay_seconds" class="form-control" min="0" max="59"
+                                    value="0" />
+                            </div>
+
                             <label>Vídeo (upload opcional):</label>
                             <input type="file" id="remarketing_not_purchased_video"
                                 name="remarketing_not_purchased_video" class="form-control-file" accept="video/*" />
+
                             <h6 class="mt-2">Botões (até 3)</h6>
                             <div class="bot-buttons-row">
                                 <input type="text" class="form-control" id="remarketing_not_purchased_buttonName1"
@@ -709,12 +750,21 @@
                             <label for="remarketing_purchased_description">Descrição:</label>
                             <textarea id="remarketing_purchased_description" name="remarketing_purchased_description"
                                 class="form-control" rows="2"></textarea>
-                            <label for="remarketing_purchased_delay">Delay (minutos):</label>
-                            <input type="number" id="remarketing_purchased_delay" name="remarketing_purchased_delay"
-                                class="form-control" value="30" />
+
+                            <label>Delay (min e seg):</label>
+                            <div class="delay-container">
+                                <input type="number" id="remarketing_purchased_delay_minutes"
+                                    name="remarketing_purchased_delay_minutes" class="form-control" min="0"
+                                    value="30" />
+                                <input type="number" id="remarketing_purchased_delay_seconds"
+                                    name="remarketing_purchased_delay_seconds" class="form-control" min="0" max="59"
+                                    value="0" />
+                            </div>
+
                             <label>Vídeo (upload opcional):</label>
                             <input type="file" id="remarketing_purchased_video" name="remarketing_purchased_video"
                                 class="form-control-file" accept="video/*" />
+
                             <h6 class="mt-2">Botões (até 3)</h6>
                             <div class="bot-buttons-row">
                                 <input type="text" class="form-control" id="remarketing_purchased_buttonName1"

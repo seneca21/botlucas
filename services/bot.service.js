@@ -1,5 +1,6 @@
+//------------------------------------------------------
 // services/bot.service.js
-
+//------------------------------------------------------
 const { Telegraf, Markup } = require('telegraf');
 const { createCharge, checkPaymentStatus } = require('./qr.service');
 const path = require('path');
@@ -364,9 +365,9 @@ function initializeBot(botConfig) {
       } else {
         logger.info(`🔄 Usuário atualizado: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
       }
-      // Para remarketing not purchased, usa o delay definido no remarketing
+      // Para remarketing not purchased
       if (botConfig.remarketing && botConfig.remarketing.not_purchased) {
-        const delayNotPurchased = botConfig.remarketing.not_purchased.delay || 5;
+        const delayNotPurchasedSec = botConfig.remarketing.not_purchased.delay || 0;
         setTimeout(async () => {
           try {
             const currentUser = await User.findOne({ where: { telegramId } });
@@ -379,7 +380,7 @@ function initializeBot(botConfig) {
           } catch (err) {
             logger.error(`❌ Erro ao enviar remarketing para ${telegramId}:`, err);
           }
-        }, delayNotPurchased * 60 * 1000);
+        }, delayNotPurchasedSec * 1000); // Multiplica por 1000, pois agora o delay está em segundos
       }
     } catch (error) {
       logger.error('❌ Erro ao registrar usuário:', error);
@@ -486,26 +487,27 @@ function initializeBot(botConfig) {
   });
 
   bot.action(/^select_plan_(\d+)$/, async (ctx) => {
-    const chatId = ctx.chat.id;
-    const index = parseInt(ctx.match[1]);
-    const plan = (botConfig.buttons || [])[index];
-    if (!plan) {
-      logger.error(`❌ Plano não encontrado para o índice ${index} no bot ${botConfig.name}.`);
-      await ctx.answerCbQuery("Plano não encontrado.");
-      return;
-    }
-    const user = await User.findOne({ where: { telegramId: chatId.toString() } });
-    if (user) {
-      user.lastInteraction = new Date();
-      user.botName = botConfig.name;
-      await user.save();
-    }
-    if (!userSessions[chatId]) userSessions[chatId] = {};
-    userSessions[chatId].originCondition = 'main';
-    userSessions[chatId].selectedPlan = plan;
-    userSessions[chatId].paymentCheckCount = 0;
-    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
     try {
+      const chatId = ctx.chat.id;
+      const index = parseInt(ctx.match[1]);
+      const plan = (botConfig.buttons || [])[index];
+      if (!plan) {
+        logger.error(`❌ Plano não encontrado para o índice ${index} no bot ${botConfig.name}.`);
+        await ctx.answerCbQuery("Plano não encontrado.");
+        return;
+      }
+      const user = await User.findOne({ where: { telegramId: chatId.toString() } });
+      if (user) {
+        user.lastInteraction = new Date();
+        user.botName = botConfig.name;
+        await user.save();
+      }
+      if (!userSessions[chatId]) userSessions[chatId] = {};
+      userSessions[chatId].originCondition = 'main';
+      userSessions[chatId].selectedPlan = plan;
+      userSessions[chatId].paymentCheckCount = 0;
+      logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+
       const chargeData = {
         value: plan.value * 100,
         webhook_url: null,
@@ -535,16 +537,16 @@ function initializeBot(botConfig) {
           Markup.button.callback('🔍 Verificar Pagamento', `check_payment_${chargeId}`),
         ])
       );
+
+      await ctx.answerCbQuery();
     } catch (error) {
       logger.error('❌ Erro ao criar cobrança:', error);
       if (error.response && error.response.error_code === 403) {
         logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
-        delete userSessions[chatId];
       } else {
         await ctx.reply('⚠️ Erro ao criar cobrança.');
       }
     }
-    await ctx.answerCbQuery();
   });
 
   bot.action(/check_payment_(.+)/, async (ctx) => {
@@ -583,8 +585,9 @@ function initializeBot(botConfig) {
             );
             logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
+          // Dispara remarketing purchased
           if (botConfig.remarketing && botConfig.remarketing.purchased) {
-            const delayPurchased = botConfig.remarketing.purchased.delay || 30;
+            const delayPurchasedSec = botConfig.remarketing.purchased.delay || 0;
             setTimeout(async () => {
               try {
                 const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
@@ -595,7 +598,7 @@ function initializeBot(botConfig) {
               } catch (err) {
                 logger.error(`❌ Erro upsell -> ${chatId}:`, err);
               }
-            }, delayPurchased * 60 * 1000);
+            }, delayPurchasedSec * 1000);
           }
           if (session.selectedPlan && session.selectedPlan.vipLink) {
             await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.vipLink})`, { parse_mode: 'Markdown' });
