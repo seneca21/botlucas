@@ -630,14 +630,19 @@ $(document).ready(function () {
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
 
+        // 2) Esconder o filtro de data no "Gerenciar Bots"
+        if (targetSection === 'manageBotsSection') {
+            $('#dateFilterContainer').hide();
+            loadExistingBots();
+        } else {
+            $('#dateFilterContainer').show();
+        }
+
         if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
             targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
             $('#botFilterContainer').show();
         } else {
             $('#botFilterContainer').hide();
-            if (targetSection === 'manageBotsSection') {
-                loadExistingBots();
-            }
         }
 
         currentPage = 1;

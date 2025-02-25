@@ -211,15 +211,6 @@ body.dark-mode .modal-body .form-control {
     border-color: #555;
 }
 
-/* Se quiser ajustar a cor do backdrop (fundo do modal),
-   descomente abaixo e altere conforme desejado:
-
-body.dark-mode .modal-backdrop {
-  background-color: #000 !important;
-  opacity: 0.6 !important;
-}
-*/
-
 /* ========== ABAS (Tabs) ========== */
 .nav-tabs .nav-link {
     border-radius: 0 !important;
@@ -231,6 +222,27 @@ body.dark-mode .modal-backdrop {
     background-color: #fff !important;
     border-color: #ddd #ddd #fff;
     color: #000 !important;
+}
+
+/* No modo escuro, colorir as abas de forma legível */
+body.dark-mode .nav-tabs .nav-link {
+    color: #aaa !important;
+    background-color: transparent !important;
+    border-color: transparent;
+}
+
+body.dark-mode .nav-tabs .nav-link.active {
+    background-color: #333 !important;
+    color: #fff !important;
+    border-color: #555;
+}
+
+/* Botões .btn-info no modo escuro (para destaque) */
+body.dark-mode .btn-info {
+    background-color: #005f9e !important;
+    /* tom de azul escuro */
+    border-color: #004a7a !important;
+    color: #fff !important;
 }
 
 /* Container de edição do bot inline (não overlay) */
