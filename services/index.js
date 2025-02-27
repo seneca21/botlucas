@@ -3,13 +3,13 @@
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se necessário
 
-// Cria a conexão com o banco de dados
+// Cria a conexão com o banco de dados com as novas credenciais
 const sequelize = new Sequelize(
-  'd36d4dkqgtr6ut',          // Nome do DB
-  'ud4gfju6bdnki2',          // Usuário
-  'p2dfc875746ebbd4c8f65e63ecbb29426db19f49b15c9ec1d3a8941553abef74c', // Senha
+  'd13ijjeo6khqca',          // Nome do DB
+  'uk45hkh25hti8',           // Usuário
+  'pe279989af5bc573b57149751ccbab42748832a89c3fd3d1db9b7978e0822fd49', // Senha
   {
-    host: 'cbdhrtd93854d5.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
+    host: 'c6sfjnr30ch74e.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
     port: 5432,
     dialect: 'postgres',
     logging: false,
