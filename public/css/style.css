@@ -4,92 +4,173 @@
 #appContainer {
     display: flex;
     min-height: 100vh;
-    /* altura total da tela */
 }
 
 /* SIDEBAR */
 #sidebar {
     width: 230px;
-    transition: width 0.4s ease;
-    background-color: #f8f9fa;
+    transition: all 0.4s ease;
+    background-color: #2D3748 !important;
     border-right: 1px solid #ddd;
     overflow: hidden;
-    position: relative;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1100;
 }
 
 #sidebarContent {
-    /* Deixamos texto com normal wrap */
     transition: opacity 0.3s ease;
     padding: 1rem;
 }
 
-/* Colapsando sidebar */
-#sidebar.collapsed {
-    width: 0;
+#sidebarToggle {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 1200;
 }
 
-#sidebar.collapsed #sidebarContent {
-    opacity: 0;
-    pointer-events: none;
-    /* evita clique em texto oculto */
+#toggleSidebarBtn {
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
 }
 
 /* MAIN CONTENT */
 #mainContent {
     flex: 1;
-    padding: 0 1.5rem;
+    margin-left: 230px;
     transition: all 0.4s ease;
 }
 
-/* ========== HAMBURGER ICON ========== */
+/* TOP BOX */
+.top-box {
+    width: 100%;
+    height: auto;
+    background-color: #2F855A !important;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    box-sizing: border-box;
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
+}
+
+body.dark-mode .top-box {
+    background-color: #333 !important;
+    border-bottom: 1px solid #444;
+}
+
+/* HAMBURGER CUSTOMIZADO */
 .hamburger-icon {
-    width: 24px;
-    height: 18px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 22px;
     position: relative;
     display: inline-block;
-    cursor: pointer;
 }
 
 .hamburger-icon span {
-    background-color: #000;
     display: block;
+    position: absolute;
     height: 2px;
     width: 100%;
-    position: absolute;
+    background: #000;
     left: 0;
-    transition: all 0.3s;
+    transition: all 0.2s ease;
 }
 
-.hamburger-icon span:nth-child(1) {
+body.dark-mode .hamburger-icon span {
+    background: #fff;
+}
+
+.hamburger-icon .line1 {
     top: 0;
 }
 
-.hamburger-icon span:nth-child(2) {
+.hamburger-icon .line2 {
     top: 8px;
 }
 
-.hamburger-icon span:nth-child(3) {
+.hamburger-icon .line3 {
     top: 16px;
+    width: 50%;
+    right: 0;
 }
 
-/* ========== BORDAS ARREDONDADAS ========== */
-.card,
-.table,
-.form-control,
-.btn,
-.nav-link {
-    border-radius: 8px !important;
+/* TOP BOX – textos */
+.top-box-right {
+    margin-left: auto;
 }
 
-/* NAV LINKS no sidebar */
+.revenue-text {
+    font-size: 0.8rem;
+    color: #fff;
+    text-align: right;
+    margin-bottom: 0;
+}
+
+.revenue-progress {
+    width: 120px;
+    margin: 0.5rem auto 0 auto;
+    height: 8px;
+    background-color: #ddd;
+    border-radius: 4px;
+    position: relative;
+}
+
+body.dark-mode .revenue-progress {
+    background-color: #555;
+}
+
+.revenue-progress .progress-bar {
+    height: 100%;
+    background-color: #4caf50;
+    border-radius: 4px;
+    width: 0%;
+}
+
+/* TÍTULOS */
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-align: left;
+}
+
+.section-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.chart-title {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #666;
+    text-align: left;
+    margin-bottom: 0.5rem;
+    padding-left: 5px;
+}
+
+/* LINKS DA SIDEBAR */
 #sidebarNav .nav-link {
-    color: #000 !important;
+    color: #fff !important;
     transition: box-shadow 0.3s;
     padding: 0.75rem 1rem;
     display: block;
 }
 
-/* Efeito de shadow momentâneo ao clicar */
 .nav-link.clicked {
     animation: highlight 0.8s forwards;
 }
@@ -106,29 +187,50 @@
 
 #sidebarNav .nav-link.active {
     background-color: transparent !important;
-    color: #000 !important;
+    color: #fff !important;
 }
 
-/* ========== CARDS: TÍTULOS PRETOS, NÚMEROS AZUIS ========== */
+/* CARDS */
+.card {
+    border-radius: 12px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    .card:hover {
+        transform: none;
+        box-shadow: none;
+    }
+}
+
 .card-title {
     color: #000 !important;
     font-weight: 600;
     font-size: 1.1rem;
+    text-align: center;
 }
 
 .card-text {
     font-size: 1.4rem;
     font-weight: bold;
-    color: #0000ff !important;
+    color: #1C4532 !important;
+    text-align: center;
 }
 
-/* ========== MODO ESCURO (dark-mode) ========== */
+body.dark-mode .card .card-text {
+    color: #40c987 !important;
+}
+
+.value-cell {
+    text-align: right;
+}
+
+/* MODO ESCURO */
 body.dark-mode {
     background-color: #121212;
     color: #fff;
 }
 
-/* Sidebar no dark-mode */
 body.dark-mode #sidebar {
     background-color: #1e1e1e !important;
     border-right: 1px solid #444;
@@ -143,7 +245,6 @@ body.dark-mode .nav-link.active {
     background-color: transparent !important;
 }
 
-/* Tabelas no modo escuro */
 body.dark-mode .table {
     background-color: #2a2a2a;
     color: #fff;
@@ -153,7 +254,6 @@ body.dark-mode .table.table-striped tbody tr:nth-of-type(odd) {
     background-color: #272727;
 }
 
-/* Form e botões no modo escuro */
 body.dark-mode .form-control {
     background-color: #2a2a2a;
     color: #fff;
@@ -166,27 +266,12 @@ body.dark-mode .btn {
     border: 1px solid #555;
 }
 
-/* Hamburguer no modo escuro */
-body.dark-mode .hamburger-icon span {
-    background-color: #fff;
-}
-
-/* Cards no modo escuro */
 body.dark-mode .card {
     background-color: #1e1e1e !important;
     color: #fff !important;
     border-color: #444 !important;
 }
 
-body.dark-mode .card .card-title {
-    color: #fff !important;
-}
-
-body.dark-mode .card .card-text {
-    color: #40a8ff !important;
-}
-
-/* Modal no modo escuro */
 body.dark-mode .modal-content {
     background-color: #1e1e1e !important;
     color: #fff !important;
@@ -198,7 +283,6 @@ body.dark-mode .modal-footer {
     background-color: #1e1e1e !important;
     color: #fff !important;
     border-bottom: 1px solid #444 !important;
-    border-top: none !important;
 }
 
 body.dark-mode .modal-header .close span {
@@ -211,7 +295,7 @@ body.dark-mode .modal-body .form-control {
     border-color: #555;
 }
 
-/* ========== ABAS (Tabs) ========== */
+/* ABAS */
 .nav-tabs .nav-link {
     border-radius: 0 !important;
     border: 1px solid transparent;
@@ -224,7 +308,6 @@ body.dark-mode .modal-body .form-control {
     color: #000 !important;
 }
 
-/* No modo escuro, colorir as abas de forma legível */
 body.dark-mode .nav-tabs .nav-link {
     color: #aaa !important;
     background-color: transparent !important;
@@ -237,18 +320,366 @@ body.dark-mode .nav-tabs .nav-link.active {
     border-color: #555;
 }
 
-/* Botões .btn-info no modo escuro (para destaque) */
-body.dark-mode .btn-info {
-    background-color: #005f9e !important;
-    /* tom de azul escuro */
-    border-color: #004a7a !important;
-    color: #fff !important;
+/* Botões de grupo */
+.bot-buttons-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
-/* Container de edição do bot inline (não overlay) */
-#editBotArea {
+/* Custom File Upload Button */
+.custom-file-upload {
+    display: inline-block;
+    padding: 6px 12px;
+    cursor: pointer;
+    background-color: #eee;
     border: 1px solid #ccc;
-    padding: 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+
+.custom-file-upload:hover {
+    background-color: #d0d0d0;
+}
+
+/* FILTRO DE DATAS E BOTS: setinha */
+.custom-select-arrow {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 16px;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='none' stroke='%23000' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+}
+
+body.dark-mode .custom-select-arrow {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='none' stroke='%23fff' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+}
+
+/* Dropdown para Bot Filter (desktop) */
+.dropdown-multi {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-multi .dropdown-toggle {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+}
+
+.dropdown-multi .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    min-width: 100%;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-multi .dropdown-menu.show {
+    display: block;
+}
+
+/* Últimas Transações – layout responsivo */
+#lastTransactionsContainer {
+    display: block;
     margin-top: 1rem;
-    border-radius: 6px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 1rem;
+    background-color: #fefefe;
+}
+
+body.dark-mode #lastTransactionsContainer {
+    border: 1px solid #555;
+    background-color: #1e1e1e;
+}
+
+.last-transactions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: transparent;
+    padding: 0.5rem 0;
+    border-radius: 4px 4px 0 0;
+}
+
+body.dark-mode .last-transactions-header {
+    background-color: transparent;
+}
+
+.last-transactions-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.last-transactions-filter select {
+    max-width: 150px;
+}
+
+/* Sale Card */
+.sale-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #ddd;
+    padding: 0.5rem 0;
+}
+
+body.dark-mode .sale-card {
+    border-top: 1px solid #555;
+}
+
+.sale-card:first-of-type {
+    border-top: none;
+}
+
+.sale-card-left {
+    flex: 0 0 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.status-icon.paid {
+    background-color: #4caf50;
+}
+
+.status-icon.pending {
+    background-color: #ff9900;
+}
+
+.status-icon.cancelado {
+    background-color: #8B0000;
+}
+
+.sale-card-center {
+    flex: 1;
+    padding: 0 0.5rem;
+}
+
+.sale-lead-id {
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.sale-date {
+    font-size: 0.8rem;
+    color: #777;
+}
+
+.sale-card-right {
+    flex: 0 0 100px;
+    text-align: right;
+}
+
+.sale-value {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.sale-status {
+    font-size: 0.7rem;
+    margin-top: 0.25rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    text-align: center;
+    display: inline-block;
+    width: 80px;
+}
+
+.paid-status {
+    background-color: #c8e6c9;
+    color: #2e7d32;
+}
+
+.pending-status {
+    background-color: #fff9c4;
+    color: #f57f17;
+}
+
+.cancelado-status {
+    background-color: #ffcdd2;
+    color: #8B0000;
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    width: 80px;
+    text-align: center;
+}
+
+@media (min-width: 768px) {
+    .cancelado-status {
+        background-color: #f8d7da;
+        color: #cc0000;
+    }
+}
+
+/* Chart Box – nova classe para o gráfico */
+.chart-box {
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 1rem;
+    background-color: #fff;
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
+    margin-top: 0.5rem;
+}
+
+body.dark-mode .chart-box {
+    background-color: #1e1e1e;
+    border: 1px solid #555;
+}
+
+/* RESPONSIVO */
+@media (max-width: 768px) {
+    #appContainer {
+        flex-direction: column;
+    }
+
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: -230px;
+        width: 230px;
+        height: 100%;
+        transition: left 0.3s ease;
+        z-index: 1200;
+    }
+
+    #sidebar.open {
+        left: 0;
+    }
+
+    #sidebarToggle {
+        display: none;
+    }
+
+    #mainContent {
+        margin-left: 0;
+        transition: filter 0.3s ease;
+    }
+
+    #movPerPage {
+        display: none;
+    }
+
+    .filter-container {
+        display: none;
+    }
+
+    #dateFilterContainer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #dateFilterContainer select {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+
+    .card-carousel {
+        overflow: hidden;
+        position: relative;
+    }
+
+    .card-scroll {
+        display: flex;
+        justify-content: flex-start;
+        overflow-x: scroll;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        gap: 10px;
+    }
+
+    .card-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    .card-scroll .card {
+        scroll-snap-align: start;
+        flex-shrink: 0;
+        width: 100%;
+    }
+
+    .carousel-dots {
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .carousel-dots .line-indicator {
+        display: inline-block;
+        width: 20px;
+        height: 2px;
+        background-color: #ccc;
+        margin: 0 5px;
+        cursor: pointer;
+    }
+
+    .carousel-dots .line-indicator.active {
+        background-color: #333;
+    }
+}
+
+@media (max-width: 768px) {
+    .dropdown-multi {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #botFilterContainerMobile {
+        display: block;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    #botFilterSelectorMobile {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        width: 100%;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 16px;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='none' stroke='%23000' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    }
+
+    body.dark-mode #botFilterSelectorMobile {
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='none' stroke='%23fff' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+        background-color: #2a2a2a;
+        color: #fff;
+        border-color: #555;
+    }
 }

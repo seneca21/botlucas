@@ -2,14 +2,21 @@
 $(document).ready(function () {
     let salesChart;
     let lineComparisonChart;
-
     let currentPage = 1;
     let currentPerPage = 10;
     let totalMovementsCount = 0;
     let totalPages = 1;
-
-    // Armazenamos os bots selecionados
     let selectedBots = [];
+
+    // Cria o seletor de status para as Últimas Transações (usado no header da seção)
+    let mobileStatusFilter = $(
+        `<select id="movStatusFilter" class="form-control form-control-sm" style="max-width: 150px;">
+            <option value="">Todos</option>
+            <option value="pending">Pendentes</option>
+            <option value="paid">Pagos</option>
+            <option value="cancelado">Cancelado</option>
+        </select>`
+    );
 
     //------------------------------------------------------------
     // PLUGIN: Background chart
@@ -31,13 +38,11 @@ $(document).ready(function () {
     //------------------------------------------------------------
     const body = $('body');
     const themeBtn = $('#themeToggleBtn');
-
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         body.addClass('dark-mode');
         themeBtn.text('☀');
     }
-
     themeBtn.on('click', function () {
         if (body.hasClass('dark-mode')) {
             body.removeClass('dark-mode');
@@ -50,7 +55,6 @@ $(document).ready(function () {
         }
         updateChartsIfExist();
     });
-
     function updateChartsIfExist() {
         if (salesChart) {
             applyChartOptions(salesChart);
@@ -61,16 +65,14 @@ $(document).ready(function () {
             lineComparisonChart.update();
         }
     }
-
     function getChartConfigs() {
         const isDark = body.hasClass('dark-mode');
         return {
             backgroundColor: isDark ? '#1e1e1e' : '#fff',
             axisColor: isDark ? '#fff' : '#000',
-            gridColor: isDark ? '#555' : '#ccc',
+            gridColor: isDark ? '#555' : '#ccc'
         };
     }
-
     function applyChartOptions(chartInstance) {
         const cfg = getChartConfigs();
         chartInstance.options.plugins.chartBackground = { color: cfg.backgroundColor };
@@ -100,12 +102,8 @@ $(document).ready(function () {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
         paginationContainer.empty();
-
         if (totalPages <= 1) return;
-
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
-
-        // << (back 10)
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -116,8 +114,6 @@ $(document).ready(function () {
             doubleLeft.prop('disabled', true);
         }
         group.append(doubleLeft);
-
-        // < (back 1)
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -128,8 +124,6 @@ $(document).ready(function () {
             singleLeft.prop('disabled', true);
         }
         group.append(singleLeft);
-
-        // 3 pages window
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -153,8 +147,6 @@ $(document).ready(function () {
             }
             group.append(btn);
         }
-
-        // > (forward 1)
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -165,8 +157,6 @@ $(document).ready(function () {
             singleRight.prop('disabled', true);
         }
         group.append(singleRight);
-
-        // >> (forward 10)
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -177,35 +167,30 @@ $(document).ready(function () {
             doubleRight.prop('disabled', true);
         }
         group.append(doubleRight);
-
         paginationContainer.append(group);
     }
 
     //------------------------------------------------------------
-    // LOAD BOTS (para o dropdown)
+    // LOAD BOTS (para o dropdown e seletor mobile)
     //------------------------------------------------------------
     function loadBotList() {
         fetch('/api/bots-list')
-            .then(res => res.json())
-            .then(botNames => {
+            .then((res) => res.json())
+            .then((botNames) => {
                 renderBotCheckboxDropdown(botNames);
+                renderBotFilterMobile(botNames);
             })
-            .catch(err => console.error('Erro ao carregar bots-list:', err));
+            .catch((err) => console.error('Erro ao carregar bots-list:', err));
     }
-
     function renderBotCheckboxDropdown(botNames) {
         const container = $('#botFilterContainer');
         container.empty();
-
         const toggleBtn = $(`
             <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
                 Bots
             </button>
         `);
-
         const checkList = $('<div class="dropdown-menu" style="max-height:250px; overflow:auto;"></div>');
-
-        // All
         const allId = 'bot_all';
         const allItem = $(`
             <div class="form-check pl-2">
@@ -224,7 +209,6 @@ $(document).ready(function () {
             refreshDashboard();
         });
         checkList.append(allItem);
-
         botNames.forEach(bot => {
             const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
             const item = $(`
@@ -246,10 +230,8 @@ $(document).ready(function () {
             });
             checkList.append(item);
         });
-
         const dropDiv = $('<div class="dropdown-multi"></div>');
         dropDiv.append(toggleBtn).append(checkList);
-
         toggleBtn.on('click', function (e) {
             e.stopPropagation();
             checkList.toggleClass('show');
@@ -259,8 +241,32 @@ $(document).ready(function () {
                 checkList.removeClass('show');
             }
         });
-
         container.append(dropDiv);
+    }
+    function renderBotFilterMobile(botNames) {
+        const containerMobile = $('#botFilterContainerMobile');
+        if (!containerMobile || containerMobile.length === 0) return;
+        containerMobile.empty();
+        const selectEl = $(`
+            <select id="botFilterSelectorMobile" class="form-control form-control-sm">
+                <option value="All">All</option>
+            </select>
+        `);
+        botNames.forEach(bot => {
+            const option = $(`<option value="${bot}">${bot}</option>`);
+            selectEl.append(option);
+        });
+        selectEl.on('change', function () {
+            const val = $(this).val();
+            if (val === 'All') {
+                selectedBots = ['All'];
+            } else {
+                selectedBots = [val];
+            }
+            currentPage = 1;
+            refreshDashboard();
+        });
+        containerMobile.append(selectEl);
     }
 
     //------------------------------------------------------------
@@ -281,81 +287,51 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // UPDATE DASHBOARD
+    // UPDATE DASHBOARD – Atualiza estatísticas, gráficos e últimas transações
     //------------------------------------------------------------
-    async function updateDashboard(movStatus, page, perPage) {
+    async function updateDashboard(page, perPage) {
         try {
             const dr = getDateRangeParams();
+            const movStatus = $('#movStatusFilter').val() || '';
             let botFilterParam = '';
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-
             let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
-
             if (dr.dateRange === 'custom') {
                 url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
             } else {
                 url += `&dateRange=${dr.dateRange}`;
             }
-
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
 
-            $('#totalUsers').text(data.statsAll.totalUsers);
+            // Atualiza os cards de faturamento
+            $('#totalUsers').text("R$ " + data.statsAll.totalVendasConvertidas.toFixed(2));
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
+            $('#totalUsersMobile').text("R$ " + data.statsAll.totalVendasConvertidas.toFixed(2));
+            $('#totalPurchasesMobile').text(data.statsAll.totalPurchases);
+            $('#conversionRateMobile').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#avgPaymentTimeTextMobile').text(formatDuration(avgPayDelayMs));
 
-            const barData = {
-                labels: ['Usuários', 'Compras'],
-                datasets: [
-                    {
-                        label: 'Quantidade',
-                        data: [data.statsAll.totalUsers, data.statsAll.totalPurchases],
-                        backgroundColor: ['#36A2EB', '#FF0000']
-                    },
-                ],
-            };
-            const barCtx = document.getElementById('salesChart').getContext('2d');
-            if (!salesChart) {
-                salesChart = new Chart(barCtx, {
-                    type: 'bar',
-                    data: barData,
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: { beginAtZero: true }
-                        },
-                        plugins: {
-                            chartBackground: {}
-                        }
-                    }
-                });
-            } else {
-                salesChart.data = barData;
-            }
-            applyChartOptions(salesChart);
-            salesChart.update();
-
+            // GRÁFICO DE FATURAMENTO
             const lineLabels = data.stats7Days.map(item => {
                 const parts = item.date.split('-');
-                return `${parts[2]}/${parts[0]}`;
+                return `${parts[2]}/${parts[1]}`; // Formato: Dia/Mês
             });
             const convertedValues = data.stats7Days.map(item => item.totalVendasConvertidas);
             const generatedValues = data.stats7Days.map(item => item.totalVendasGeradas);
             const conversionRates = data.stats7Days.map(item => {
-                return item.totalVendasGeradas > 0
-                    ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
-                    : 0;
+                return item.totalVendasGeradas > 0 ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100 : 0;
             });
-
             const lineData = {
                 labels: lineLabels,
                 datasets: [
@@ -368,7 +344,7 @@ $(document).ready(function () {
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        yAxisID: 'y-axis-convertido'
+                        yAxisID: 'y-axis-left'
                     },
                     {
                         label: 'Valor Gerado (R$)',
@@ -379,7 +355,7 @@ $(document).ready(function () {
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        yAxisID: 'y-axis-gerado'
+                        yAxisID: 'y-axis-left'
                     },
                     {
                         label: 'Taxa de Conversão (%)',
@@ -390,11 +366,10 @@ $(document).ready(function () {
                         pointHoverRadius: 6,
                         tension: 0.4,
                         cubicInterpolationMode: 'monotone',
-                        yAxisID: 'y-axis-conversion'
+                        yAxisID: 'y-axis-left'
                     }
                 ]
             };
-
             const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
             if (!lineComparisonChart) {
                 lineComparisonChart = new Chart(lineCtx, {
@@ -403,35 +378,12 @@ $(document).ready(function () {
                     options: {
                         responsive: true,
                         scales: {
-                            'y-axis-convertido': {
+                            'y-axis-left': {
                                 type: 'linear',
                                 position: 'left',
                                 beginAtZero: true,
-                                offset: true
-                            },
-                            'y-axis-gerado': {
-                                type: 'linear',
-                                position: 'right',
-                                beginAtZero: true,
                                 offset: true,
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            },
-                            'y-axis-conversion': {
-                                type: 'linear',
-                                position: 'right',
-                                beginAtZero: true,
-                                offset: true,
-                                suggestedMax: 100,
-                                grid: {
-                                    drawOnChartArea: false
-                                },
-                                ticks: {
-                                    callback: function (value) {
-                                        return value + '%';
-                                    }
-                                }
+                                ticks: { display: true }
                             },
                             x: {}
                         },
@@ -446,11 +398,12 @@ $(document).ready(function () {
                                         } else {
                                             return `R$ ${value.toFixed(2)}`;
                                         }
-                                    },
-                                },
+                                    }
+                                }
                             },
-                        },
-                    },
+                            title: { display: false }
+                        }
+                    }
                 });
             } else {
                 lineComparisonChart.data = lineData;
@@ -458,21 +411,93 @@ $(document).ready(function () {
             applyChartOptions(lineComparisonChart);
             lineComparisonChart.update();
 
+            // Atualiza a barra de progresso (faturamento)
+            const revenue = data.statsAll.totalVendasConvertidas;
+            const percentage = Math.min((revenue / 10000) * 100, 100);
+            $('.revenue-progress .progress-bar').css('width', percentage + '%');
+
+            // Tabela de Últimas Transações
+            $('#lastTransactionsContainer').show();
+            const container = $('#lastTransactionsContainer');
+            container.empty();
+            const headerDiv = $(`
+                <div class="last-transactions-header">
+                    <div class="last-transactions-title">ULTIMAS TRANSAÇÕES</div>
+                    <div class="last-transactions-filter"></div>
+                </div>
+            `);
+            headerDiv.find('.last-transactions-filter').append(mobileStatusFilter);
+            container.append(headerDiv);
+            mobileStatusFilter.on('change', function () {
+                currentPage = 1;
+                refreshDashboard();
+            });
+            data.lastMovements.forEach(mov => {
+                let arrowIcon = '';
+                if (mov.status === 'paid') {
+                    arrowIcon = '<div class="status-icon paid"><i class="fas fa-arrow-up"></i></div>';
+                } else if (mov.status === 'pending') {
+                    arrowIcon = '<div class="status-icon pending"><i class="fas fa-arrow-right"></i></div>';
+                } else if (mov.status === 'cancelado') {
+                    arrowIcon = '<div class="status-icon cancelado"><i class="fas fa-arrow-down"></i></div>';
+                } else {
+                    arrowIcon = '<div class="status-icon"><i class="fas fa-question"></i></div>';
+                }
+                const leadId = mov.User ? mov.User.telegramId : 'N/A';
+                const dateGenObj = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt) : null;
+                let dtGen = '';
+                if (dateGenObj) {
+                    const day = dateGenObj.getDate().toString().padStart(2, '0');
+                    const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+                    const month = monthNames[dateGenObj.getMonth()];
+                    const hour = dateGenObj.getHours().toString().padStart(2, '0');
+                    const minute = dateGenObj.getMinutes().toString().padStart(2, '0');
+                    dtGen = `${day} ${month} ${hour}:${minute}`;
+                }
+                const value = mov.planValue.toFixed(2);
+                let statusHtml = '';
+                if (mov.status === 'paid') {
+                    statusHtml = '<div class="sale-status paid-status">PAGO</div>';
+                } else if (mov.status === 'pending') {
+                    statusHtml = '<div class="sale-status pending-status">Pendente</div>';
+                } else if (mov.status === 'cancelado') {
+                    statusHtml = '<div class="sale-status cancelado-status">Cancelado</div>';
+                } else {
+                    statusHtml = `<div class="sale-status">${mov.status}</div>`;
+                }
+                const saleCard = `
+                    <div class="sale-card">
+                        <div class="sale-card-left">
+                            ${arrowIcon}
+                        </div>
+                        <div class="sale-card-center">
+                            <div class="sale-lead-id"><strong>${leadId}</strong></div>
+                            <div class="sale-date">${dtGen}</div>
+                        </div>
+                        <div class="sale-card-right">
+                            <div class="sale-value">R$ ${value}</div>
+                            ${statusHtml}
+                        </div>
+                    </div>
+                `;
+                container.append(saleCard);
+            });
+
+            // Atualiza Ranking e Detalhes dos Bots
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
                         <tr>
-                            <td>${bot.botName || 'N/A'}</td>
-                            <td>${bot.vendas}</td>
+                          <td>${bot.botName || 'N/A'}</td>
+                          <td>${bot.vendas}</td>
                         </tr>
                     `);
                 });
             } else {
                 botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
-
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -483,19 +508,19 @@ $(document).ready(function () {
                     });
                     detailsTbody.append(`
                         <tr>
-                            <td>${bot.botName}</td>
-                            <td>R$${bot.valorGerado.toFixed(2)}</td>
-                            <td>${bot.totalPurchases}</td>
-                            <td>${plansHtml}</td>
-                            <td>${bot.conversionRate.toFixed(2)}%</td>
-                            <td>R$${bot.averageValue.toFixed(2)}</td>
+                          <td>${bot.botName}</td>
+                          <td>R$${bot.valorGerado.toFixed(2)}</td>
+                          <td>${bot.totalPurchases}</td>
+                          <td>${plansHtml}</td>
+                          <td>${bot.conversionRate.toFixed(2)}%</td>
+                          <td>R$${bot.averageValue.toFixed(2)}</td>
                         </tr>
                     `);
                 });
             } else {
                 detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
-
+            // Atualiza os cards detalhados
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
@@ -522,47 +547,6 @@ $(document).ready(function () {
 
             totalMovementsCount = data.totalMovements || 0;
             renderPagination(totalMovementsCount, page, perPage);
-
-            const movementsTbody = $('#lastMovementsBody');
-            movementsTbody.empty();
-            if (data.lastMovements && data.lastMovements.length > 0) {
-                data.lastMovements.forEach(mov => {
-                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
-                    let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
-                    let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
-                    let statusHtml = '';
-                    if (mov.status === 'paid') {
-                        statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
-                    } else if (mov.status === 'pending') {
-                        statusHtml = `<span style="color:#ff9900;font-weight:bold;">Pending</span>`;
-                    } else {
-                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
-                    }
-                    let payDelayHtml = '—';
-                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
-                        const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
-                        if (diffMs >= 0) {
-                            payDelayHtml = formatDuration(diffMs);
-                        }
-                    }
-                    movementsTbody.append(`
-                        <tr>
-                            <td>${leadId}</td>
-                            <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td>${dtGen}</td>
-                            <td>${dtPaid}</td>
-                            <td>${statusHtml}</td>
-                            <td>${payDelayHtml}</td>
-                        </tr>
-                    `);
-                });
-            } else {
-                movementsTbody.append(`
-                    <tr>
-                        <td colspan="6">Nenhuma movimentação encontrada</td>
-                    </tr>
-                `);
-            }
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -572,291 +556,196 @@ $(document).ready(function () {
     // REFRESH
     //------------------------------------------------------------
     function refreshDashboard() {
-        const movStatus = $('#movStatusFilter').val() || '';
-        updateDashboard(movStatus, currentPage, currentPerPage);
+        updateDashboard(currentPage, currentPerPage);
     }
 
     //------------------------------------------------------------
-    // Inicial
+    // Carousel (Mobile) para Últimas Transações
     //------------------------------------------------------------
-    loadBotList();
-    refreshDashboard();
-
-    const defaultSection = $('#sidebarNav .nav-link.active').data('section');
-    if (defaultSection === 'statsSection' || defaultSection === 'statsDetailedSection') {
-        $('#botFilterContainer').show();
-    } else {
-        $('#botFilterContainer').hide();
+    function updateCarouselIndicators() {
+        const $dotsContainer = $('.carousel-dots');
+        $dotsContainer.empty();
+        const totalCards = $('.card-scroll .card').length;
+        for (let i = 0; i < totalCards; i++) {
+            const $indicator = $('<span class="line-indicator"></span>');
+            if (i === 0) $indicator.addClass('active');
+            $dotsContainer.append($indicator);
+        }
     }
-
-    //------------------------------------------------------------
-    // EVENTOS
-    //------------------------------------------------------------
-    $('#movStatusFilter').on('change', function () {
-        currentPage = 1;
-        refreshDashboard();
-    });
-    $('#movPerPage').on('change', function () {
-        currentPerPage = parseInt($(this).val(), 10);
-        currentPage = 1;
-        refreshDashboard();
-    });
-
-    $('#dateRangeSelector').on('change', function () {
-        if ($(this).val() === 'custom') {
-            $('#customDateModal').modal('show');
-        } else {
-            currentPage = 1;
-            refreshDashboard();
-        }
-    });
-    $('#applyCustomDateBtn').on('click', function () {
-        $('#customDateModal').modal('hide');
-        currentPage = 1;
-        refreshDashboard();
-    });
-
-    $('#sidebarNav .nav-link').on('click', function (e) {
-        e.preventDefault();
-        $('#sidebarNav .nav-link').removeClass('active clicked');
-        $(this).addClass('active clicked');
-
-        $('#statsSection').addClass('d-none');
-        $('#rankingSimplesSection').addClass('d-none');
-        $('#rankingDetalhadoSection').addClass('d-none');
-        $('#statsDetailedSection').addClass('d-none');
-        $('#manageBotsSection').addClass('d-none');
-
-        const targetSection = $(this).data('section');
-        $(`#${targetSection}`).removeClass('d-none');
-
-        // 2) Esconder o filtro de data no "Gerenciar Bots"
-        if (targetSection === 'manageBotsSection') {
-            $('#dateFilterContainer').hide();
-            loadExistingBots();
-        } else {
-            $('#dateFilterContainer').show();
-        }
-
-        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection' ||
-            targetSection === 'rankingSimplesSection' || targetSection === 'rankingDetalhadoSection') {
-            $('#botFilterContainer').show();
-        } else {
-            $('#botFilterContainer').hide();
-        }
-
-        currentPage = 1;
-        refreshDashboard();
-    });
-
-    $('#toggleSidebarBtn').on('click', function () {
-        $('#sidebar').toggleClass('collapsed');
-        $('main[role="main"]').toggleClass('expanded');
-    });
-
-    //------------------------------------------------------------
-    // [1] Form Criar Novo Bot
-    //------------------------------------------------------------
-    $('#addBotForm').on('submit', function (e) {
-        e.preventDefault();
-
-        const formData = new FormData(this);
-        fetch('/admin/bots', {
-            method: 'POST',
-            body: formData
-        })
-            .then(async (res) => {
-                if (!res.ok) {
-                    const textErr = await res.text();
-                    throw new Error(textErr);
-                }
-                return res.text();
-            })
-            .then(htmlResponse => {
-                $('#addBotResponse').html(htmlResponse);
-                loadBotList();
-                loadExistingBots();
-                $('#addBotForm')[0].reset();
-            })
-            .catch(err => {
-                $('#addBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+    function initCarousel() {
+        const $carousel = $('.card-scroll');
+        const $cards = $carousel.find('.card');
+        const $dotsContainer = $('.carousel-dots');
+        $dotsContainer.empty();
+        const totalCards = $cards.length;
+        for (let i = 0; i < totalCards; i++) {
+            const $indicator = $('<span class="line-indicator"></span>');
+            if (i === 0) $indicator.addClass('active');
+            $indicator.on('click', function () {
+                const cardWidth = $cards.outerWidth(true);
+                $carousel.animate({ scrollLeft: i * cardWidth }, 300);
             });
-    });
+            $dotsContainer.append($indicator);
+        }
+        $carousel.on('scroll', function () {
+            const scrollLeft = $carousel.scrollLeft();
+            const cardWidth = $cards.outerWidth(true);
+            const index = Math.round(scrollLeft / cardWidth);
+            $dotsContainer.find('.line-indicator').removeClass('active').eq(index).addClass('active');
+        });
+    }
+    if ($('.card-carousel').length > 0) {
+        initCarousel();
+    }
 
     //------------------------------------------------------------
-    // [2] Lista de Bots Existentes
+    // Função para carregar os bots existentes (para a aba "Bots Existentes")
     //------------------------------------------------------------
     function loadExistingBots() {
-        $('#existingBotsBody').html(`<tr><td colspan="4">Carregando...</td></tr>`);
+        $("#existingBotsBody").html(`<tr><td colspan="4">Carregando...</td></tr>`);
         fetch('/admin/bots/list')
-            .then(res => res.json())
-            .then(list => {
-                const tbody = $('#existingBotsBody');
+            .then((res) => res.json())
+            .then((list) => {
+                const tbody = $("#existingBotsBody");
                 tbody.empty();
                 if (!list || list.length === 0) {
                     tbody.html(`<tr><td colspan="4">Nenhum bot cadastrado</td></tr>`);
                     return;
                 }
-                list.forEach(bot => {
-                    let videoLabel = bot.video ? bot.video : '—';
+                list.forEach((bot) => {
+                    let videoLabel = bot.video ? bot.video : "—";
                     tbody.append(`
-                    <tr>
-                        <td>${bot.id}</td>
-                        <td>${bot.name}</td>
-                        <td>${videoLabel}</td>
-                        <td>
+                        <tr>
+                          <td>${bot.id}</td>
+                          <td>${bot.name}</td>
+                          <td>${videoLabel}</td>
+                          <td>
                             <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
-                        </td>
-                    </tr>
-                `);
+                          </td>
+                        </tr>
+                    `);
                 });
             })
-            .catch(err => {
-                console.error('Erro ao carregar bots:', err);
-                $('#existingBotsBody').html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
+            .catch((err) => {
+                console.error("Erro ao carregar bots:", err);
+                $("#existingBotsBody").html(`<tr><td colspan="4">Erro ao carregar bots.</td></tr>`);
             });
     }
 
-    // Ao clicar em "Editar"
-    $(document).on('click', '[data-edit-bot]', function () {
-        const botId = $(this).attr('data-edit-bot');
+    $(document).on("click", "[data-edit-bot]", function () {
+        const botId = $(this).attr("data-edit-bot");
         editBot(botId);
     });
 
     function editBot(botId) {
-        // Limpamos e abrimos a area de edição
-        $('#editBotForm')[0].reset();
-        $('#editBotResponse').empty();
-        $('#editBotId').val(botId);
-
+        $("#editBotForm")[0].reset();
+        $("#editBotResponse").empty();
+        $("#editBotId").val(botId);
         fetch(`/admin/bots/${botId}`)
-            .then(res => {
-                if (!res.ok) throw new Error('Bot não encontrado');
+            .then((res) => {
+                if (!res.ok) throw new Error("Bot não encontrado");
                 return res.json();
             })
-            .then(bot => {
-                // Preenche form
-                $('#editBotName').val(bot.name);
-                $('#editBotToken').val(bot.token);
-                $('#editBotDescription').val(bot.description || '');
-
-                // Exibir nome do vídeo atual
-                if (bot.video) {
-                    $('#editVideoInfo').text(`Vídeo atual: ${bot.video}`);
-                } else {
-                    $('#editVideoInfo').text('Sem vídeo anterior');
-                }
-
-                // Botões "main"
+            .then((bot) => {
+                $("#editBotName").val(bot.name);
+                $("#editBotToken").val(bot.token);
+                $("#editBotDescription").val(bot.description || "");
                 let bjson = [];
                 try {
-                    bjson = JSON.parse(bot.buttonsJson || '[]');
-                } catch (e) { /* ignore */ }
+                    bjson = JSON.parse(bot.buttonsJson || "[]");
+                } catch (e) { }
                 if (bjson[0]) {
-                    $('#editButtonName1').val(bjson[0].name);
-                    $('#editButtonValue1').val(bjson[0].value);
-                    $('#editButtonVipLink1').val(bjson[0].vipLink);
+                    $("#editButtonName1").val(bjson[0].name);
+                    $("#editButtonValue1").val(bjson[0].value);
+                    $("#editButtonVipLink1").val(bjson[0].vipLink);
                 } else {
-                    $('#editButtonName1').val('');
-                    $('#editButtonValue1').val('');
-                    $('#editButtonVipLink1').val('');
+                    $("#editButtonName1").val("");
+                    $("#editButtonValue1").val("");
+                    $("#editButtonVipLink1").val("");
                 }
                 if (bjson[1]) {
-                    $('#editButtonName2').val(bjson[1].name);
-                    $('#editButtonValue2').val(bjson[1].value);
-                    $('#editButtonVipLink2').val(bjson[1].vipLink);
+                    $("#editButtonName2").val(bjson[1].name);
+                    $("#editButtonValue2").val(bjson[1].value);
+                    $("#editButtonVipLink2").val(bjson[1].vipLink);
                 } else {
-                    $('#editButtonName2').val('');
-                    $('#editButtonValue2').val('');
-                    $('#editButtonVipLink2').val('');
+                    $("#editButtonName2").val("");
+                    $("#editButtonValue2").val("");
+                    $("#editButtonVipLink2").val("");
                 }
                 if (bjson[2]) {
-                    $('#editButtonName3').val(bjson[2].name);
-                    $('#editButtonValue3').val(bjson[2].value);
-                    $('#editButtonVipLink3').val(bjson[2].vipLink);
+                    $("#editButtonName3").val(bjson[2].name);
+                    $("#editButtonValue3").val(bjson[2].value);
+                    $("#editButtonVipLink3").val(bjson[2].vipLink);
                 } else {
-                    $('#editButtonName3').val('');
-                    $('#editButtonValue3').val('');
-                    $('#editButtonVipLink3').val('');
+                    $("#editButtonName3").val("");
+                    $("#editButtonValue3").val("");
+                    $("#editButtonVipLink3").val("");
                 }
-
-                // remarketing
                 if (bot.remarketingJson) {
                     try {
                         const remarketing = JSON.parse(bot.remarketingJson);
-
-                        // not_purchased
                         if (remarketing.not_purchased) {
-                            $('#remarketing_not_purchased_description').val(remarketing.not_purchased.description || '');
+                            $("#remarketing_not_purchased_description").val(remarketing.not_purchased.description || "");
                             const npDelay = remarketing.not_purchased.delay || 0;
                             const npMin = Math.floor(npDelay / 60);
                             const npSec = npDelay % 60;
-                            $('#edit_remarketing_not_purchased_delay_minutes').val(npMin);
-                            $('#edit_remarketing_not_purchased_delay_seconds').val(npSec);
-
+                            $("#edit_remarketing_not_purchased_delay_minutes").val(npMin);
+                            $("#edit_remarketing_not_purchased_delay_seconds").val(npSec);
                             const npButtons = remarketing.not_purchased.buttons || [];
                             if (npButtons[0]) {
-                                $('#remarketing_not_purchased_buttonName1').val(npButtons[0].name);
-                                $('#remarketing_not_purchased_buttonValue1').val(npButtons[0].value);
-                                $('#remarketing_not_purchased_buttonLink1').val(npButtons[0].link);
+                                $("#remarketing_not_purchased_buttonName1").val(npButtons[0].name);
+                                $("#remarketing_not_purchased_buttonValue1").val(npButtons[0].value);
+                                $("#remarketing_not_purchased_buttonLink1").val(npButtons[0].link);
                             }
                             if (npButtons[1]) {
-                                $('#remarketing_not_purchased_buttonName2').val(npButtons[1].name);
-                                $('#remarketing_not_purchased_buttonValue2').val(npButtons[1].value);
-                                $('#remarketing_not_purchased_buttonLink2').val(npButtons[1].link);
+                                $("#remarketing_not_purchased_buttonName2").val(npButtons[1].name);
+                                $("#remarketing_not_purchased_buttonValue2").val(npButtons[1].value);
+                                $("#remarketing_not_purchased_buttonLink2").val(npButtons[1].link);
                             }
                             if (npButtons[2]) {
-                                $('#remarketing_not_purchased_buttonName3').val(npButtons[2].name);
-                                $('#remarketing_not_purchased_buttonValue3').val(npButtons[2].value);
-                                $('#remarketing_not_purchased_buttonLink3').val(npButtons[2].link);
+                                $("#remarketing_not_purchased_buttonName3").val(npButtons[2].name);
+                                $("#remarketing_not_purchased_buttonValue3").val(npButtons[2].value);
+                                $("#remarketing_not_purchased_buttonLink3").val(npButtons[2].link);
                             }
                         }
-
-                        // purchased
                         if (remarketing.purchased) {
-                            $('#remarketing_purchased_description').val(remarketing.purchased.description || '');
+                            $("#remarketing_purchased_description").val(remarketing.purchased.description || "");
                             const pDelay = remarketing.purchased.delay || 0;
                             const pMin = Math.floor(pDelay / 60);
                             const pSec = pDelay % 60;
-                            $('#edit_remarketing_purchased_delay_minutes').val(pMin);
-                            $('#edit_remarketing_purchased_delay_seconds').val(pSec);
-
+                            $("#edit_remarketing_purchased_delay_minutes").val(pMin);
+                            $("#edit_remarketing_purchased_delay_seconds").val(pSec);
                             const pButtons = remarketing.purchased.buttons || [];
                             if (pButtons[0]) {
-                                $('#remarketing_purchased_buttonName1').val(pButtons[0].name);
-                                $('#remarketing_purchased_buttonValue1').val(pButtons[0].value);
-                                $('#remarketing_purchased_buttonLink1').val(pButtons[0].link);
+                                $("#remarketing_purchased_buttonName1").val(pButtons[0].name);
+                                $("#remarketing_purchased_buttonValue1").val(pButtons[0].value);
+                                $("#remarketing_purchased_buttonLink1").val(pButtons[0].link);
                             }
                             if (pButtons[1]) {
-                                $('#remarketing_purchased_buttonName2').val(pButtons[1].name);
-                                $('#remarketing_purchased_buttonValue2').val(pButtons[1].value);
-                                $('#remarketing_purchased_buttonLink2').val(pButtons[1].link);
+                                $("#remarketing_purchased_buttonName2").val(pButtons[1].name);
+                                $("#remarketing_purchased_buttonValue2").val(pButtons[1].value);
+                                $("#remarketing_purchased_buttonLink2").val(pButtons[1].link);
                             }
                             if (pButtons[2]) {
-                                $('#remarketing_purchased_buttonName3').val(pButtons[2].name);
-                                $('#remarketing_purchased_buttonValue3').val(pButtons[2].value);
-                                $('#remarketing_purchased_buttonLink3').val(pButtons[2].link);
+                                $("#remarketing_purchased_buttonName3").val(pButtons[2].name);
+                                $("#remarketing_purchased_buttonValue3").val(pButtons[2].value);
+                                $("#remarketing_purchased_buttonLink3").val(pButtons[2].link);
                             }
                         }
                     } catch (e) {
                         console.error("Erro ao parse remarketingJson", e);
                     }
                 }
-
-                // Exibe form de edição
-                $('#editBotArea').removeClass('d-none');
+                $('#editBotArea').removeClass("d-none");
             })
             .catch(err => {
                 $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
             });
     }
-
-    $('#cancelEditBotBtn').on('click', function () {
-        // Oculta form de edição
-        $('#editBotArea').addClass('d-none');
+    $('#cancelEditBotBtn').on("click", function () {
+        $('#editBotArea').addClass("d-none");
     });
-
-    $('#editBotForm').on('submit', function (e) {
+    $('#editBotForm').on("submit", function (e) {
         e.preventDefault();
         const botId = $('#editBotId').val();
         if (!botId) {
@@ -865,7 +754,7 @@ $(document).ready(function () {
         }
         const formData = new FormData(this);
         fetch(`/admin/bots/edit/${botId}`, {
-            method: 'POST',
+            method: "POST",
             body: formData
         })
             .then(async (res) => {
@@ -875,13 +764,122 @@ $(document).ready(function () {
                 }
                 return res.text();
             })
-            .then(htmlResp => {
+            .then((htmlResp) => {
                 $('#editBotResponse').html(htmlResp);
                 loadExistingBots();
                 loadBotList();
             })
-            .catch(err => {
+            .catch((err) => {
                 $('#editBotResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
             });
+    });
+
+    //------------------------------------------------------------
+    // [3] Pagamentos - PaymentSetting
+    //------------------------------------------------------------
+    function loadPaymentSetting() {
+        fetch("/admin/payment-setting")
+            .then((res) => res.json())
+            .then((data) => {
+                $('#pushinToken').val(data.pushinToken || "");
+            })
+            .catch((err) => {
+                console.error("Erro ao carregar PaymentSetting:", err);
+            });
+    }
+    $('#paymentSettingForm').on("submit", function (e) {
+        e.preventDefault();
+        const pushinToken = $('#pushinToken').val().trim();
+        if (!pushinToken) {
+            $('#paymentSettingResponse').html(`<div class="alert alert-danger">Campo token é obrigatório.</div>`);
+            return;
+        }
+        fetch("/admin/payment-setting", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pushinToken })
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const t = await res.json();
+                    throw new Error(t.error || "Erro ao salvar token");
+                }
+                return res.json();
+            })
+            .then((resp) => {
+                if (resp.success) {
+                    $('#paymentSettingResponse').html(`<div class="alert alert-success">Token salvo com sucesso!</div>`);
+                }
+            })
+            .catch((err) => {
+                $('#paymentSettingResponse').html(`<div class="alert alert-danger">${err.message}</div>`);
+            });
+    });
+
+    //------------------------------------------------------------
+    // Inicializa o Dashboard
+    //------------------------------------------------------------
+    loadBotList();
+    refreshDashboard();
+    if ($(window).width() < 768) {
+        $('#botFilterContainer').hide();
+        $('#botFilterContainerMobile').show();
+    } else {
+        $('#botFilterContainer').show();
+        $('#botFilterContainerMobile').hide();
+    }
+    $('#sidebarNav .nav-link').on("click", function (e) {
+        e.preventDefault();
+        $('#sidebarNav .nav-link').removeClass('active clicked');
+        $(this).addClass('active clicked');
+        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection, #paymentSection').addClass('d-none');
+        const targetSection = $(this).data('section');
+        $(`#${targetSection}`).removeClass('d-none');
+        if (targetSection === 'manageBotsSection' || targetSection === 'paymentSection') {
+            $('#dateFilterContainer').hide();
+        } else {
+            $('#dateFilterContainer').show();
+        }
+        if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
+            if ($(window).width() < 768) {
+                $('#botFilterContainer').hide();
+                $('#botFilterContainerMobile').show();
+            } else {
+                $('#botFilterContainer').show();
+                $('#botFilterContainerMobile').hide();
+            }
+        } else {
+            $('#botFilterContainer').hide();
+            $('#botFilterContainerMobile').hide();
+        }
+        if (targetSection === 'manageBotsSection') {
+            loadExistingBots();
+        } else if (targetSection === 'paymentSection') {
+            loadPaymentSetting();
+        } else {
+            refreshDashboard();
+        }
+    });
+    $('#movPerPage').on("change", function () {
+        currentPerPage = parseInt($(this).val(), 10);
+        currentPage = 1;
+        refreshDashboard();
+    });
+    $('#dateRangeSelector').on("change", function () {
+        if ($(this).val() === "custom") {
+            $('#customDateModal').modal("show");
+        } else {
+            currentPage = 1;
+            refreshDashboard();
+        }
+    });
+    $('#applyCustomDateBtn').on("click", function () {
+        $('#customDateModal').modal("hide");
+        currentPage = 1;
+        refreshDashboard();
+    });
+    $('#toggleSidebarBtn').on("click", function () {
+        $("#sidebar").toggleClass("collapsed");
+        $("main[role='main']").toggleClass("expanded");
     });
 });
