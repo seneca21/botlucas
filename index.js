@@ -3,13 +3,13 @@
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se necessário
 
-// Cria a conexão com o banco de dados
+// Cria a conexão com o banco de dados com as credenciais fornecidas
 const sequelize = new Sequelize(
-  'd36d4dkqgtr6ut',          // Nome do DB
-  'ud4gfju6bdnki2',          // Usuário
-  'p2dfc875746ebbd4c8f65e63ecbb29426db19f49b15c9ec1d3a8941553abef74c', // Senha
+  'deefe35i9plvl7',          // Nome do DB
+  'ucahdtofln6o1c',          // Usuário
+  'p5091a792840333d7cb39c5cf8461d5c9b2a223f6db70b93287977e0ba152229b', // Senha
   {
-    host: 'cbdhrtd93854d5.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
+    host: 'c3nv2ev86aje4j.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
     port: 5432,
     dialect: 'postgres',
     logging: false,
@@ -26,6 +26,7 @@ const sequelize = new Sequelize(
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
 const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes); // <-- Importação do Bot
+const PaymentSetting = require('../models/PaymentSetting')(sequelize, Sequelize.DataTypes); // <-- Novo modelo PaymentSetting
 
 // Relações, se houver
 User.hasMany(Purchase, { foreignKey: 'userId' });
@@ -36,5 +37,6 @@ module.exports = {
   sequelize,
   User,
   Purchase,
-  BotModel
+  BotModel,
+  PaymentSetting
 };
