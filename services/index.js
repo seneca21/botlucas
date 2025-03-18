@@ -3,7 +3,7 @@
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se necessário
 
-// Cria a conexão com o banco de dados com as novas credenciais
+// Cria a conexão com o banco de dados com as credenciais fornecidas
 const sequelize = new Sequelize(
   'deefe35i9plvl7',          // Nome do DB
   'ucahdtofln6o1c',          // Usuário

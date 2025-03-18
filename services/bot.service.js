@@ -52,7 +52,9 @@ async function getS3VideoStream(videoUrl) {
 const botInstances = new Map();
 const userSessions = {};
 
-// (As funções de rate limiting e demais proteções permanecem inalteradas)
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Rate limiting e proteções
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const verificationLimits = new Map();
 const MAX_VERIFICATION_ATTEMPTS = 4;
 const VERIFICATION_WINDOW_MS = 60 * 1000;
@@ -74,8 +76,15 @@ function canAttemptVerification(telegramId) {
     return { allowed: true };
   }
   if (now < userData.blockUntil) {
-    logger.info(`Verificação: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
-    return { allowed: false, message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.` };
+    logger.info(
+      `Verificação: ${telegramId} - Bloqueado até ${new Date(
+        userData.blockUntil
+      ).toISOString()}.`
+    );
+    return {
+      allowed: false,
+      message: `⏰ Você excedeu o número de tentativas permitidas. Tente novamente mais tarde.`,
+    };
   }
   if (now - userData.lastAttempt > VERIFICATION_CYCLE_RESET_MS) {
     verificationLimits.set(telegramId, {
@@ -84,14 +93,18 @@ function canAttemptVerification(telegramId) {
       violations: 0,
       lastAttempt: now,
     });
-    logger.info(`Verificação: ${telegramId} - Ciclo resetado. Primeira tentativa permitida.`);
+    logger.info(
+      `Verificação: ${telegramId} - Ciclo resetado. Primeira tentativa permitida.`
+    );
     return { allowed: true };
   }
   if (userData.attempts < MAX_VERIFICATION_ATTEMPTS) {
     userData.attempts += 1;
     userData.lastAttempt = now;
     verificationLimits.set(telegramId, userData);
-    logger.info(`Verificação: ${telegramId} - Tentativa ${userData.attempts} permitida.`);
+    logger.info(
+      `Verificação: ${telegramId} - Tentativa ${userData.attempts} permitida.`
+    );
     return { allowed: true };
   } else {
     userData.violations += 1;
@@ -100,12 +113,18 @@ function canAttemptVerification(telegramId) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_FIRST;
       verificationLimits.set(telegramId, userData);
       logger.info(`Verificação: ${telegramId} - Bloqueado por 2 minutos.`);
-      return { allowed: false, message: `🚫 Bloqueado por 2 minutos devido a múltiplas tentativas.` };
+      return {
+        allowed: false,
+        message: `🚫 Bloqueado por 2 minutos devido a múltiplas tentativas.`,
+      };
     } else if (userData.violations === 2) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_SECOND;
       verificationLimits.set(telegramId, userData);
       logger.info(`Verificação: ${telegramId} - Bloqueado por 10 minutos.`);
-      return { allowed: false, message: `🚫 Bloqueado por 10 minutos devido a múltiplas tentativas.` };
+      return {
+        allowed: false,
+        message: `🚫 Bloqueado por 10 minutos devido a múltiplas tentativas.`,
+      };
     } else if (userData.violations >= 3) {
       userData.blockUntil = now + VERIFICATION_BLOCK_TIME_THIRD;
       verificationLimits.set(telegramId, userData);
@@ -114,7 +133,10 @@ function canAttemptVerification(telegramId) {
     }
     verificationLimits.set(telegramId, userData);
     logger.info(`Verificação: ${telegramId} - Tentativa não permitida.`);
-    return { allowed: false, message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.` };
+    return {
+      allowed: false,
+      message: `🚫 Você excedeu o número de tentativas. Tente mais tarde.`,
+    };
   }
 }
 
@@ -134,14 +156,20 @@ function canAttemptStart(telegramId) {
     return true;
   }
   if (now < userData.nextAllowedStartTime) {
-    logger.info(`/start: ${telegramId} - Bloqueado até ${new Date(userData.nextAllowedStartTime).toISOString()}.`);
+    logger.info(
+      `/start: ${telegramId} - Bloqueado até ${new Date(
+        userData.nextAllowedStartTime
+      ).toISOString()}.`
+    );
     return false;
   }
   if (userData.startCount < MAX_STARTS) {
     userData.startCount++;
     userData.nextAllowedStartTime = now + START_WAIT_SECOND_MS;
     startLimits.set(telegramId, userData);
-    logger.info(`/start: ${telegramId} - Start número ${userData.startCount} permitido.`);
+    logger.info(
+      `/start: ${telegramId} - Start número ${userData.startCount} permitido.`
+    );
     return true;
   } else {
     userData.startCount = 1;
@@ -164,29 +192,41 @@ function canAttemptSelectPlan(telegramId, planId) {
       blockUntil: 0,
       lastAttempt: now,
     });
-    logger.info(`Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) selecionado.`);
+    logger.info(
+      `Seleção de Plano: ${telegramId} - Primeiro plano (${planId}) selecionado.`
+    );
     return true;
   }
   if (now < userData.blockUntil) {
-    logger.info(`Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(userData.blockUntil).toISOString()}.`);
+    logger.info(
+      `Seleção de Plano: ${telegramId} - Bloqueado até ${new Date(
+        userData.blockUntil
+      ).toISOString()}.`
+    );
     return false;
   }
   if (userData.selectedPlans.has(planId)) {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Repetição do plano (${planId}). Bloqueado por 24h.`);
+    logger.info(
+      `Seleção de Plano: ${telegramId} - Repetição do plano (${planId}). Bloqueado por 24h.`
+    );
     return false;
   }
   if (userData.selectedPlans.size < MAX_SELECT_PLAN_ATTEMPTS) {
     userData.selectedPlans.add(planId);
     userData.lastAttempt = now;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Plano (${planId}) selecionado. Total: ${userData.selectedPlans.size}.`);
+    logger.info(
+      `Seleção de Plano: ${telegramId} - Plano (${planId}) selecionado. Total: ${userData.selectedPlans.size}.`
+    );
     return true;
   } else {
     userData.blockUntil = now + SELECT_PLAN_BLOCK_TIME_MS;
     selectPlanLimits.set(telegramId, userData);
-    logger.info(`Seleção de Plano: ${telegramId} - Excedeu seleções. Bloqueado por 24h.`);
+    logger.info(
+      `Seleção de Plano: ${telegramId} - Excedeu seleções. Bloqueado por 24h.`
+    );
     return false;
   }
 }
@@ -216,13 +256,17 @@ function checkStartFlood(botName) {
       return true;
     }
   }
-  floodData.startTimestamps = floodData.startTimestamps.filter((ts) => now - ts <= START_FLOOD_WINDOW_MS);
+  floodData.startTimestamps = floodData.startTimestamps.filter(
+    (ts) => now - ts <= START_FLOOD_WINDOW_MS
+  );
   floodData.startTimestamps.push(now);
   if (floodData.startTimestamps.length >= START_FLOOD_LIMIT) {
     floodData.isPaused = true;
     floodData.pauseUntil = now + START_FLOOD_PAUSE_MS;
     startFloodProtection.set(botName, floodData);
-    logger.warn(`Proteção Flood: ${botName} - Pausando /start por 8min, ${floodData.startTimestamps.length} starts em 3min.`);
+    logger.warn(
+      `Proteção Flood: ${botName} - Pausando /start por 8min, ${floodData.startTimestamps.length} starts em 3min.`
+    );
     return true;
   }
   startFloodProtection.set(botName, floodData);
@@ -278,9 +322,11 @@ function handleUserBlock(telegramId) {
     userBlockStatus.set(telegramId, blockData);
   }
 }
+
 function booleanParaTexto(value, verdadeiro, falso) {
   return value ? verdadeiro : falso;
 }
+
 async function reloadBotsFromDB() {
   try {
     const allBots = await BotModel.findAll();
@@ -297,7 +343,10 @@ async function reloadBotsFromDB() {
         try {
           botConfig.buttons = JSON.parse(botRow.buttonsJson);
         } catch (err) {
-          logger.error(`Erro ao parse buttonsJson do bot ${botRow.name}:`, err);
+          logger.error(
+            `Erro ao parse buttonsJson do bot ${botRow.name}:`,
+            err
+          );
         }
       }
       if (botRow.remarketingJson) {
@@ -307,10 +356,15 @@ async function reloadBotsFromDB() {
             botConfig.remarketing = JSON.parse(trimmed);
           } else {
             botConfig.remarketing = {};
-            logger.warn(`Remarketing JSON para o bot ${botRow.name} não é válido. Usando objeto vazio.`);
+            logger.warn(
+              `Remarketing JSON para o bot ${botRow.name} não é válido. Usando objeto vazio.`
+            );
           }
         } catch (err) {
-          logger.error(`Erro ao parse remarketingJson do bot ${botRow.name}:`, err);
+          logger.error(
+            `Erro ao parse remarketingJson do bot ${botRow.name}:`,
+            err
+          );
         }
       }
       initializeBot(botConfig, botRow.id.toString());
@@ -319,6 +373,7 @@ async function reloadBotsFromDB() {
     logger.error("Erro em reloadBotsFromDB:", err);
   }
 }
+
 /**
  * Inicializa um bot com a configuração fornecida.
  * Se já existir uma instância, ela é parada.
@@ -337,6 +392,7 @@ function initializeBot(botConfig, botId) {
   }
   const bot = new Telegraf(botConfig.token);
   logger.info(`🚀 Bot ${botConfig.name} em execução.`);
+
   async function registerUser(ctx) {
     try {
       const telegramId = ctx.from.id.toString();
@@ -359,13 +415,7 @@ function initializeBot(botConfig, botId) {
         user.botName = botConfig.name;
         await user.save();
       }
-      const statusRemarketing = user.remarketingSent ? "Enviado" : "Não Enviado";
-      const statusCompra = user.hasPurchased ? "Comprado" : "Sem Compra";
-      if (created) {
-        logger.info(`✅ Novo usuário: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
-      } else {
-        logger.info(`🔄 Usuário atualizado: ${telegramId}, Remarketing: ${statusRemarketing}, Compra: ${statusCompra}`);
-      }
+      // Registra remarketing not purchased se aplicável
       if (botConfig.remarketing && botConfig.remarketing.not_purchased) {
         const delayNotPurchasedSec = botConfig.remarketing.not_purchased.delay || 0;
         setTimeout(async () => {
@@ -378,14 +428,15 @@ function initializeBot(botConfig, botId) {
               logger.info(`✅ Mensagem de remarketing (not purchased) enviada para ${telegramId}`);
             }
           } catch (err) {
-            logger.error(`❌ Erro ao enviar remarketing para ${telegramId}:`, err);
+            logger.error(`Erro ao enviar remarketing para ${telegramId}:`, err);
           }
         }, delayNotPurchasedSec * 1000);
       }
     } catch (error) {
-      logger.error("❌ Erro ao registrar usuário:", error);
+      logger.error("Erro ao registrar usuário:", error);
     }
   }
+
   async function sendRemarketingMessage(user, condition) {
     try {
       if (!userSessions[user.telegramId]) {
@@ -403,19 +454,26 @@ function initializeBot(botConfig, botId) {
         messageConfig = botConfig.remarketing.purchased;
       }
       if (!messageConfig) {
-        logger.error(`❌ Não existe configuração de remarketing para a condição: ${condition}`);
+        logger.error(
+          `Não existe configuração de remarketing para a condição: ${condition}`
+        );
         return;
       }
       let videoInput;
       if (messageConfig.video && messageConfig.video.startsWith("http")) {
         videoInput = { source: await getS3VideoStream(messageConfig.video) };
-      } else {
-        let videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
+      } else if (messageConfig.video) {
+        const videoPath = path.resolve(
+          __dirname,
+          `../src/videos/${messageConfig.video}`
+        );
         if (!fs.existsSync(videoPath)) {
-          logger.error(`❌ Vídeo do remarketing não encontrado: ${videoPath}`);
+          logger.error(`Vídeo do remarketing não encontrado: ${videoPath}`);
           return;
         }
         videoInput = { source: fs.createReadStream(videoPath) };
+      } else {
+        videoInput = null;
       }
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
@@ -426,17 +484,19 @@ function initializeBot(botConfig, botId) {
         ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
       });
     } catch (error) {
-      logger.error(`❌ Erro no remarketing (${condition}):`, error);
+      logger.error(`Erro no remarketing (${condition}):`, error);
     }
   }
+
   bot.catch((err, ctx) => {
-    logger.error("❌ Erro no bot:", err);
+    logger.error("Erro no bot:", err);
     if (err.response && err.response.error_code === 403) {
-      logger.warn(`🚫 Bot bloqueado por ${ctx.chat.id}.`);
+      logger.warn(`Bot bloqueado por ${ctx.chat.id}.`);
     } else {
       ctx.reply("⚠️ Erro inesperado. Tente mais tarde.");
     }
   });
+
   bot.start(async (ctx) => {
     try {
       const telegramId = ctx.from.id.toString();
@@ -455,7 +515,7 @@ function initializeBot(botConfig, botId) {
       } else {
         const videoPath = path.resolve(__dirname, `../src/videos/${botConfig.video}`);
         if (!fs.existsSync(videoPath)) {
-          logger.error(`❌ Vídeo não achado: ${videoPath}`);
+          logger.error(`Vídeo não achado: ${videoPath}`);
           await ctx.reply("⚠️ Erro ao carregar vídeo.");
           return;
         }
@@ -469,23 +529,26 @@ function initializeBot(botConfig, botId) {
         parse_mode: "HTML",
         ...Markup.inlineKeyboard(buttonMarkup, { columns: 1 }),
       });
-      logger.info(`🎥 Vídeo & botões enviados para ${ctx.chat.id}`);
+      logger.info(`Vídeo & botões enviados para ${ctx.chat.id}`);
     } catch (error) {
-      logger.error("❌ Erro /start:", error);
+      logger.error("Erro /start:", error);
       if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
+        logger.warn(`Bot bloqueado: ${ctx.chat.id}.`);
       } else {
         await ctx.reply("⚠️ Erro ao processar /start.");
       }
     }
   });
+
   bot.action(/^select_plan_(\d+)$/, async (ctx) => {
     try {
       const chatId = ctx.chat.id;
       const index = parseInt(ctx.match[1]);
       const plan = (botConfig.buttons || [])[index];
       if (!plan) {
-        logger.error(`❌ Plano não encontrado para o índice ${index} no bot ${botConfig.name}.`);
+        logger.error(
+          `Plano não encontrado para o índice ${index} no bot ${botConfig.name}.`
+        );
         await ctx.answerCbQuery("Plano não encontrado.");
         return;
       }
@@ -499,7 +562,8 @@ function initializeBot(botConfig, botId) {
       userSessions[chatId].originCondition = "main";
       userSessions[chatId].selectedPlan = plan;
       userSessions[chatId].paymentCheckCount = 0;
-      logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+      logger.info(`Plano ${plan.name} (R$${plan.value}) (main) enviado.`);
+
       const chargeData = {
         value: plan.value * 100,
         webhook_url: null,
@@ -507,6 +571,7 @@ function initializeBot(botConfig, botId) {
       const chargeResult = await createCharge(chargeData);
       const chargeId = chargeResult.id;
       const emv = chargeResult.qr_code;
+
       const newPurchase = await Purchase.create({
         userId: user ? user.id : null,
         planName: plan.name,
@@ -519,10 +584,10 @@ function initializeBot(botConfig, botId) {
       });
       userSessions[chatId].chargeId = chargeId;
       userSessions[chatId].purchaseId = newPurchase.id;
-      await ctx.reply(
-        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
-        { parse_mode: "Markdown" }
-      );
+
+      await ctx.reply(`📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``, {
+        parse_mode: "Markdown",
+      });
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -531,15 +596,16 @@ function initializeBot(botConfig, botId) {
       );
       await ctx.answerCbQuery();
     } catch (error) {
-      logger.error("❌ Erro ao criar cobrança:", error);
+      logger.error("Erro ao criar cobrança:", error);
       if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
+        logger.warn(`Bot bloqueado: ${ctx.chat.id}.`);
         delete userSessions[ctx.chat.id];
       } else {
         await ctx.reply("⚠️ Erro ao criar cobrança.");
       }
     }
   });
+
   bot.action(/check_payment_(.+)/, async (ctx) => {
     const chatId = ctx.chat.id;
     const telegramId = chatId.toString();
@@ -550,7 +616,11 @@ function initializeBot(botConfig, botId) {
       await ctx.answerCbQuery();
       return;
     }
-    if (userBlockStatus.get(telegramId) && (userBlockStatus.get(telegramId).isBlocked || userBlockStatus.get(telegramId).isBanned)) {
+    if (
+      userBlockStatus.get(telegramId) &&
+      (userBlockStatus.get(telegramId).isBlocked ||
+        userBlockStatus.get(telegramId).isBanned)
+    ) {
       await ctx.answerCbQuery();
       return;
     }
@@ -561,7 +631,7 @@ function initializeBot(botConfig, botId) {
       return;
     }
     try {
-      logger.info("🔍 Verificando pagamento...");
+      logger.info("Verificando pagamento...");
       const paymentStatus = await checkPaymentStatus(chargeId);
       if (paymentStatus.status === "paid") {
         await ctx.reply("🎉 Pagamento confirmado!");
@@ -574,24 +644,29 @@ function initializeBot(botConfig, botId) {
               { status: "paid", purchasedAt: new Date() },
               { where: { id: session.purchaseId } }
             );
-            logger.info(`✅ ${chatId} -> Purchase ID ${session.purchaseId} atualizado para paid.`);
+            logger.info(`Purchase ID ${session.purchaseId} atualizado para paid.`);
           }
           if (botConfig.remarketing && botConfig.remarketing.purchased) {
             const delayPurchasedSec = botConfig.remarketing.purchased.delay || 0;
             setTimeout(async () => {
               try {
-                const currentUser = await User.findOne({ where: { telegramId: chatId.toString() } });
+                const currentUser = await User.findOne({
+                  where: { telegramId: chatId.toString() },
+                });
                 if (currentUser && currentUser.hasPurchased) {
                   await sendRemarketingMessage(currentUser, "purchased");
-                  logger.info(`✅ Upsell enviado -> ${chatId}`);
+                  logger.info(`Upsell enviado -> ${chatId}`);
                 }
               } catch (err) {
-                logger.error(`❌ Erro upsell -> ${chatId}:`, err);
+                logger.error(`Erro upsell -> ${chatId}:`, err);
               }
             }, delayPurchasedSec * 1000);
           }
           if (session.selectedPlan && session.selectedPlan.vipLink) {
-            await ctx.reply(`🎉 Produto: [Acessar](${session.selectedPlan.vipLink})`, { parse_mode: "Markdown" });
+            await ctx.reply(
+              `🎉 Produto: [Acessar](${session.selectedPlan.vipLink})`,
+              { parse_mode: "Markdown" }
+            );
           } else {
             await ctx.reply("⚠️ Link do produto não encontrado.");
           }
@@ -602,17 +677,16 @@ function initializeBot(botConfig, botId) {
         delete userSessions[chatId];
       } else {
         session.paymentCheckCount = (session.paymentCheckCount || 0) + 1;
-        const count = session.paymentCheckCount;
-        if (count === 1) {
+        if (session.paymentCheckCount === 1) {
           await ctx.reply("⏳ Pagamento pendente");
-        } else if (count === 2) {
+        } else if (session.paymentCheckCount === 2) {
           await ctx.reply("⏳ Pagamento pendente, conclua o pagamento.");
         }
       }
     } catch (error) {
-      logger.error("❌ Erro ao verificar pagamento:", error);
+      logger.error("Erro ao verificar pagamento:", error);
       if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bot bloqueado: ${ctx.chat.id}.`);
+        logger.warn(`Bot bloqueado: ${ctx.chat.id}.`);
         delete userSessions[ctx.chat.id];
       } else {
         await ctx.reply("⚠️ Erro ao verificar pagamento.");
@@ -620,17 +694,24 @@ function initializeBot(botConfig, botId) {
     }
     await ctx.answerCbQuery();
   });
+
   bot.action(/^remarketing_select_plan_(\d+(\.\d+)?)$/, async (ctx) => {
     const chatId = ctx.chat.id;
     const planValue = parseFloat(ctx.match[1]);
     const mainPlan = (botConfig.buttons || []).find((btn) => btn.value === planValue);
     let remarketingPlan = null;
-    if (botConfig.remarketing && botConfig.remarketing.not_purchased && botConfig.remarketing.not_purchased.buttons) {
-      remarketingPlan = botConfig.remarketing.not_purchased.buttons.find((btn) => btn.value === planValue);
+    if (
+      botConfig.remarketing &&
+      botConfig.remarketing.not_purchased &&
+      botConfig.remarketing.not_purchased.buttons
+    ) {
+      remarketingPlan = botConfig.remarketing.not_purchased.buttons.find(
+        (btn) => btn.value === planValue
+      );
     }
     const plan = mainPlan || remarketingPlan;
     if (!plan) {
-      logger.error(`❌ Plano valor ${planValue} não encontrado no bot ${botConfig.name}.`);
+      logger.error(`Plano valor ${planValue} não encontrado no bot ${botConfig.name}.`);
       await ctx.answerCbQuery();
       return;
     }
@@ -644,7 +725,8 @@ function initializeBot(botConfig, botId) {
     userSessions[chatId].originCondition = "main";
     userSessions[chatId].selectedPlan = plan;
     userSessions[chatId].paymentCheckCount = 0;
-    logger.info(`✅ Plano ${plan.name} (R$${plan.value}) (remarketing) enviado.`);
+    logger.info(`Plano ${plan.name} (R$${plan.value}) (remarketing) enviado.`);
+
     try {
       const chargeData = {
         value: plan.value * 100,
@@ -653,6 +735,7 @@ function initializeBot(botConfig, botId) {
       const chargeResult = await createCharge(chargeData);
       const chargeId = chargeResult.id;
       const emv = chargeResult.qr_code;
+
       const newPurchase = await Purchase.create({
         userId: user ? user.id : null,
         planName: plan.name,
@@ -665,10 +748,10 @@ function initializeBot(botConfig, botId) {
       });
       userSessions[chatId].chargeId = chargeId;
       userSessions[chatId].purchaseId = newPurchase.id;
-      await ctx.reply(
-        `📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``,
-        { parse_mode: "Markdown" }
-      );
+
+      await ctx.reply(`📄 Código PIX gerado!\n\`\`\`\n${emv}\n\`\`\``, {
+        parse_mode: "Markdown",
+      });
       await ctx.reply(
         '⚠️ Depois de pagar, clique em "Verificar Pagamento".',
         Markup.inlineKeyboard([
@@ -676,9 +759,9 @@ function initializeBot(botConfig, botId) {
         ])
       );
     } catch (error) {
-      logger.error("❌ Erro ao criar cobrança:", error);
+      logger.error("Erro ao criar cobrança:", error);
       if (error.response && error.response.error_code === 403) {
-        logger.warn(`🚫 Bloqueado por ${ctx.chat.id}.`);
+        logger.warn(`Bot bloqueado: ${ctx.chat.id}.`);
         delete userSessions[ctx.chat.id];
       } else {
         await ctx.reply("⚠️ Erro ao criar cobrança.");
@@ -686,26 +769,41 @@ function initializeBot(botConfig, botId) {
     }
     await ctx.answerCbQuery();
   });
+
   bot
     .launch()
     .then(() => {
-      logger.info(`🚀 Bot ${botConfig.name} iniciado com sucesso.`);
+      logger.info(`Bot ${botConfig.name} iniciado com sucesso.`);
     })
     .catch((error) => {
-      logger.error(`🔥 Erro ao iniciar bot ${botConfig.name}:`, error);
+      logger.error(`Erro ao iniciar bot ${botConfig.name}:`, error);
     });
+
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
   botInstances.set(botId, bot);
 }
 
-function updateBotInMemory(id, newConfig) {
-  logger.info(`Atualizando bot em memória (ID: ${id}).`);
-  initializeBot(newConfig, id.toString());
+/**
+ * Remove um bot da memória (para que ele pare de funcionar de fato).
+ * @param {string} botId
+ */
+function removeBot(botId) {
+  if (botInstances.has(botId)) {
+    try {
+      const existingBot = botInstances.get(botId);
+      existingBot.stop();
+      logger.info(`Bot ID ${botId} parado e removido.`);
+    } catch (err) {
+      logger.error(`Erro ao parar bot (ID: ${botId}):`, err);
+    }
+    botInstances.delete(botId);
+  }
 }
 
 module.exports = {
   initializeBot,
   reloadBotsFromDB,
-  updateBotInMemory,
+  updateBotInMemory: initializeBot, // "updateBotInMemory" é apenas um alias do initializeBot
+  removeBot,
 };

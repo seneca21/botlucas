@@ -2,52 +2,62 @@
 
 const axios = require('axios');
 const HttpsProxyAgent = require('https-proxy-agent');
-const ConfigService = require('./config.service'); // Verifique o caminho relativo
+const db = require('./index'); // Importa o index do Sequelize
+const PaymentSetting = db.PaymentSetting; // Modelo que guarda o token da PushinPay
+const logger = require('./logger');
 
-const botConfig = ConfigService.loadConfig().bots[0]; // Deve funcionar agora
+/**
+ * Cria dinamicamente uma instância do Axios,
+ * injetando o token salvo no DB (PaymentSetting).
+ */
+async function createAxiosInstance() {
+    // Busca o token no banco
+    const setting = await PaymentSetting.findOne();
+    if (!setting || !setting.pushinToken) {
+        throw new Error('Nenhum token da PushinPay definido. Configure em /admin/payment-setting');
+    }
+    const pushinToken = setting.pushinToken;
 
-const PUSHIN_API_URL = botConfig.pushin_config.api_url; // Deve ser 'https://api.pushinpay.com.br/api'
-const YOUR_TOKEN = botConfig.pushin_config.token; // Certifique-se de que o token está correto
+    // Define a URL da API da PushinPay
+    const PUSHIN_API_URL = 'https://api.pushinpay.com.br/api';
 
-// Obtenha a URL do proxy do Fixie a partir das variáveis de ambiente
-const FIXIE_PROXY_URL = process.env.FIXIE_PROXY_URL;
+    // Se você utiliza o proxy Fixie, pegue a URL do ambiente
+    const FIXIE_PROXY_URL = process.env.FIXIE_PROXY_URL;
+    if (!FIXIE_PROXY_URL) {
+        logger.error('❌ FIXIE_PROXY_URL não está definida. Proxy é obrigatório para PushinPay.');
+        throw new Error('FIXIE_PROXY_URL não está definida nas variáveis de ambiente.');
+    }
 
-// Verifique se FIXIE_PROXY_URL está definida
-if (!FIXIE_PROXY_URL) {
-    console.error('❌ FIXIE_PROXY_URL não está definida. Proxy é obrigatório para PushinPay.');
-    process.exit(1); // Encerra a aplicação
+    let agent;
+    try {
+        agent = new HttpsProxyAgent(FIXIE_PROXY_URL);
+    } catch (err) {
+        logger.error('❌ Erro ao configurar proxy Fixie:', err);
+        throw err;
+    }
+
+    // Cria a instância do Axios, utilizando o token lido do DB
+    const instance = axios.create({
+        baseURL: PUSHIN_API_URL,
+        headers: {
+            Authorization: `Bearer ${pushinToken}`,
+            'Content-Type': 'application/json'
+        },
+        httpsAgent: agent
+    });
+
+    // Interceptor para log (opcional)
+    instance.interceptors.request.use(
+        (config) => {
+            logger.info(`🔄 Enviando requisição para PushinPay: ${config.url}`);
+            return config;
+        },
+        (error) => Promise.reject(error)
+    );
+
+    return instance;
 }
 
-// Log opcional para depuração (remova em produção)
-console.log('YOUR_TOKEN:', YOUR_TOKEN ? 'Definido' : 'Não definido');
-console.log('FIXIE_PROXY_URL:', FIXIE_PROXY_URL ? 'Definido' : 'Não definido');
-
-// Cria um agente de proxy HTTP usando a URL do proxy
-let agent;
-try {
-    agent = new HttpsProxyAgent(FIXIE_PROXY_URL);
-    console.log('🔗 Proxy configurado com sucesso.');
-} catch (error) {
-    console.error('❌ Erro ao configurar o proxy:', error);
-    process.exit(1); // Encerra a aplicação
-}
-
-// Cria uma instância do Axios com a configuração base e o agente de proxy
-const pushinApi = axios.create({
-    baseURL: PUSHIN_API_URL,
-    headers: {
-        Authorization: `Bearer ${YOUR_TOKEN}`, // Inclui o prefixo 'Bearer' conforme a documentação
-        'Content-Type': 'application/json',
-    },
-    httpsAgent: agent,
-});
-
-// Adicione um interceptor para logar as requisições
-pushinApi.interceptors.request.use((config) => {
-    console.log('🔄 Enviando requisição para PushinPay:', config.url);
-    return config;
-}, (error) => {
-    return Promise.reject(error);
-});
-
-module.exports = pushinApi;
+module.exports = {
+    createAxiosInstance
+};

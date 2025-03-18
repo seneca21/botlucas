@@ -16,21 +16,21 @@ const fs = require("fs");
 const db = require("./services/index"); // Index do Sequelize
 const User = db.User;
 const Purchase = db.Purchase;
-const BotModel = db.BotModel; // Modelo BotModel
-const PaymentSetting = db.PaymentSetting; // Modelo para token
+const BotModel = db.BotModel;
+const PaymentSetting = db.PaymentSetting; // Novo modelo para salvar token
 
 const logger = require("./services/logger");
 const ConfigService = require("./services/config.service");
 const config = ConfigService.loadConfig(); // carrega config.json
 
-// Funções para inicializar/editar bots
-const { initializeBot, reloadBotsFromDB, updateBotInMemory } = require("./services/bot.service");
+// Importa funções para inicializar/editar/deletar bots
+const { initializeBot, reloadBotsFromDB, updateBotInMemory, removeBot } = require("./services/bot.service");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Configuração do multer para tratar os campos esperados
+// Utilizaremos upload.fields para tratar múltiplos arquivos: vídeo principal e vídeos de remarketing
 const upload = multer({
     storage: multerS3({
         s3: new S3Client({
@@ -48,7 +48,6 @@ const upload = multer({
     }),
 });
 
-// Espera exatamente os campos: videoFile, remarketing_not_purchased_video, remarketing_purchased_video
 app.use(
     session({
         secret: "chave-super-secreta",
@@ -74,6 +73,7 @@ db.sequelize
     .sync({ alter: true })
     .then(async () => {
         logger.info("✅ Modelos sincronizados (alter).");
+        // Ao iniciar, recarregamos todos os bots já cadastrados no BD
         await reloadBotsFromDB();
     })
     .catch((err) => logger.error("❌ Erro ao sincronizar modelos:", err));
@@ -90,11 +90,32 @@ app.get("/login", (req, res) => {
       <title>Login</title>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
       <style>
-        body { background-color: #f8f9fa; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-container { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 300px; }
-        .login-container h1 { font-size: 1.5rem; margin-bottom: 1.5rem; text-align: center; }
-        .btn-login { border-radius: 50px; }
-        .input-group-text { cursor: pointer; }
+        body {
+          background-color: #f8f9fa;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .login-container {
+          background-color: #fff;
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          width: 300px;
+        }
+        .login-container h1 {
+          font-size: 1.5rem;
+          margin-bottom: 1.5rem;
+          text-align: center;
+        }
+        .btn-login {
+          border-radius: 50px;
+        }
+        .input-group-text {
+          cursor: pointer;
+        }
       </style>
     </head>
     <body>
@@ -161,7 +182,7 @@ app.get("/", checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Serve a pasta public
+// Servimos a pasta public
 app.use(checkAuth, express.static(path.join(__dirname, "public")));
 
 //------------------------------------------------------
@@ -538,13 +559,13 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             totalMovements,
         });
     } catch (error) {
-        logger.error("❌ Erro ao obter estatísticas:", error);
+        logger.error("Erro ao obter estatísticas:", error);
         res.status(500).json({ error: "Erro ao obter estatísticas" });
     }
 });
 
 //------------------------------------------------------
-// Nova rota para listar bots
+// Rotas de Gerenciar Bots
 //------------------------------------------------------
 app.get("/admin/bots/list", checkAuth, async (req, res) => {
     try {
@@ -556,9 +577,6 @@ app.get("/admin/bots/list", checkAuth, async (req, res) => {
     }
 });
 
-//------------------------------------------------------
-// Rota GET /admin/bots/:id (para editar)
-//------------------------------------------------------
 app.get("/admin/bots/:id", checkAuth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -573,9 +591,33 @@ app.get("/admin/bots/:id", checkAuth, async (req, res) => {
     }
 });
 
-//------------------------------------------------------
-// Rotas de Gerenciar Bots
-//------------------------------------------------------
+// Novo endpoint para deletar Bot
+app.delete("/admin/bots/:id", checkAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bot = await BotModel.findByPk(id);
+        if (!bot) {
+            return res.status(404).send("Bot não encontrado");
+        }
+        // Remove do BD
+        await BotModel.destroy({ where: { id } });
+        // Remove da memória (Telegraf)
+        removeBot(id);
+
+        res.send(`Bot ID ${id} excluído com sucesso!`);
+    } catch (err) {
+        logger.error("Erro ao deletar bot:", err);
+        res.status(500).send("Erro ao deletar bot: " + err.message);
+    }
+});
+
+// ------------------ IMPORTANTE: APENAS O BOTÃO #1 É OBRIGATÓRIO ------------------
+
+// Helper: se user preencheu o "primeiro botão" (nome, valor e link)
+function isButton1Filled(bName, bValue, bVipLink) {
+    return bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bVipLink && bVipLink.trim() !== "";
+}
+
 app.post(
     "/admin/bots",
     checkAuth,
@@ -587,75 +629,146 @@ app.post(
     async (req, res) => {
         try {
             const payload = req.body;
-            const { name, token, description, buttonName1, buttonValue1, buttonVipLink1, buttonName2, buttonValue2, buttonVipLink2, buttonName3, buttonValue3, buttonVipLink3 } = payload;
+            const {
+                name,
+                token,
+                description,
+                buttonName1,
+                buttonValue1,
+                buttonVipLink1,
+                buttonName2,
+                buttonValue2,
+                buttonVipLink2,
+                buttonName3,
+                buttonValue3,
+                buttonVipLink3,
+            } = payload;
+
+            // Verifica token duplicado
+            const existingBotWithSameToken = await BotModel.findOne({ where: { token } });
+            if (existingBotWithSameToken) {
+                return res
+                    .status(400)
+                    .send("Erro: Este token já está sendo usado por outro bot. Escolha outro token.");
+            }
+
+            // ------------------------------------------------
+            // MAIN BOTÕES
+            // ------------------------------------------------
+            // Apenas o botão 1 é obrigatório; 2 e 3 são opcionais
+            if (!isButton1Filled(buttonName1, buttonValue1, buttonVipLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do plano principal.");
+            }
+
             const buttons = [];
             function pushButtonIfValid(bName, bValue, bVipLink) {
                 if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bVipLink && bVipLink.trim() !== "") {
                     buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bVipLink.trim() });
                 }
             }
+            // Adiciona botões se foram preenchidos
             pushButtonIfValid(buttonName1, buttonValue1, buttonVipLink1);
             pushButtonIfValid(buttonName2, buttonValue2, buttonVipLink2);
             pushButtonIfValid(buttonName3, buttonValue3, buttonVipLink3);
-            if (buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão com Link VIP.");
-            }
+
             const buttonsJson = JSON.stringify(buttons);
+
             let videoFilename = "";
             if (req.files && req.files.videoFile && req.files.videoFile[0]) {
                 videoFilename = req.files.videoFile[0].location;
             }
+
+            // ------------------------------------------------
+            // REMARKETING NOT PURCHASED
+            // ------------------------------------------------
             const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
             const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
             const npTotalSeconds = npMin * 60 + npSec;
+            // Ao menos o 1° botão do remarketing "not purchased" é obrigatório:
+            const rnpbName1 = req.body.remarketing_not_purchased_buttonName1;
+            const rnpbValue1 = req.body.remarketing_not_purchased_buttonValue1;
+            const rnpbLink1 = req.body.remarketing_not_purchased_buttonLink1;
+            if (!isButton1Filled(rnpbName1, rnpbValue1, rnpbLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased).");
+            }
+
             const remarketingNotPurchased = {
                 description: req.body.remarketing_not_purchased_description || "",
                 delay: npTotalSeconds,
                 video:
-                    req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0]
+                    req.files &&
+                        req.files.remarketing_not_purchased_video &&
+                        req.files.remarketing_not_purchased_video[0]
                         ? req.files.remarketing_not_purchased_video[0].location
                         : "",
                 buttons: [],
             };
-            for (let i = 1; i <= 3; i++) {
-                const rName = req.body[`remarketing_not_purchased_buttonName${i}`];
-                const rValue = req.body[`remarketing_not_purchased_buttonValue${i}`];
-                const rLink = req.body[`remarketing_not_purchased_buttonLink${i}`];
-                if (rName && rValue && !isNaN(parseFloat(rValue)) && rLink) {
-                    remarketingNotPurchased.buttons.push({ name: rName.trim(), value: parseFloat(rValue), link: rLink.trim() });
+            // preenche botões 1..3
+            function pushRnpButton(bName, bValue, bLink) {
+                if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== "") {
+                    remarketingNotPurchased.buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
                 }
             }
-            if (remarketingNotPurchased.buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão no remarketing (not purchased).");
-            }
+            pushRnpButton(rnpbName1, rnpbValue1, rnpbLink1);
+            pushRnpButton(
+                req.body.remarketing_not_purchased_buttonName2,
+                req.body.remarketing_not_purchased_buttonValue2,
+                req.body.remarketing_not_purchased_buttonLink2
+            );
+            pushRnpButton(
+                req.body.remarketing_not_purchased_buttonName3,
+                req.body.remarketing_not_purchased_buttonValue3,
+                req.body.remarketing_not_purchased_buttonLink3
+            );
+
+            // ------------------------------------------------
+            // REMARKETING PURCHASED
+            // ------------------------------------------------
             const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
             const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
             const pTotalSeconds = pMin * 60 + pSec;
+            // Ao menos o 1° botão do remarketing "purchased" é obrigatório:
+            const rpbName1 = req.body.remarketing_purchased_buttonName1;
+            const rpbValue1 = req.body.remarketing_purchased_buttonValue1;
+            const rpbLink1 = req.body.remarketing_purchased_buttonLink1;
+            if (!isButton1Filled(rpbName1, rpbValue1, rpbLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased).");
+            }
+
             const remarketingPurchased = {
                 description: req.body.remarketing_purchased_description || "",
                 delay: pTotalSeconds,
                 video:
-                    req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0]
+                    req.files &&
+                        req.files.remarketing_purchased_video &&
+                        req.files.remarketing_purchased_video[0]
                         ? req.files.remarketing_purchased_video[0].location
                         : "",
                 buttons: [],
             };
-            for (let i = 1; i <= 3; i++) {
-                const rName = req.body[`remarketing_purchased_buttonName${i}`];
-                const rValue = req.body[`remarketing_purchased_buttonValue${i}`];
-                const rLink = req.body[`remarketing_purchased_buttonLink${i}`];
-                if (rName && rValue && !isNaN(parseFloat(rValue)) && rLink) {
-                    remarketingPurchased.buttons.push({ name: rName.trim(), value: parseFloat(rValue), link: rLink.trim() });
+            function pushRpButton(bName, bValue, bLink) {
+                if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== "") {
+                    remarketingPurchased.buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
                 }
             }
-            if (remarketingPurchased.buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão no remarketing (purchased).");
-            }
+            pushRpButton(rpbName1, rpbValue1, rpbLink1);
+            pushRpButton(
+                req.body.remarketing_purchased_buttonName2,
+                req.body.remarketing_purchased_buttonValue2,
+                req.body.remarketing_purchased_buttonLink2
+            );
+            pushRpButton(
+                req.body.remarketing_purchased_buttonName3,
+                req.body.remarketing_purchased_buttonValue3,
+                req.body.remarketing_purchased_buttonLink3
+            );
+
             const remarketing = {
                 not_purchased: remarketingNotPurchased,
                 purchased: remarketingPurchased,
             };
             const remarketingJson = JSON.stringify(remarketing);
+
             const newBot = await BotModel.create({
                 name,
                 token,
@@ -665,6 +778,7 @@ app.post(
                 remarketingJson,
             });
             logger.info(`✅ Bot ${name} inserido no BD.`);
+
             const bc = {
                 name: newBot.name,
                 token: newBot.token,
@@ -675,6 +789,7 @@ app.post(
             };
             // Inicializa o bot passando o ID do novo bot
             initializeBot(bc, newBot.id.toString());
+
             res.send(`
             <div class="alert alert-success">
               Bot <strong>${name}</strong> cadastrado e iniciado com sucesso!
@@ -702,8 +817,36 @@ app.post(
             if (!bot) {
                 return res.status(404).send("Bot não encontrado");
             }
-            // Usa os mesmos nomes dos inputs conforme no formulário de edição
-            const { name, token, description, buttonName1, buttonValue1, buttonVipLink1, buttonName2, buttonValue2, buttonVipLink2, buttonName3, buttonValue3, buttonVipLink3 } = req.body;
+            const {
+                name,
+                token,
+                description,
+                buttonName1,
+                buttonValue1,
+                buttonVipLink1,
+                buttonName2,
+                buttonValue2,
+                buttonVipLink2,
+                buttonName3,
+                buttonValue3,
+                buttonVipLink3,
+            } = req.body;
+
+            // Caso o token tenha mudado, checar duplicado:
+            if (token !== bot.token) {
+                const existingWithToken = await BotModel.findOne({ where: { token } });
+                if (existingWithToken) {
+                    return res
+                        .status(400)
+                        .send("Erro: Este token já está sendo usado por outro bot. Escolha outro token.");
+                }
+            }
+
+            // Apenas o botão 1 é obrigatório no plano principal
+            if (!isButton1Filled(buttonName1, buttonValue1, buttonVipLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do plano principal (edit).");
+            }
+
             const buttons = [];
             function pushButtonIfValid(bName, bValue, bVipLink) {
                 if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bVipLink && bVipLink.trim() !== "") {
@@ -713,82 +856,115 @@ app.post(
             pushButtonIfValid(buttonName1, buttonValue1, buttonVipLink1);
             pushButtonIfValid(buttonName2, buttonValue2, buttonVipLink2);
             pushButtonIfValid(buttonName3, buttonValue3, buttonVipLink3);
-            if (buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão com Link VIP.");
-            }
-            const buttonsJson = JSON.stringify(buttons);
+
             let videoFilename = bot.video;
             if (req.files && req.files.videoFile && req.files.videoFile[0]) {
                 videoFilename = req.files.videoFile[0].location;
             }
+
+            // REMARKETING - Not Purchased
             const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
             const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
             const npTotalSeconds = npMin * 60 + npSec;
+            const rnpbName1 = req.body.remarketing_not_purchased_buttonName1;
+            const rnpbValue1 = req.body.remarketing_not_purchased_buttonValue1;
+            const rnpbLink1 = req.body.remarketing_not_purchased_buttonLink1;
+            if (!isButton1Filled(rnpbName1, rnpbValue1, rnpbLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased) (edit).");
+            }
             const remarketingNotPurchased = {
                 description: req.body.remarketing_not_purchased_description || "",
                 delay: npTotalSeconds,
                 video:
-                    req.files && req.files.remarketing_not_purchased_video && req.files.remarketing_not_purchased_video[0]
+                    req.files &&
+                        req.files.remarketing_not_purchased_video &&
+                        req.files.remarketing_not_purchased_video[0]
                         ? req.files.remarketing_not_purchased_video[0].location
                         : "",
                 buttons: [],
             };
-            for (let i = 1; i <= 3; i++) {
-                const rName = req.body[`remarketing_not_purchased_buttonName${i}`];
-                const rValue = req.body[`remarketing_not_purchased_buttonValue${i}`];
-                const rLink = req.body[`remarketing_not_purchased_buttonLink${i}`];
-                if (rName && rValue && !isNaN(parseFloat(rValue)) && rLink) {
-                    remarketingNotPurchased.buttons.push({ name: rName.trim(), value: parseFloat(rValue), link: rLink.trim() });
+            function pushRnpButton(bName, bValue, bLink) {
+                if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== "") {
+                    remarketingNotPurchased.buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
                 }
             }
-            if (remarketingNotPurchased.buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão no remarketing (not purchased).");
-            }
+            pushRnpButton(rnpbName1, rnpbValue1, rnpbLink1);
+            pushRnpButton(
+                req.body.remarketing_not_purchased_buttonName2,
+                req.body.remarketing_not_purchased_buttonValue2,
+                req.body.remarketing_not_purchased_buttonLink2
+            );
+            pushRnpButton(
+                req.body.remarketing_not_purchased_buttonName3,
+                req.body.remarketing_not_purchased_buttonValue3,
+                req.body.remarketing_not_purchased_buttonLink3
+            );
+
+            // REMARKETING - Purchased
             const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
             const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
             const pTotalSeconds = pMin * 60 + pSec;
+            const rpbName1 = req.body.remarketing_purchased_buttonName1;
+            const rpbValue1 = req.body.remarketing_purchased_buttonValue1;
+            const rpbLink1 = req.body.remarketing_purchased_buttonLink1;
+            if (!isButton1Filled(rpbName1, rpbValue1, rpbLink1)) {
+                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased) (edit).");
+            }
             const remarketingPurchased = {
                 description: req.body.remarketing_purchased_description || "",
                 delay: pTotalSeconds,
                 video:
-                    req.files && req.files.remarketing_purchased_video && req.files.remarketing_purchased_video[0]
+                    req.files &&
+                        req.files.remarketing_purchased_video &&
+                        req.files.remarketing_purchased_video[0]
                         ? req.files.remarketing_purchased_video[0].location
                         : "",
                 buttons: [],
             };
-            for (let i = 1; i <= 3; i++) {
-                const rName = req.body[`remarketing_purchased_buttonName${i}`];
-                const rValue = req.body[`remarketing_purchased_buttonValue${i}`];
-                const rLink = req.body[`remarketing_purchased_buttonLink${i}`];
-                if (rName && rValue && !isNaN(parseFloat(rValue)) && rLink) {
-                    remarketingPurchased.buttons.push({ name: rName.trim(), value: parseFloat(rValue), link: rLink.trim() });
+            function pushRpButton(bName, bValue, bLink) {
+                if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== "") {
+                    remarketingPurchased.buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
                 }
             }
-            if (remarketingPurchased.buttons.length === 0) {
-                return res.status(400).send("Erro: é obrigatório definir pelo menos um botão no remarketing (purchased).");
-            }
-            const remarketing = {
+            pushRpButton(rpbName1, rpbValue1, rpbLink1);
+            pushRpButton(
+                req.body.remarketing_purchased_buttonName2,
+                req.body.remarketing_purchased_buttonValue2,
+                req.body.remarketing_purchased_buttonLink2
+            );
+            pushRpButton(
+                req.body.remarketing_purchased_buttonName3,
+                req.body.remarketing_purchased_buttonValue3,
+                req.body.remarketing_purchased_buttonLink3
+            );
+            const safeRemarketingJson = JSON.stringify({
                 not_purchased: remarketingNotPurchased,
                 purchased: remarketingPurchased,
-            };
-            const safeRemarketingJson = JSON.stringify(remarketing);
+            });
+
             bot.name = name;
             bot.token = token;
             bot.description = description;
             bot.video = videoFilename;
-            bot.buttonsJson = buttonsJson;
+            bot.buttonsJson = JSON.stringify(buttons);
             bot.remarketingJson = safeRemarketingJson;
             await bot.save();
+
             logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
+
             const bc = {
                 name: bot.name,
                 token: bot.token,
                 description: bot.description,
                 video: bot.video,
                 buttons: buttons,
-                remarketing: remarketing,
+                remarketing: {
+                    not_purchased: remarketingNotPurchased,
+                    purchased: remarketingPurchased,
+                },
             };
             updateBotInMemory(id, bc);
+
             res.send(`
             <div class="alert alert-success">
               Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!

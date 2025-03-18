@@ -392,7 +392,7 @@ body.dark-mode .custom-select-arrow {
     display: block;
 }
 
-/* Últimas Transações – layout responsivo */
+/* Últimas Transações */
 #lastTransactionsContainer {
     display: block;
     margin-top: 1rem;
@@ -414,13 +414,8 @@ body.dark-mode #lastTransactionsContainer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: transparent;
     padding: 0.5rem 0;
     border-radius: 4px 4px 0 0;
-}
-
-body.dark-mode .last-transactions-header {
-    background-color: transparent;
 }
 
 .last-transactions-title {
@@ -541,7 +536,7 @@ body.dark-mode .sale-card {
     }
 }
 
-/* Chart Box – nova classe para o gráfico */
+/* Chart Box */
 .chart-box {
     border: 1px solid #ddd;
     border-radius: 12px;
