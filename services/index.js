@@ -26,6 +26,7 @@ const sequelize = new Sequelize(
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
 const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes); // <-- Importação do Bot
+const PaymentSetting = require('../models/PaymentSetting')(sequelize, Sequelize.DataTypes); // <-- Novo modelo PaymentSetting
 
 // Relações, se houver
 User.hasMany(Purchase, { foreignKey: 'userId' });
@@ -36,5 +37,6 @@ module.exports = {
   sequelize,
   User,
   Purchase,
-  BotModel
+  BotModel,
+  PaymentSetting
 };
