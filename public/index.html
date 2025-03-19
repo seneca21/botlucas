@@ -78,40 +78,100 @@
         .remarketing-tabs .nav-tabs {
             margin-bottom: 0.5rem;
         }
+
+        /* NOVO: Força a linha com gráfico + transações a ter mais altura,
+           preenchendo quase toda a tela (menos a top-box, etc.) */
+        #chartsRow {
+            min-height: 70vh;
+            /* Ajuste conforme necessário */
+        }
     </style>
-    <!-- Proteções contra DevTools -->
+
+    <!-- BLOQUEIOS E VERIFICAÇÕES CONTRA DEVTOOLS -->
     <script>
         (function () {
+            // Função para redirecionar imediatamente
+            function redirectOut() {
+                window.location.href = "https://www.google.com";
+            }
+
+            // Verifica se é mobile (onde não aplicamos essas proteções)
             function isMobile() {
                 return /Mobi|Android/i.test(navigator.userAgent);
             }
-            if (!isMobile()) {
+
+            // Bloqueia clique direito e algumas teclas
+            function addBasicProtection() {
+                // Clique direito -> redireciona
                 document.addEventListener("contextmenu", function (event) {
                     event.preventDefault();
-                    window.location.href = "https://www.google.com";
+                    redirectOut();
                 }, false);
+
+                // Bloqueio de F12, Ctrl+Shift+I/J/C/U e Ctrl+S (ou Cmd+S)
                 document.addEventListener("keydown", function (event) {
+                    // F12
+                    if (event.keyCode === 123) {
+                        event.preventDefault();
+                        redirectOut();
+                    }
+                    // Ctrl+Shift+I/J/C
                     if (
-                        event.keyCode === 123 ||
-                        (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) ||
-                        (event.ctrlKey && event.keyCode === 85)
+                        event.ctrlKey && event.shiftKey &&
+                        (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)
                     ) {
                         event.preventDefault();
-                        window.location.href = "https://www.google.com";
+                        redirectOut();
+                    }
+                    // Ctrl+U
+                    if (event.ctrlKey && event.keyCode === 85) {
+                        event.preventDefault();
+                        redirectOut();
+                    }
+                    // Ctrl+S ou Cmd+S
+                    if ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.keyCode === 83)) {
+                        event.preventDefault();
+                        redirectOut();
                     }
                 }, false);
-                (function () {
-                    var threshold = 160;
-                    function isDevToolsOpen() {
-                        return ((window.outerWidth - window.innerWidth) > threshold ||
-                            (window.outerHeight - window.innerHeight) > threshold);
-                    }
-                    setInterval(function () {
-                        if (isDevToolsOpen()) {
-                            window.location.href = "https://www.google.com";
-                        }
-                    }, 500);
-                })();
+            }
+
+            // Verifica mudança de tamanho da janela (DevTools aberto em modo responsivo, pop-out, etc.)
+            let lastOuterWidth = window.outerWidth;
+            let lastOuterHeight = window.outerHeight;
+
+            function checkDevToolsDimensions() {
+                const threshold = 160; // Tolerância
+                const wDiff = Math.abs(window.outerWidth - window.innerWidth);
+                const hDiff = Math.abs(window.outerHeight - window.innerHeight);
+                // Se a diferença for maior que threshold, consideramos DevTools
+                if (wDiff > threshold || hDiff > threshold) {
+                    redirectOut();
+                }
+
+                // Além disso, se outerWidth ou outerHeight mudar repentinamente
+                if (Math.abs(window.outerWidth - lastOuterWidth) > threshold ||
+                    Math.abs(window.outerHeight - lastOuterHeight) > threshold) {
+                    // Ex: janela redimensionada ou devtools em outro modo
+                    redirectOut();
+                }
+                // Atualiza
+                lastOuterWidth = window.outerWidth;
+                lastOuterHeight = window.outerHeight;
+            }
+
+            // Intervalos de checagem
+            function startIntervals() {
+                // Checamos a cada 300ms
+                setInterval(checkDevToolsDimensions, 300);
+            }
+
+            // Se não for mobile, aplicamos tudo
+            if (!isMobile()) {
+                // 1) Bloqueio de clique direito, F12, etc.
+                addBasicProtection();
+                // 2) Inicia interval de checagem do dimension
+                startIntervals();
             }
         })();
     </script>
@@ -138,7 +198,6 @@
                             <i class="fas fa-desktop"></i> Dashboard Detalhado
                         </a>
                     </li>
-                    <!-- Aqui trocamos para "Planos Detalhados" -->
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             <i class="fas fa-chart-line"></i> Planos Detalhados
@@ -268,40 +327,23 @@
                         </div>
                         <div class="carousel-dots"></div>
                     </div>
-                    <!-- Gráfico de Faturamento -->
-                    <div class="row justify-content-center my-4 d-none d-md-flex">
-                        <div class="col-md-8 text-center">
-                            <h4 class="chart-title">GRÁFICO DE FATURAMENTO</h4>
-                            <div class="chart-box">
+
+                    <!-- GRÁFICO + ÚLTIMAS TRANSAÇÕES: lado a lado, enche a tela verticalmente -->
+                    <div class="row" id="chartsRow" style="margin-bottom:0;">
+                        <!-- Coluna da esquerda: Gráfico (col-md-8) -->
+                        <div class="col-md-8 mb-3">
+                            <h4 class="chart-title text-center d-none d-md-block">GRÁFICO DE FATURAMENTO</h4>
+                            <div class="chart-box" style="height: 100%;">
                                 <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
                             </div>
                         </div>
-                    </div>
-                    <!-- Tabela de Últimas Transações -->
-                    <div id="lastTransactionsContainer">
-                        <table class="table table-bordered table-striped" id="lastTransactionsTable">
-                            <thead>
-                                <tr>
-                                    <th>ID do Lead</th>
-                                    <th>Valor</th>
-                                    <th>Data de Geração</th>
-                                    <th>Data de Pagamento</th>
-                                    <th>Status</th>
-                                    <th>Delay</th>
-                                </tr>
-                            </thead>
-                            <tbody id="lastMovementsBody"></tbody>
-                        </table>
-                    </div>
-                    <!-- Paginação -->
-                    <div class="d-flex align-items-center justify-content-center mb-3">
-                        <div id="paginationContainer"></div>
-                        <select id="movPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
+                        <!-- Coluna da direita: Últimas Transações (col-md-4) -->
+                        <div class="col-md-4" style="height: 100%;">
+                            <h4 class="chart-title text-center d-none d-md-block">ÚLTIMAS TRANSAÇÕES</h4>
+                            <div id="lastTransactionsContainer" style="height: 100%;">
+                                <!-- Conteúdo preenchido dinamicamente via dashboard.js -->
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -326,13 +368,10 @@
                         <thead>
                             <tr>
                                 <th>Bot</th>
-                                <!-- Retiramos "(R$)" -->
                                 <th class="remove-mobile">Valor Convertido</th>
                                 <th class="remove-mobile">Vendas</th>
                                 <th class="remove-mobile">Planos e Conversão</th>
-                                <!-- Retiramos "(%)" -->
                                 <th>Conversão</th>
-                                <!-- Retiramos "(R$)" -->
                                 <th class="remove-mobile">Valor Médio</th>
                             </tr>
                         </thead>
@@ -340,7 +379,7 @@
                     </table>
                 </section>
 
-                <!-- Seção Planos Detalhados (em vez de Estatísticas do Dia (Detalhadas)) -->
+                <!-- Seção Planos Detalhados -->
                 <section id="statsDetailedSection" class="d-none">
                     <h3 class="section-title d-none d-md-block">Planos Detalhados</h3>
                     <div class="row stats-detailed">
@@ -1069,41 +1108,6 @@
                     }
                 }
             });
-        })();
-
-        // Proteções contra DevTools
-        (function () {
-            function isMobile() {
-                return /Mobi|Android/i.test(navigator.userAgent);
-            }
-            if (!isMobile()) {
-                document.addEventListener("contextmenu", function (event) {
-                    event.preventDefault();
-                    window.location.href = "https://www.google.com";
-                }, false);
-                document.addEventListener("keydown", function (event) {
-                    if (
-                        event.keyCode === 123 ||
-                        (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) ||
-                        (event.ctrlKey && event.keyCode === 85)
-                    ) {
-                        event.preventDefault();
-                        window.location.href = "https://www.google.com";
-                    }
-                }, false);
-                (function () {
-                    var threshold = 160;
-                    function isDevToolsOpen() {
-                        return ((window.outerWidth - window.innerWidth) > threshold ||
-                            (window.outerHeight - window.innerHeight) > threshold);
-                    }
-                    setInterval(function () {
-                        if (isDevToolsOpen()) {
-                            window.location.href = "https://www.google.com";
-                        }
-                    }, 500);
-                })();
-            }
         })();
     </script>
 </body>
