@@ -49,7 +49,7 @@
             gap: 0.5rem !important;
         }
 
-        /* Ajusta o contorno do gráfico para que fique justo abaixo das datas */
+        /* Ajusta o contorno do gráfico sem altura fixa para se ajustar ao conteúdo (datas) */
         .chart-box {
             border: 1px solid #ddd;
             border-radius: 12px;
@@ -57,20 +57,18 @@
             background-color: #fff;
             box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
             margin-top: 0.5rem;
-            /* Removida a altura fixa para ajustar automaticamente */
             height: auto;
         }
 
-        /* Aplica o mesmo contorno ao container das Últimas Transações */
+        /* Últimas Transações: exibe apenas 6 itens (limita a altura) */
         #lastTransactionsContainer {
             border: 1px solid #ddd;
             border-radius: 12px;
             padding: 1rem;
             background-color: #fff;
             box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
-            /* Remove a altura fixa para que se ajuste ao conteúdo */
-            height: auto;
-            overflow-y: auto;
+            max-height: 480px;
+            overflow-y: hidden;
         }
 
         /* Força o mainContent a ter altura mínima da viewport */
@@ -78,6 +76,7 @@
             min-height: 100vh;
         }
 
+        /* Em telas pequenas, esconde elementos com a classe remove-mobile */
         @media (max-width: 768px) {
             .remove-mobile {
                 display: none !important;
@@ -100,14 +99,17 @@
             function redirectOut() {
                 window.location.href = "https://www.google.com";
             }
+
             function isMobile() {
                 return /Mobi|Android/i.test(navigator.userAgent);
             }
+
             function addBasicProtection() {
                 document.addEventListener("contextmenu", function (event) {
                     event.preventDefault();
                     redirectOut();
                 }, false);
+
                 document.addEventListener("keydown", function (event) {
                     if (event.keyCode === 123 ||
                         (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) ||
@@ -119,8 +121,10 @@
                     }
                 }, false);
             }
+
             let lastOuterWidth = window.outerWidth;
             let lastOuterHeight = window.outerHeight;
+
             function checkDevToolsDimensions() {
                 const threshold = 160;
                 const wDiff = Math.abs(window.outerWidth - window.innerWidth);
@@ -135,9 +139,11 @@
                 lastOuterWidth = window.outerWidth;
                 lastOuterHeight = window.outerHeight;
             }
+
             function startIntervals() {
                 setInterval(checkDevToolsDimensions, 300);
             }
+
             if (!isMobile()) {
                 addBasicProtection();
                 startIntervals();
@@ -170,6 +176,12 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="statsDetailedSection">
                             <i class="fas fa-chart-line"></i> Planos Detalhados
+                        </a>
+                    </li>
+                    <!-- Novo item para Todas as Transações -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="allTransactionsSection">
+                            <i class="fas fa-list"></i> Todas as Transações
                         </a>
                     </li>
                     <li class="nav-item">
@@ -306,11 +318,29 @@
                                 <canvas id="lineComparisonChart" style="width:100%;"></canvas>
                             </div>
                         </div>
-                        <!-- Coluna da direita: Últimas Transações -->
+                        <!-- Coluna da direita: Últimas Transações (limitado a 6 itens) -->
                         <div class="col-md-4">
                             <h4 class="chart-title text-center d-none d-md-block">ÚLTIMAS TRANSAÇÕES</h4>
                             <div id="lastTransactionsContainer">
-                                <!-- Conteúdo preenchido dinamicamente via dashboard.js -->
+                                <table class="table table-bordered table-striped" id="lastTransactionsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID do Lead</th>
+                                            <th>Valor</th>
+                                            <th>Data de Geração</th>
+                                            <th>Data de Pagamento</th>
+                                            <th>Status</th>
+                                            <th>Delay</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lastMovementsBody"></tbody>
+                                </table>
+                            </div>
+                            <!-- Botão "Ver Todos" que simula o clique no item da sidebar -->
+                            <div class="text-right mt-2">
+                                <button id="viewAllBtn" class="btn btn-secondary"
+                                    onclick="document.querySelector('[data-section=\'allTransactionsSection\']').click();">Ver
+                                    Todos</button>
                             </div>
                         </div>
                     </div>
@@ -484,6 +514,36 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- Nova Seção: Todas as Transações (com paginação e filtro) -->
+                <section id="allTransactionsSection" class="d-none">
+                    <h3 class="section-title">Todas as Transações</h3>
+                    <div id="allTransactionsContainer"
+                        style="border: 1px solid #ddd; border-radius: 12px; padding: 1rem; background-color: #fff; box-shadow: 0 2px 2px rgba(0,0,0,0.06);">
+                        <table class="table table-bordered table-striped" id="allTransactionsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID do Lead</th>
+                                    <th>Valor</th>
+                                    <th>Data de Geração</th>
+                                    <th>Data de Pagamento</th>
+                                    <th>Status</th>
+                                    <th>Delay</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allTransactionsBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center mb-3">
+                        <div id="allPaginationContainer"></div>
+                        <select id="allMovPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
                     </div>
                 </section>
 
@@ -755,10 +815,9 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary mt-3">Salvar Edição</button>
-                                    <button type="button" class="btn btn-secondary mt-3"
-                                        id="cancelEditBotBtn">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary mt-3">Salvar Edição</button>
+                                        <button type="button" class="btn btn-secondary mt-3"
+                                            id="cancelEditBotBtn">Cancelar</button>
                                 </form>
                                 <div id="editBotResponse" class="mt-2"></div>
                             </div>
@@ -998,6 +1057,7 @@
                             <form id="paymentSettingForm" method="POST" action="/admin/payment-setting">
                                 <div class="form-group">
                                     <label for="pushinToken">PushinPay Token:</label>
+                                    <!-- Campo de token com olho para exibir/esconder -->
                                     <div class="input-group">
                                         <input type="password" id="pushinToken" name="pushinToken" class="form-control"
                                             required />
