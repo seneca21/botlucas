@@ -63,7 +63,16 @@
             border: 1px solid #555;
         }
 
-        /* Esconde em telas <= 768px */
+        /* Remoção do filtro de páginas (paginação) – bloco removido */
+
+        /* Força o mainContent a ocupar toda a altura da viewport e usar flex */
+        #mainContent {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Em telas pequenas, mantém a regra para esconder elementos com a classe remove-mobile */
         @media (max-width: 768px) {
             .remove-mobile {
                 display: none !important;
@@ -77,13 +86,6 @@
 
         .remarketing-tabs .nav-tabs {
             margin-bottom: 0.5rem;
-        }
-
-        /* NOVO: Força a linha com gráfico + transações a ter mais altura,
-           preenchendo quase toda a tela (menos a top-box, etc.) */
-        #chartsRow {
-            min-height: 70vh;
-            /* Ajuste conforme necessário */
         }
     </style>
 
@@ -100,43 +102,26 @@
                 return /Mobi|Android/i.test(navigator.userAgent);
             }
 
-            // Bloqueia clique direito e algumas teclas
+            // Bloqueia clique direito e teclas específicas
             function addBasicProtection() {
-                // Clique direito -> redireciona
                 document.addEventListener("contextmenu", function (event) {
                     event.preventDefault();
                     redirectOut();
                 }, false);
 
-                // Bloqueio de F12, Ctrl+Shift+I/J/C/U e Ctrl+S (ou Cmd+S)
                 document.addEventListener("keydown", function (event) {
-                    // F12
-                    if (event.keyCode === 123) {
-                        event.preventDefault();
-                        redirectOut();
-                    }
-                    // Ctrl+Shift+I/J/C
-                    if (
-                        event.ctrlKey && event.shiftKey &&
-                        (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)
+                    if (event.keyCode === 123 ||
+                        (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) ||
+                        (event.ctrlKey && event.keyCode === 85) ||
+                        ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.keyCode === 83))
                     ) {
-                        event.preventDefault();
-                        redirectOut();
-                    }
-                    // Ctrl+U
-                    if (event.ctrlKey && event.keyCode === 85) {
-                        event.preventDefault();
-                        redirectOut();
-                    }
-                    // Ctrl+S ou Cmd+S
-                    if ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.keyCode === 83)) {
                         event.preventDefault();
                         redirectOut();
                     }
                 }, false);
             }
 
-            // Verifica mudança de tamanho da janela (DevTools aberto em modo responsivo, pop-out, etc.)
+            // Verifica mudanças de dimensões que indiquem DevTools aberto
             let lastOuterWidth = window.outerWidth;
             let lastOuterHeight = window.outerHeight;
 
@@ -144,33 +129,23 @@
                 const threshold = 160; // Tolerância
                 const wDiff = Math.abs(window.outerWidth - window.innerWidth);
                 const hDiff = Math.abs(window.outerHeight - window.innerHeight);
-                // Se a diferença for maior que threshold, consideramos DevTools
                 if (wDiff > threshold || hDiff > threshold) {
                     redirectOut();
                 }
-
-                // Além disso, se outerWidth ou outerHeight mudar repentinamente
                 if (Math.abs(window.outerWidth - lastOuterWidth) > threshold ||
                     Math.abs(window.outerHeight - lastOuterHeight) > threshold) {
-                    // Ex: janela redimensionada ou devtools em outro modo
                     redirectOut();
                 }
-                // Atualiza
                 lastOuterWidth = window.outerWidth;
                 lastOuterHeight = window.outerHeight;
             }
 
-            // Intervalos de checagem
             function startIntervals() {
-                // Checamos a cada 300ms
                 setInterval(checkDevToolsDimensions, 300);
             }
 
-            // Se não for mobile, aplicamos tudo
             if (!isMobile()) {
-                // 1) Bloqueio de clique direito, F12, etc.
                 addBasicProtection();
-                // 2) Inicia interval de checagem do dimension
                 startIntervals();
             }
         })();
@@ -262,7 +237,7 @@
                 <!-- Seção Estatísticas do Dia -->
                 <section id="statsSection">
                     <h3 class="section-title d-none d-md-block">Estatísticas do Dia</h3>
-                    <!-- Cards Desktop -->
+                    <!-- Cards Desktop e Carousel Mobile permanecem inalterados -->
                     <div class="row text-center d-none d-md-flex">
                         <div class="col-md-3 mb-3">
                             <div class="card shadow-sm card-hover">
@@ -297,7 +272,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Carousel Mobile -->
                     <div class="card-carousel d-md-none">
                         <div class="card-scroll">
                             <div class="card shadow-sm card-hover">
@@ -328,23 +302,24 @@
                         <div class="carousel-dots"></div>
                     </div>
 
-                    <!-- GRÁFICO + ÚLTIMAS TRANSAÇÕES: lado a lado, enche a tela verticalmente -->
-                    <div class="row" id="chartsRow" style="margin-bottom:0;">
+                    <!-- GRÁFICO DE FATURAMENTO e ÚLTIMAS TRANSAÇÕES estendidos verticalmente -->
+                    <div class="row flex-grow-1 align-items-stretch" style="height: 100%;">
                         <!-- Coluna da esquerda: Gráfico (col-md-8) -->
-                        <div class="col-md-8 mb-3">
+                        <div class="col-md-8 mb-3" style="height: 100%;">
                             <h4 class="chart-title text-center d-none d-md-block">GRÁFICO DE FATURAMENTO</h4>
                             <div class="chart-box" style="height: 100%;">
-                                <canvas id="lineComparisonChart" style="width:100%; height:300px;"></canvas>
+                                <canvas id="lineComparisonChart" style="width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>
                         <!-- Coluna da direita: Últimas Transações (col-md-4) -->
                         <div class="col-md-4" style="height: 100%;">
                             <h4 class="chart-title text-center d-none d-md-block">ÚLTIMAS TRANSAÇÕES</h4>
-                            <div id="lastTransactionsContainer" style="height: 100%;">
+                            <div id="lastTransactionsContainer" style="height: 100%; overflow-y: auto;">
                                 <!-- Conteúdo preenchido dinamicamente via dashboard.js -->
                             </div>
                         </div>
                     </div>
+                    <!-- Filtro de páginas removido -->
                 </section>
 
                 <!-- Seção Ranking -->
@@ -1018,35 +993,34 @@
                             <div id="addBotResponse" class="mt-3"></div>
                         </div>
                     </div>
-            </div>
-            </section>
+                </section>
 
-            <!-- Seção Configurações de Pagamento -->
-            <section id="paymentSection" class="d-none">
-                <h3 class="section-title">Configurações de Pagamento</h3>
-                <p>Aqui você pode definir o token da PushinPay utilizado nas cobranças Pix.</p>
-                <div class="card">
-                    <div class="card-body">
-                        <form id="paymentSettingForm" method="POST" action="/admin/payment-setting">
-                            <div class="form-group">
-                                <label for="pushinToken">PushinPay Token:</label>
-                                <!-- Campo de token com olho para exibir/esconder -->
-                                <div class="input-group">
-                                    <input type="password" id="pushinToken" name="pushinToken" class="form-control"
-                                        required />
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="togglePushinToken">&#128065;</span>
+                <!-- Seção Configurações de Pagamento -->
+                <section id="paymentSection" class="d-none">
+                    <h3 class="section-title">Configurações de Pagamento</h3>
+                    <p>Aqui você pode definir o token da PushinPay utilizado nas cobranças Pix.</p>
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="paymentSettingForm" method="POST" action="/admin/payment-setting">
+                                <div class="form-group">
+                                    <label for="pushinToken">PushinPay Token:</label>
+                                    <!-- Campo de token com olho para exibir/esconder -->
+                                    <div class="input-group">
+                                        <input type="password" id="pushinToken" name="pushinToken" class="form-control"
+                                            required />
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" id="togglePushinToken">&#128065;</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Salvar Token</button>
-                            <div id="paymentSettingResponse" class="mt-2"></div>
-                        </form>
+                                <button type="submit" class="btn btn-primary">Salvar Token</button>
+                                <div id="paymentSettingResponse" class="mt-2"></div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
-    </div>
     </div>
     <!-- Modal de Data Personalizada -->
     <div class="modal fade" id="customDateModal" tabindex="-1" role="dialog" aria-labelledby="customDateModalLabel"
