@@ -49,7 +49,7 @@
             gap: 0.5rem !important;
         }
 
-        /* Ajusta o contorno do gráfico sem altura fixa para se ajustar ao conteúdo (datas) */
+        /* Gráfico de faturamento: contorno ajustado automaticamente */
         .chart-box {
             border: 1px solid #ddd;
             border-radius: 12px;
@@ -60,15 +60,27 @@
             height: auto;
         }
 
-        /* Últimas Transações: exibe apenas 6 itens (limita a altura) */
+        /* Painel Últimas Transações na seção Estatísticas do Dia:
+       - Altura fixa para exibir apenas 6 transações */
         #lastTransactionsContainer {
             border: 1px solid #ddd;
             border-radius: 12px;
             padding: 1rem;
             background-color: #fff;
             box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
-            max-height: 480px;
+            height: 480px;
             overflow-y: hidden;
+        }
+
+        /* Aba Todas as Transações (com paginação e filtro) usa altura automática */
+        #allTransactionsContainer {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 1rem;
+            background-color: #fff;
+            box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
+            height: auto;
+            overflow-y: auto;
         }
 
         /* Força o mainContent a ter altura mínima da viewport */
@@ -76,7 +88,6 @@
             min-height: 100vh;
         }
 
-        /* Em telas pequenas, esconde elementos com a classe remove-mobile */
         @media (max-width: 768px) {
             .remove-mobile {
                 display: none !important;
@@ -318,7 +329,7 @@
                                 <canvas id="lineComparisonChart" style="width:100%;"></canvas>
                             </div>
                         </div>
-                        <!-- Coluna da direita: Últimas Transações (limitado a 6 itens) -->
+                        <!-- Coluna da direita: Últimas Transações -->
                         <div class="col-md-4">
                             <h4 class="chart-title text-center d-none d-md-block">ÚLTIMAS TRANSAÇÕES</h4>
                             <div id="lastTransactionsContainer">
@@ -336,13 +347,40 @@
                                     <tbody id="lastMovementsBody"></tbody>
                                 </table>
                             </div>
-                            <!-- Botão "Ver Todos" que simula o clique no item da sidebar -->
-                            <div class="text-right mt-2">
-                                <button id="viewAllBtn" class="btn btn-secondary"
-                                    onclick="document.querySelector('[data-section=\'allTransactionsSection\']').click();">Ver
-                                    Todos</button>
+                            <!-- Botão "Ver Todos" centralizado abaixo do painel -->
+                            <div class="text-center mt-2">
+                                <button id="viewAllBtn" class="btn btn-link">Ver Todos</button>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- Seção Todas as Transações (com paginação e filtro) -->
+                <section id="allTransactionsSection" class="d-none">
+                    <h3 class="section-title">Todas as Transações</h3>
+                    <div id="allTransactionsContainer">
+                        <table class="table table-bordered table-striped" id="allTransactionsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID do Lead</th>
+                                    <th>Valor</th>
+                                    <th>Data de Geração</th>
+                                    <th>Data de Pagamento</th>
+                                    <th>Status</th>
+                                    <th>Delay</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allTransactionsBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center mb-3">
+                        <div id="allPaginationContainer"></div>
+                        <select id="allMovPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
                     </div>
                 </section>
 
@@ -514,36 +552,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </section>
-
-                <!-- Nova Seção: Todas as Transações (com paginação e filtro) -->
-                <section id="allTransactionsSection" class="d-none">
-                    <h3 class="section-title">Todas as Transações</h3>
-                    <div id="allTransactionsContainer"
-                        style="border: 1px solid #ddd; border-radius: 12px; padding: 1rem; background-color: #fff; box-shadow: 0 2px 2px rgba(0,0,0,0.06);">
-                        <table class="table table-bordered table-striped" id="allTransactionsTable">
-                            <thead>
-                                <tr>
-                                    <th>ID do Lead</th>
-                                    <th>Valor</th>
-                                    <th>Data de Geração</th>
-                                    <th>Data de Pagamento</th>
-                                    <th>Status</th>
-                                    <th>Delay</th>
-                                </tr>
-                            </thead>
-                            <tbody id="allTransactionsBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="d-flex align-items-center justify-content-center mb-3">
-                        <div id="allPaginationContainer"></div>
-                        <select id="allMovPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
                     </div>
                 </section>
 
@@ -815,237 +823,11 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <button type="submit" class="btn btn-primary mt-3">Salvar Edição</button>
-                                        <button type="button" class="btn btn-secondary mt-3"
-                                            id="cancelEditBotBtn">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
                                 </form>
-                                <div id="editBotResponse" class="mt-2"></div>
+                                <div id="addBotResponse" class="mt-3"></div>
                             </div>
                         </div>
-                        <!-- Aba Cadastrar Novo Bot -->
-                        <div class="tab-pane fade" id="newBotTab" role="tabpanel" aria-labelledby="newBotTab-link">
-                            <h5 class="mt-3">Cadastrar Novo Bot</h5>
-                            <form id="addBotForm" method="POST" action="/admin/bots" style="max-width:600px;"
-                                enctype="multipart/form-data">
-                                <label for="botNameInput">Nome do Bot:</label>
-                                <input type="text" id="botNameInput" name="name" class="form-control" required />
-                                <label for="botTokenInput">Token do Bot:</label>
-                                <input type="text" id="botTokenInput" name="token" class="form-control" required />
-                                <label for="botDescriptionInput">Descrição:</label>
-                                <textarea id="botDescriptionInput" name="description" class="form-control"
-                                    rows="2"></textarea>
-                                <label>Vídeo Principal:</label>
-                                <input type="file" id="botVideoFile" name="videoFile" class="form-control-file"
-                                    accept="video/*" />
-                                <hr />
-                                <h6>Botões</h6>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="buttonName1" name="buttonName1"
-                                        placeholder="Nome Botão 1" />
-                                    <input type="text" class="form-control" id="buttonValue1" name="buttonValue1"
-                                        placeholder="Valor Pix 1" />
-                                    <input type="text" class="form-control" id="buttonVipLink1" name="buttonVipLink1"
-                                        placeholder="Link VIP" required />
-                                </div>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="buttonName2" name="buttonName2"
-                                        placeholder="Nome Botão 2" />
-                                    <input type="text" class="form-control" id="buttonValue2" name="buttonValue2"
-                                        placeholder="Valor Pix 2" />
-                                    <input type="text" class="form-control" id="buttonVipLink2" name="buttonVipLink2"
-                                        placeholder="Link VIP" />
-                                </div>
-                                <div class="bot-buttons-row">
-                                    <input type="text" class="form-control" id="buttonName3" name="buttonName3"
-                                        placeholder="Nome Botão 3" />
-                                    <input type="text" class="form-control" id="buttonValue3" name="buttonValue3"
-                                        placeholder="Valor Pix 3" />
-                                    <input type="text" class="form-control" id="buttonVipLink3" name="buttonVipLink3"
-                                        placeholder="Link VIP" />
-                                </div>
-                                <hr />
-                                <!-- Remarketing - Not Purchased -->
-                                <div class="remarketing-group">
-                                    <h6>Remarketing - Not Purchased</h6>
-                                    <label for="remarketing_not_purchased_description">Descrição:</label>
-                                    <textarea id="remarketing_not_purchased_description"
-                                        name="remarketing_not_purchased_description" class="form-control"
-                                        rows="2"></textarea>
-                                    <div class="remarketing-tabs">
-                                        <ul class="nav nav-tabs" role="tablist">
-                                            <li class="nav-item">
-                                                <a class="nav-link active" data-toggle="tab"
-                                                    href="#new_np_video">Vídeo</a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a class="nav-link" data-toggle="tab" href="#new_np_botoes">Botões</a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a class="nav-link" data-toggle="tab" href="#new_np_delay">Delay</a>
-                                            </li>
-                                        </ul>
-                                        <div class="tab-content">
-                                            <div id="new_np_video" class="tab-pane fade show active">
-                                                <label>Vídeo (upload opcional):</label>
-                                                <input type="file" id="remarketing_not_purchased_video"
-                                                    name="remarketing_not_purchased_video" accept="video/*"
-                                                    class="form-control-file" />
-                                            </div>
-                                            <div id="new_np_botoes" class="tab-pane fade">
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonName1"
-                                                        name="remarketing_not_purchased_buttonName1"
-                                                        placeholder="Nome Botão 1" required>
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonValue1"
-                                                        name="remarketing_not_purchased_buttonValue1"
-                                                        placeholder="Valor Pix 1" required>
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonLink1"
-                                                        name="remarketing_not_purchased_buttonLink1" placeholder="Link"
-                                                        required>
-                                                </div>
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonName2"
-                                                        name="remarketing_not_purchased_buttonName2"
-                                                        placeholder="Nome Botão 2">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonValue2"
-                                                        name="remarketing_not_purchased_buttonValue2"
-                                                        placeholder="Valor Pix 2">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonLink2"
-                                                        name="remarketing_not_purchased_buttonLink2" placeholder="Link">
-                                                </div>
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonName3"
-                                                        name="remarketing_not_purchased_buttonName3"
-                                                        placeholder="Nome Botão 3">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonValue3"
-                                                        name="remarketing_not_purchased_buttonValue3"
-                                                        placeholder="Valor Pix 3">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_not_purchased_buttonLink3"
-                                                        name="remarketing_not_purchased_buttonLink3" placeholder="Link">
-                                                </div>
-                                            </div>
-                                            <div id="new_np_delay" class="tab-pane fade">
-                                                <label>Delay (min e seg):</label>
-                                                <div class="input-group">
-                                                    <div class="input-group-prepend">
-                                                        <span class="input-group-text">Min</span>
-                                                    </div>
-                                                    <input type="number" id="remarketing_not_purchased_delay_minutes"
-                                                        name="remarketing_not_purchased_delay_minutes"
-                                                        class="form-control" min="0" value="5">
-                                                    <div class="input-group-prepend">
-                                                        <span class="input-group-text">Seg</span>
-                                                    </div>
-                                                    <input type="number" id="remarketing_not_purchased_delay_seconds"
-                                                        name="remarketing_not_purchased_delay_seconds"
-                                                        class="form-control" min="0" max="59" value="0">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Remarketing - Purchased (Upsell) -->
-                                <div class="remarketing-group">
-                                    <h6>Remarketing - Purchased (Upsell)</h6>
-                                    <label for="remarketing_purchased_description">Descrição:</label>
-                                    <textarea id="remarketing_purchased_description"
-                                        name="remarketing_purchased_description" class="form-control"
-                                        rows="2"></textarea>
-                                    <div class="remarketing-tabs">
-                                        <ul class="nav nav-tabs" role="tablist">
-                                            <li class="nav-item">
-                                                <a class="nav-link active" data-toggle="tab"
-                                                    href="#new_rp_video">Vídeo</a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a class="nav-link" data-toggle="tab" href="#new_rp_botoes">Botões</a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a class="nav-link" data-toggle="tab" href="#new_rp_delay">Delay</a>
-                                            </li>
-                                        </ul>
-                                        <div class="tab-content">
-                                            <div id="new_rp_video" class="tab-pane fade show active">
-                                                <label>Vídeo (upload opcional):</label>
-                                                <input type="file" id="remarketing_purchased_video"
-                                                    name="remarketing_purchased_video" accept="video/*"
-                                                    class="form-control-file">
-                                            </div>
-                                            <div id="new_rp_botoes" class="tab-pane fade">
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonName1"
-                                                        name="remarketing_purchased_buttonName1"
-                                                        placeholder="Nome Botão 1" required>
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonValue1"
-                                                        name="remarketing_purchased_buttonValue1"
-                                                        placeholder="Valor Pix 1" required>
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonLink1"
-                                                        name="remarketing_purchased_buttonLink1" placeholder="Link"
-                                                        required>
-                                                </div>
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonName2"
-                                                        name="remarketing_purchased_buttonName2"
-                                                        placeholder="Nome Botão 2">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonValue2"
-                                                        name="remarketing_purchased_buttonValue2"
-                                                        placeholder="Valor Pix 2">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonLink2"
-                                                        name="remarketing_purchased_buttonLink2" placeholder="Link">
-                                                </div>
-                                                <div class="bot-buttons-row">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonName3"
-                                                        name="remarketing_purchased_buttonName3"
-                                                        placeholder="Nome Botão 3">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonValue3"
-                                                        name="remarketing_purchased_buttonValue3"
-                                                        placeholder="Valor Pix 3">
-                                                    <input type="text" class="form-control"
-                                                        id="remarketing_purchased_buttonLink3"
-                                                        name="remarketing_purchased_buttonLink3" placeholder="Link">
-                                                </div>
-                                            </div>
-                                            <div id="new_rp_delay" class="tab-pane fade">
-                                                <label>Delay (min e seg):</label>
-                                                <div class="input-group">
-                                                    <div class="input-group-prepend">
-                                                        <span class="input-group-text">Min</span>
-                                                    </div>
-                                                    <input type="number" id="remarketing_purchased_delay_minutes"
-                                                        name="remarketing_purchased_delay_minutes" class="form-control"
-                                                        min="0" value="30">
-                                                    <div class="input-group-prepend">
-                                                        <span class="input-group-text">Seg</span>
-                                                    </div>
-                                                    <input type="number" id="remarketing_purchased_delay_seconds"
-                                                        name="remarketing_purchased_delay_seconds" class="form-control"
-                                                        min="0" max="59" value="0">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary mt-3">Salvar Novo Bot</button>
-                            </form>
-                            <div id="addBotResponse" class="mt-3"></div>
-                        </div>
-                    </div>
                 </section>
 
                 <!-- Seção Configurações de Pagamento -->
@@ -1057,7 +839,6 @@
                             <form id="paymentSettingForm" method="POST" action="/admin/payment-setting">
                                 <div class="form-group">
                                     <label for="pushinToken">PushinPay Token:</label>
-                                    <!-- Campo de token com olho para exibir/esconder -->
                                     <div class="input-group">
                                         <input type="password" id="pushinToken" name="pushinToken" class="form-control"
                                             required />
@@ -1110,6 +891,50 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/js/dashboard.js"></script>
+    <script>
+        // Script para o controle de exibição de seções
+        $(document).ready(function () {
+            $('#sidebarNav .nav-link').on("click", function (e) {
+                e.preventDefault();
+                $('#sidebarNav .nav-link').removeClass('active clicked');
+                $(this).addClass('active clicked');
+                // Lista de seções a serem ocultadas
+                $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection, #paymentSection, #allTransactionsSection').addClass('d-none');
+                const targetSection = $(this).data('section');
+                $('#' + targetSection).removeClass('d-none');
+                if (targetSection === 'manageBotsSection' || targetSection === 'paymentSection') {
+                    $('#dateFilterContainer').hide();
+                } else {
+                    $('#dateFilterContainer').show();
+                }
+                if (targetSection === 'statsSection' || targetSection === 'statsDetailedSection') {
+                    if ($(window).width() < 768) {
+                        $('#botFilterContainer').hide();
+                        $('#botFilterContainerMobile').show();
+                    } else {
+                        $('#botFilterContainer').show();
+                        $('#botFilterContainerMobile').hide();
+                    }
+                } else {
+                    $('#botFilterContainer').hide();
+                    $('#botFilterContainerMobile').hide();
+                }
+                if (targetSection === 'manageBotsSection') {
+                    loadExistingBots();
+                } else if (targetSection === 'paymentSection') {
+                    loadPaymentSetting();
+                } else {
+                    refreshDashboard();
+                }
+            });
+
+            // Botão "Ver Todos" na seção Últimas Transações
+            $('#viewAllBtn').on("click", function () {
+                // Simula o clique na opção da sidebar que exibe a aba Todas as Transações
+                $('[data-section="allTransactionsSection"]').click();
+            });
+        });
+    </script>
     <script>
         (function () {
             var sidebar = document.getElementById("sidebar");
