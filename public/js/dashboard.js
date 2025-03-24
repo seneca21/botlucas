@@ -8,6 +8,12 @@ $(document).ready(function () {
     let totalPages = 1;
     let selectedBots = [];
 
+    // Variáveis separadas para a aba "Todas as Transações"
+    let allCurrentPage = 1;
+    let allCurrentPerPage = 10;
+    let allTotalMovementsCount = 0;
+    let allTotalPages = 1;
+
     // Cria o seletor de status para as Últimas Transações (usado no header da seção)
     let mobileStatusFilter = $(
         `<select id="movStatusFilter" class="form-control form-control-sm" style="max-width: 150px;">
@@ -96,16 +102,14 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // RENDER PAGINATION
+    // RENDER PAGINATION (para painel limitadas)
     //------------------------------------------------------------
     function renderPagination(total, page, perPage) {
         totalPages = Math.ceil(total / perPage);
         const paginationContainer = $('#paginationContainer');
         paginationContainer.empty();
         if (totalPages <= 1) return;
-
         const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
-
         const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
         if (page > 10) {
             doubleLeft.on('click', () => {
@@ -116,7 +120,6 @@ $(document).ready(function () {
             doubleLeft.prop('disabled', true);
         }
         group.append(doubleLeft);
-
         const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
         if (page > 1) {
             singleLeft.on('click', () => {
@@ -127,7 +130,6 @@ $(document).ready(function () {
             singleLeft.prop('disabled', true);
         }
         group.append(singleLeft);
-
         let startPage = page - 1;
         let endPage = page + 1;
         if (startPage < 1) {
@@ -139,7 +141,6 @@ $(document).ready(function () {
             startPage = endPage - 2;
             if (startPage < 1) startPage = 1;
         }
-
         for (let p = startPage; p <= endPage; p++) {
             const btn = $(`<button class="btn btn-light">${p}</button>`);
             if (p === page) {
@@ -152,7 +153,6 @@ $(document).ready(function () {
             }
             group.append(btn);
         }
-
         const singleRight = $('<button class="btn btn-light">&raquo;</button>');
         if (page < totalPages) {
             singleRight.on('click', () => {
@@ -163,7 +163,6 @@ $(document).ready(function () {
             singleRight.prop('disabled', true);
         }
         group.append(singleRight);
-
         const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
         if (page + 10 <= totalPages) {
             doubleRight.on('click', () => {
@@ -174,7 +173,81 @@ $(document).ready(function () {
             doubleRight.prop('disabled', true);
         }
         group.append(doubleRight);
+        paginationContainer.append(group);
+    }
 
+    //------------------------------------------------------------
+    // RENDER PAGINATION PARA "Todas as Transações"
+    //------------------------------------------------------------
+    function renderPaginationAll(total, page, perPage) {
+        allTotalPages = Math.ceil(total / perPage);
+        const paginationContainer = $('#allPaginationContainer');
+        paginationContainer.empty();
+        if (allTotalPages <= 1) return;
+        const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
+        const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
+        if (page > 10) {
+            doubleLeft.on('click', () => {
+                allCurrentPage = Math.max(1, page - 10);
+                updateAllTransactions(allCurrentPage, allCurrentPerPage);
+            });
+        } else {
+            doubleLeft.prop('disabled', true);
+        }
+        group.append(doubleLeft);
+        const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
+        if (page > 1) {
+            singleLeft.on('click', () => {
+                allCurrentPage = page - 1;
+                updateAllTransactions(allCurrentPage, allCurrentPerPage);
+            });
+        } else {
+            singleLeft.prop('disabled', true);
+        }
+        group.append(singleLeft);
+        let startPage = page - 1;
+        let endPage = page + 1;
+        if (startPage < 1) {
+            startPage = 1;
+            endPage = 3;
+        }
+        if (endPage > allTotalPages) {
+            endPage = allTotalPages;
+            startPage = endPage - 2;
+            if (startPage < 1) startPage = 1;
+        }
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = $(`<button class="btn btn-light">${p}</button>`);
+            if (p === page) {
+                btn.addClass('btn-primary');
+            } else {
+                btn.on('click', () => {
+                    allCurrentPage = p;
+                    updateAllTransactions(allCurrentPage, allCurrentPerPage);
+                });
+            }
+            group.append(btn);
+        }
+        const singleRight = $('<button class="btn btn-light">&raquo;</button>');
+        if (page < allTotalPages) {
+            singleRight.on('click', () => {
+                allCurrentPage = page + 1;
+                updateAllTransactions(allCurrentPage, allCurrentPerPage);
+            });
+        } else {
+            singleRight.prop('disabled', true);
+        }
+        group.append(singleRight);
+        const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
+        if (page + 10 <= allTotalPages) {
+            doubleRight.on('click', () => {
+                allCurrentPage = Math.min(allTotalPages, page + 10);
+                updateAllTransactions(allCurrentPage, allCurrentPerPage);
+            });
+        } else {
+            doubleRight.prop('disabled', true);
+        }
+        group.append(doubleRight);
         paginationContainer.append(group);
     }
 
@@ -357,7 +430,6 @@ $(document).ready(function () {
                     ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
                     : 0;
             });
-
             const lineData = {
                 labels: lineLabels,
                 datasets: [
@@ -442,7 +514,7 @@ $(document).ready(function () {
             const percentage = Math.min((revenue / 10000) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 
-            // Tabela de Últimas Transações
+            // Atualiza o painel Últimas Transações (limitado)
             $('#lastTransactionsContainer').show();
             const container = $('#lastTransactionsContainer');
             container.empty();
@@ -485,7 +557,6 @@ $(document).ready(function () {
                     dtGen = `${day} ${month} ${hour}:${minute}`;
                 }
                 const value = mov.planValue.toFixed(2);
-
                 let statusHtml = '';
                 if (mov.status === 'paid') {
                     statusHtml = '<div class="sale-status paid-status">PAGO</div>';
@@ -496,7 +567,6 @@ $(document).ready(function () {
                 } else {
                     statusHtml = `<div class="sale-status">${mov.status}</div>`;
                 }
-
                 const saleCard = `
                     <div class="sale-card">
                         <div class="sale-card-left">
@@ -515,7 +585,11 @@ $(document).ready(function () {
                 container.append(saleCard);
             });
 
-            // Ranking Simples
+            // Renderiza a paginação para Últimas Transações
+            totalMovementsCount = data.totalMovements || 0;
+            renderPagination(totalMovementsCount, currentPage, currentPerPage);
+
+            // Atualiza os cards de Ranking e Dashboard Detalhado
             const botRankingTbody = $('#botRanking');
             botRankingTbody.empty();
             if (data.botRanking && data.botRanking.length > 0) {
@@ -531,7 +605,6 @@ $(document).ready(function () {
                 botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
 
-            // Ranking Detalhado
             const detailsTbody = $('#botDetailsBody');
             detailsTbody.empty();
             if (data.botDetails && data.botDetails.length > 0) {
@@ -542,15 +615,12 @@ $(document).ready(function () {
                             plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate.toFixed(2)}%)<br>`;
                         });
                     }
-                    // Removemos .remove-mobile APENAS da coluna Conversão (%)
-                    // As outras colunas ("Vendas", "Planos e Conversão", "Valor Médio") continuam hide no mobile
                     detailsTbody.append(`
                         <tr>
                           <td>${bot.botName}</td>
                           <td>R$${bot.valorGerado.toFixed(2)}</td>
                           <td class="remove-mobile">${bot.totalPurchases}</td>
                           <td class="remove-mobile">${plansHtml}</td>
-                          <!-- Conversão (%) SEM .remove-mobile -->
                           <td>${bot.conversionRate ? bot.conversionRate.toFixed(2) : '0'}%</td>
                           <td class="remove-mobile">R$${bot.averageValue ? bot.averageValue.toFixed(2) : '0'}</td>
                         </tr>
@@ -560,7 +630,6 @@ $(document).ready(function () {
                 detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
 
-            // Atualiza os cards detalhados
             $('#cardAllLeads').text(data.statsAll.totalUsers);
             $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
             $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
@@ -584,11 +653,79 @@ $(document).ready(function () {
             $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
             $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
             $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
-
-            totalMovementsCount = data.totalMovements || 0;
-            renderPagination(totalMovementsCount, page, perPage);
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
+        }
+    }
+
+    //------------------------------------------------------------
+    // UPDATE ALL TRANSACTIONS – Preenche a aba "Todas as Transações"
+    //------------------------------------------------------------
+    async function updateAllTransactions(page, perPage) {
+        try {
+            const dr = getDateRangeParams();
+            const movStatus = $('#movStatusFilter').val() || '';
+            let botFilterParam = '';
+            if (selectedBots.length > 0) {
+                botFilterParam = selectedBots.join(',');
+            }
+            let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
+            if (movStatus) url += `&movStatus=${movStatus}`;
+            if (botFilterParam) url += `&botFilter=${botFilterParam}`;
+            if (dr.dateRange === 'custom') {
+                url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
+            } else {
+                url += `&dateRange=${dr.dateRange}`;
+            }
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Erro ao obter dados da API');
+            }
+            const data = await response.json();
+            const movementsTbody = $('#allTransactionsBody');
+            movementsTbody.empty();
+            if (data.lastMovements && data.lastMovements.length > 0) {
+                data.lastMovements.forEach(mov => {
+                    const leadId = mov.User ? mov.User.telegramId : 'N/A';
+                    let dtGen = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt).toLocaleString('pt-BR') : '';
+                    let dtPaid = mov.purchasedAt ? new Date(mov.purchasedAt).toLocaleString('pt-BR') : '—';
+                    let statusHtml = '';
+                    if (mov.status === 'paid') {
+                        statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
+                    } else if (mov.status === 'pending') {
+                        statusHtml = `<span style="color:#ff9900;font-weight:bold;">Pending</span>`;
+                    } else {
+                        statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
+                    }
+                    let payDelayHtml = '—';
+                    if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                        const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
+                        if (diffMs >= 0) {
+                            payDelayHtml = formatDuration(diffMs);
+                        }
+                    }
+                    movementsTbody.append(`
+                        <tr>
+                            <td>${leadId}</td>
+                            <td>R$ ${mov.planValue.toFixed(2)}</td>
+                            <td>${dtGen}</td>
+                            <td>${dtPaid}</td>
+                            <td>${statusHtml}</td>
+                            <td>${payDelayHtml}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                movementsTbody.append(`
+                    <tr>
+                        <td colspan="6">Nenhuma movimentação encontrada</td>
+                    </tr>
+                `);
+            }
+            allTotalMovementsCount = data.totalMovements || 0;
+            renderPaginationAll(allTotalMovementsCount, page, perPage);
+        } catch (err) {
+            console.error('Erro no updateAllTransactions:', err);
         }
     }
 
@@ -598,6 +735,19 @@ $(document).ready(function () {
     function refreshDashboard() {
         updateDashboard(currentPage, currentPerPage);
     }
+
+    //------------------------------------------------------------
+    // Event listeners para os selects de paginação
+    $('#movPerPage').on("change", function () {
+        currentPerPage = parseInt($(this).val(), 10);
+        currentPage = 1;
+        refreshDashboard();
+    });
+    $('#allMovPerPage').on("change", function () {
+        allCurrentPerPage = parseInt($(this).val(), 10);
+        allCurrentPage = 1;
+        updateAllTransactions(allCurrentPage, allCurrentPerPage);
+    });
 
     //------------------------------------------------------------
     // Carousel (Mobile) para Últimas Transações
@@ -617,7 +767,6 @@ $(document).ready(function () {
         const $cards = $carousel.find('.card');
         const $dotsContainer = $('.carousel-dots');
         $dotsContainer.empty();
-
         const totalCards = $cards.length;
         for (let i = 0; i < totalCards; i++) {
             const $indicator = $('<span class="line-indicator"></span>');
@@ -723,7 +872,6 @@ $(document).ready(function () {
                     $("#editButtonValue3").val("");
                     $("#editButtonVipLink3").val("");
                 }
-
                 // Preencher os campos de remarketing
                 if (bot.remarketingJson) {
                     try {
@@ -735,7 +883,6 @@ $(document).ready(function () {
                             const npSec = npDelay % 60;
                             $("#edit_remarketing_not_purchased_delay_minutes").val(npMin);
                             $("#edit_remarketing_not_purchased_delay_seconds").val(npSec);
-
                             const npButtons = remarketing.not_purchased.buttons || [];
                             if (npButtons[0]) {
                                 $("#remarketing_not_purchased_buttonName1").val(npButtons[0].name);
@@ -760,7 +907,6 @@ $(document).ready(function () {
                             const pSec = pDelay % 60;
                             $("#edit_remarketing_purchased_delay_minutes").val(pMin);
                             $("#edit_remarketing_purchased_delay_seconds").val(pSec);
-
                             const pButtons = remarketing.purchased.buttons || [];
                             if (pButtons[0]) {
                                 $("#remarketing_purchased_buttonName1").val(pButtons[0].name);
@@ -782,7 +928,6 @@ $(document).ready(function () {
                         console.error("Erro ao parse remarketingJson", e);
                     }
                 }
-
                 $('#editBotArea').removeClass("d-none");
             })
             .catch(err => {
@@ -855,7 +1000,6 @@ $(document).ready(function () {
         fetch("/admin/payment-setting")
             .then((res) => res.json())
             .then((data) => {
-                // Carregamos o token e exibimos no campo
                 $('#pushinToken').val(data.pushinToken || "");
             })
             .catch((err) => {
@@ -892,7 +1036,7 @@ $(document).ready(function () {
     });
 
     //------------------------------------------------------------
-    // Inicializa o Dashboard
+    // Inicializa o Dashboard e controle de seções
     //------------------------------------------------------------
     loadBotList();
     refreshDashboard();
@@ -910,7 +1054,7 @@ $(document).ready(function () {
         $('#sidebarNav .nav-link').removeClass('active clicked');
         $(this).addClass('active clicked');
 
-        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection, #paymentSection').addClass('d-none');
+        $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection, #paymentSection, #allTransactionsSection').addClass('d-none');
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
 
@@ -937,6 +1081,8 @@ $(document).ready(function () {
             loadExistingBots();
         } else if (targetSection === 'paymentSection') {
             loadPaymentSetting();
+        } else if (targetSection === 'allTransactionsSection') {
+            updateAllTransactions(allCurrentPage, allCurrentPerPage);
         } else {
             refreshDashboard();
         }
@@ -976,7 +1122,6 @@ $(document).ready(function () {
     // Submeter formulário de cadastro de bot (Novo Bot)
     $('#addBotForm').on("submit", function (e) {
         e.preventDefault();
-        // Remove highlight caso tenha
         $('#botTokenInput').removeClass('is-invalid');
         $('#addBotResponse').empty();
 
@@ -988,7 +1133,6 @@ $(document).ready(function () {
             .then(async res => {
                 if (!res.ok) {
                     const textErr = await res.text();
-                    // Se for erro por token duplicado, destaque no campo
                     if (textErr.includes('Este token já está sendo usado')) {
                         $('#botTokenInput').addClass('is-invalid');
                     }
