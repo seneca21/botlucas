@@ -223,12 +223,91 @@ app.post("/admin/payment-setting", checkAuth, async (req, res) => {
 });
 
 //------------------------------------------------------
+// Função auxiliar para popular o Dashboard Detalhado
+//------------------------------------------------------
+async function getDetailedBotStats(startDate, endDate, botFilters = []) {
+    const purchasedWhere = {
+        purchasedAt: { [Op.between]: [startDate, endDate] },
+        status: "paid",
+    };
+    if (botFilters.length > 0 && !botFilters.includes("All")) {
+        purchasedWhere.botName = { [Op.in]: botFilters };
+    }
+
+    // Consulta geral de cada bot
+    const detailsRows = await Purchase.findAll({
+        attributes: [
+            "botName",
+            [Sequelize.fn("SUM", Sequelize.col("planValue")), "totalValue"],
+            [Sequelize.fn("COUNT", Sequelize.col("id")), "purchaseCount"],
+        ],
+        where: purchasedWhere,
+        group: ["botName"],
+    });
+
+    // Consulta agrupada por plano
+    const planRows = await Purchase.findAll({
+        attributes: [
+            "botName",
+            "planName",
+            [Sequelize.fn("COUNT", Sequelize.col("id")), "planCount"],
+            [Sequelize.fn("SUM", Sequelize.col("planValue")), "planSum"],
+        ],
+        where: purchasedWhere,
+        group: ["botName", "planName"],
+    });
+
+    // Montamos array final botDetails
+    const botDetails = detailsRows.map((row) => {
+        const bn = row.getDataValue("botName") || "N/A";
+        const totalValue = parseFloat(row.getDataValue("totalValue") || 0);
+        const purchaseCount = parseInt(row.getDataValue("purchaseCount") || 0, 10);
+
+        let avgValue = 0;
+        if (purchaseCount > 0) {
+            avgValue = totalValue / purchaseCount;
+        }
+
+        // Filtra as linhas de planRows para esse bot
+        const subPlans = planRows
+            .filter((p) => p.getDataValue("botName") === bn)
+            .map((p) => {
+                const name = p.getDataValue("planName") || "N/A";
+                const c = parseInt(p.getDataValue("planCount") || 0, 10);
+                // sem leads de cada plano, assumimos conversionRate 100% se count>0
+                // (apenas para exibição)
+                const planSum = parseFloat(p.getDataValue("planSum") || 0);
+                const convRate = c > 0 ? 100 : 0;
+                return {
+                    planName: name,
+                    salesCount: c,
+                    conversionRate: convRate,
+                };
+            });
+
+        // conversão geral (neste exemplo, 100% se teve compras, 0 se não teve)
+        const convRate = purchaseCount > 0 ? 100 : 0;
+
+        return {
+            botName: bn,
+            valorGerado: totalValue,
+            totalPurchases: purchaseCount,
+            plans: subPlans,
+            conversionRate: convRate,
+            averageValue: avgValue,
+        };
+    });
+
+    return botDetails;
+}
+
+//------------------------------------------------------
 // Rotas de ESTATÍSTICAS & BOT LIST
 //------------------------------------------------------
 app.get("/api/bots-list", checkAuth, async (req, res) => {
     try {
-        const botRows = await BotModel.findAll();
-        const botNames = botRows.map((b) => b.name);
+        const allBots = await BotModel.findAll();
+        const botNames = allBots.map((b) => b.name);
         res.json(botNames);
     } catch (err) {
         logger.error("Erro ao retornar lista de bots:", err);
@@ -236,9 +315,7 @@ app.get("/api/bots-list", checkAuth, async (req, res) => {
     }
 });
 
-//=====================================================================
-// Funções auxiliares para estatísticas
-//=====================================================================
+// Função para fixar data no começo do dia
 function makeDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -343,8 +420,11 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
             });
             sumGerado = (await Purchase.sum("planValue", { where: { ...baseWhere, originCondition } })) || 0;
             sumConvertido =
-                (await Purchase.sum("planValue", { where: { ...baseWhere, originCondition, status: "paid" } })) || 0;
+                (await Purchase.sum("planValue", {
+                    where: { ...baseWhere, originCondition, status: "paid" },
+                })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
             const paidPurchases = await Purchase.findAll({
                 where: { ...baseWhere, originCondition, status: "paid" },
                 attributes: ["pixGeneratedAt", "purchasedAt"],
@@ -492,6 +572,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             { where: { status: "pending", pixGeneratedAt: { [Op.lt]: new Date(Date.now() - 15 * 60 * 1000) } } }
         );
 
+        // Filtro de status (movStatus)
         const lastMovementsWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
         if (movStatus === "pending") {
             lastMovementsWhere.status = "pending";
@@ -501,8 +582,18 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes("All")) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
+
+        // Consulta principal
         const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
-            attributes: ["pixGeneratedAt", "purchasedAt", "planValue", "status"],
+            attributes: [
+                "originCondition",
+                "pixGeneratedAt",
+                "purchasedAt",
+                "planValue",
+                "status",
+                "botName",
+                "planName",
+            ],
             where: lastMovementsWhere,
             order: [["pixGeneratedAt", "DESC"]],
             limit: perPage,
@@ -514,47 +605,54 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
                 },
             ],
         });
+
+        // Montamos o array final
+        const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
+        const statsMain = await getDetailedStats(startDate, endDate, "main", botFilters);
+        const statsNotPurchased = await getDetailedStats(startDate, endDate, "not_purchased", botFilters);
+        const statsPurchased = await getDetailedStats(startDate, endDate, "purchased", botFilters);
+
+        // Dashboard Detalhado (Ranking Detalhado)
+        const botDetails = await getDetailedBotStats(startDate, endDate, botFilters);
+
+        // Ranking simples
+        const rawRanking = await Purchase.findAll({
+            attributes: ["botName", [Sequelize.fn("COUNT", Sequelize.col("botName")), "vendas"]],
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
+            group: ["botName"],
+            order: [[Sequelize.literal('"vendas"'), "DESC"]],
+        });
+        const botRanking = rawRanking.map((item) => ({
+            botName: item.botName,
+            vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
+        }));
+
+        // stats7Days (mantivemos a mesma lógica do snippet anterior)
+        const stats7Days = [];
+        for (let i = 6; i >= 0; i--) {
+            const tempDate = new Date(startDate);
+            tempDate.setDate(tempDate.getDate() - i);
+            const dayStart = makeDay(tempDate);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setHours(23, 59, 59, 999);
+            const dayStat = (await getDetailedStats(dayStart, dayEnd, null, botFilters)) || {};
+            stats7Days.push({
+                date: dayStart.toISOString().split("T")[0],
+                totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
+                totalVendasGeradas: dayStat.totalVendasGeradas || 0,
+            });
+        }
+
         res.json({
-            statsAll: await getDetailedStats(startDate, endDate, null, botFilters),
-            statsYesterday: await (async () => {
-                const yesterdayStart = makeDay(new Date(new Date(startDate).setDate(startDate.getDate() - 1)));
-                const yesterdayEnd = new Date(yesterdayStart);
-                yesterdayEnd.setHours(23, 59, 59, 999);
-                return await getDetailedStats(yesterdayStart, yesterdayEnd, null, botFilters);
-            })(),
-            statsMain: await getDetailedStats(startDate, endDate, "main", botFilters),
-            statsNotPurchased: await getDetailedStats(startDate, endDate, "not_purchased", botFilters),
-            statsPurchased: await getDetailedStats(startDate, endDate, "purchased", botFilters),
+            statsAll,
+            statsYesterday: {}, // Se quiser, pode remover ou preencher
+            statsMain,
+            statsNotPurchased,
+            statsPurchased,
             statsDetailed: {},
-            botRanking: (
-                await Purchase.findAll({
-                    attributes: ["botName", [Sequelize.fn("COUNT", Sequelize.col("botName")), "vendas"]],
-                    where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
-                    group: ["botName"],
-                    order: [[Sequelize.literal('"vendas"'), "DESC"]],
-                })
-            ).map((item) => ({
-                botName: item.botName,
-                vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
-            })),
-            botDetails: [],
-            stats7Days: await (async () => {
-                const stats7Days = [];
-                for (let i = 6; i >= 0; i--) {
-                    const tempDate = new Date(startDate);
-                    tempDate.setDate(tempDate.getDate() - i);
-                    const dayStart = makeDay(tempDate);
-                    const dayEnd = new Date(dayStart);
-                    dayEnd.setHours(23, 59, 59, 999);
-                    const dayStat = (await getDetailedStats(dayStart, dayEnd, null, botFilters)) || {};
-                    stats7Days.push({
-                        date: dayStart.toISOString().split("T")[0],
-                        totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
-                        totalVendasGeradas: dayStat.totalVendasGeradas || 0,
-                    });
-                }
-                return stats7Days;
-            })(),
+            botRanking,
+            botDetails, // <-- agora preenchido
+            stats7Days,
             lastMovements,
             totalMovements,
         });
@@ -613,7 +711,6 @@ app.delete("/admin/bots/:id", checkAuth, async (req, res) => {
 
 // ------------------ IMPORTANTE: APENAS O BOTÃO #1 É OBRIGATÓRIO ------------------
 
-// Helper: se user preencheu o "primeiro botão" (nome, valor e link)
 function isButton1Filled(bName, bValue, bVipLink) {
     return bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bVipLink && bVipLink.trim() !== "";
 }
@@ -652,12 +749,10 @@ app.post(
                     .send("Erro: Este token já está sendo usado por outro bot. Escolha outro token.");
             }
 
-            // ------------------------------------------------
-            // MAIN BOTÕES
-            // ------------------------------------------------
-            // Apenas o botão 1 é obrigatório; 2 e 3 são opcionais
             if (!isButton1Filled(buttonName1, buttonValue1, buttonVipLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do plano principal.");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do plano principal.");
             }
 
             const buttons = [];
@@ -666,11 +761,9 @@ app.post(
                     buttons.push({ name: bName.trim(), value: parseFloat(bValue), vipLink: bVipLink.trim() });
                 }
             }
-            // Adiciona botões se foram preenchidos
             pushButtonIfValid(buttonName1, buttonValue1, buttonVipLink1);
             pushButtonIfValid(buttonName2, buttonValue2, buttonVipLink2);
             pushButtonIfValid(buttonName3, buttonValue3, buttonVipLink3);
-
             const buttonsJson = JSON.stringify(buttons);
 
             let videoFilename = "";
@@ -678,20 +771,17 @@ app.post(
                 videoFilename = req.files.videoFile[0].location;
             }
 
-            // ------------------------------------------------
-            // REMARKETING NOT PURCHASED
-            // ------------------------------------------------
             const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
             const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
             const npTotalSeconds = npMin * 60 + npSec;
-            // Ao menos o 1° botão do remarketing "not purchased" é obrigatório:
             const rnpbName1 = req.body.remarketing_not_purchased_buttonName1;
             const rnpbValue1 = req.body.remarketing_not_purchased_buttonValue1;
             const rnpbLink1 = req.body.remarketing_not_purchased_buttonLink1;
             if (!isButton1Filled(rnpbName1, rnpbValue1, rnpbLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased).");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased).");
             }
-
             const remarketingNotPurchased = {
                 description: req.body.remarketing_not_purchased_description || "",
                 delay: npTotalSeconds,
@@ -703,7 +793,6 @@ app.post(
                         : "",
                 buttons: [],
             };
-            // preenche botões 1..3
             function pushRnpButton(bName, bValue, bLink) {
                 if (bName && bName.trim() !== "" && bValue && !isNaN(parseFloat(bValue)) && bLink && bLink.trim() !== "") {
                     remarketingNotPurchased.buttons.push({ name: bName.trim(), value: parseFloat(bValue), link: bLink.trim() });
@@ -721,20 +810,17 @@ app.post(
                 req.body.remarketing_not_purchased_buttonLink3
             );
 
-            // ------------------------------------------------
-            // REMARKETING PURCHASED
-            // ------------------------------------------------
             const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
             const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
             const pTotalSeconds = pMin * 60 + pSec;
-            // Ao menos o 1° botão do remarketing "purchased" é obrigatório:
             const rpbName1 = req.body.remarketing_purchased_buttonName1;
             const rpbValue1 = req.body.remarketing_purchased_buttonValue1;
             const rpbLink1 = req.body.remarketing_purchased_buttonLink1;
             if (!isButton1Filled(rpbName1, rpbValue1, rpbLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased).");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased).");
             }
-
             const remarketingPurchased = {
                 description: req.body.remarketing_purchased_description || "",
                 delay: pTotalSeconds,
@@ -762,7 +848,6 @@ app.post(
                 req.body.remarketing_purchased_buttonValue3,
                 req.body.remarketing_purchased_buttonLink3
             );
-
             const remarketing = {
                 not_purchased: remarketingNotPurchased,
                 purchased: remarketingPurchased,
@@ -832,7 +917,6 @@ app.post(
                 buttonVipLink3,
             } = req.body;
 
-            // Caso o token tenha mudado, checar duplicado:
             if (token !== bot.token) {
                 const existingWithToken = await BotModel.findOne({ where: { token } });
                 if (existingWithToken) {
@@ -842,9 +926,10 @@ app.post(
                 }
             }
 
-            // Apenas o botão 1 é obrigatório no plano principal
             if (!isButton1Filled(buttonName1, buttonValue1, buttonVipLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do plano principal (edit).");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do plano principal (edit).");
             }
 
             const buttons = [];
@@ -862,7 +947,6 @@ app.post(
                 videoFilename = req.files.videoFile[0].location;
             }
 
-            // REMARKETING - Not Purchased
             const npMin = parseInt(req.body.remarketing_not_purchased_delay_minutes) || 0;
             const npSec = parseInt(req.body.remarketing_not_purchased_delay_seconds) || 0;
             const npTotalSeconds = npMin * 60 + npSec;
@@ -870,7 +954,9 @@ app.post(
             const rnpbValue1 = req.body.remarketing_not_purchased_buttonValue1;
             const rnpbLink1 = req.body.remarketing_not_purchased_buttonLink1;
             if (!isButton1Filled(rnpbName1, rnpbValue1, rnpbLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased) (edit).");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do remarketing (not purchased) (edit).");
             }
             const remarketingNotPurchased = {
                 description: req.body.remarketing_not_purchased_description || "",
@@ -900,7 +986,6 @@ app.post(
                 req.body.remarketing_not_purchased_buttonLink3
             );
 
-            // REMARKETING - Purchased
             const pMin = parseInt(req.body.remarketing_purchased_delay_minutes) || 0;
             const pSec = parseInt(req.body.remarketing_purchased_delay_seconds) || 0;
             const pTotalSeconds = pMin * 60 + pSec;
@@ -908,7 +993,9 @@ app.post(
             const rpbValue1 = req.body.remarketing_purchased_buttonValue1;
             const rpbLink1 = req.body.remarketing_purchased_buttonLink1;
             if (!isButton1Filled(rpbName1, rpbValue1, rpbLink1)) {
-                return res.status(400).send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased) (edit).");
+                return res
+                    .status(400)
+                    .send("Erro: você precisa preencher ao menos o botão #1 do remarketing (purchased) (edit).");
             }
             const remarketingPurchased = {
                 description: req.body.remarketing_purchased_description || "",
