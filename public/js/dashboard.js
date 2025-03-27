@@ -581,11 +581,19 @@ $(document).ready(function () {
                 } else if (mov.status === 'pending') {
                     statusHtml = '<div class="sale-status pending-status" style="background-color:#fff9c4;color:#f57f17;">Pendente</div>';
                 } else if (mov.status === 'cancelado') {
-                    statusHtml = '<div class="sale-status cancelado-status" style="color:red;font-weight:bold;">Cancelado</div>';
+                    // Alterado: exibe texto "Cancelado" com cor branca
+                    statusHtml = '<div class="sale-status cancelado-status" style="color:#fff;font-weight:bold;">Cancelado</div>';
                 } else {
                     statusHtml = `<div class="sale-status">${mov.status}</div>`;
                 }
 
+                let payDelayHtml = '—';
+                if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
+                    const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
+                    if (diffMs >= 0) {
+                        payDelayHtml = formatDuration(diffMs);
+                    }
+                }
                 const saleCard = `
                     <div class="sale-card">
                         <div class="sale-card-left">
@@ -724,7 +732,6 @@ $(document).ready(function () {
                         planCol = 'upsell';
                     } else {
                         // originCondition === 'main' ou nulo
-                        // Se planName existir, exibe
                         if (mov.planName && mov.planName.trim() !== '') {
                             planCol = mov.planName;
                         }
@@ -868,10 +875,8 @@ $(document).ready(function () {
                     tbody.append('<tr><td colspan="2">Nenhum bot encontrado</td></tr>');
                 } else {
                     bots.forEach(bot => {
-                        // Removemos a coluna ID
                         tbody.append(`
                             <tr>
-                                <!-- Só exibimos o 'Nome' e as 'Ações' -->
                                 <td>${bot.name}</td>
                                 <td>
                                     <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
