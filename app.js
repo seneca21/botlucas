@@ -274,9 +274,7 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
             .map((p) => {
                 const name = p.getDataValue("planName") || "N/A";
                 const c = parseInt(p.getDataValue("planCount") || 0, 10);
-                // sem leads de cada plano, assumimos conversionRate 100% se count>0
-                // (apenas para exibição)
-                const planSum = parseFloat(p.getDataValue("planSum") || 0);
+                // para exibição, assumimos conversão 100% se houver vendas
                 const convRate = c > 0 ? 100 : 0;
                 return {
                     planName: name,
@@ -627,7 +625,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
         }));
 
-        // stats7Days (mantivemos a mesma lógica do snippet anterior)
+        // stats7Days
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(startDate);
@@ -645,13 +643,13 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
 
         res.json({
             statsAll,
-            statsYesterday: {}, // Se quiser, pode remover ou preencher
+            statsYesterday: {},
             statsMain,
             statsNotPurchased,
             statsPurchased,
             statsDetailed: {},
             botRanking,
-            botDetails, // <-- agora preenchido
+            botDetails,
             stats7Days,
             lastMovements,
             totalMovements,
@@ -1050,7 +1048,9 @@ app.post(
                     purchased: remarketingPurchased,
                 },
             };
-            updateBotInMemory(id, bc);
+            // Removemos a instância antiga e reinicializamos o bot com a nova configuração
+            removeBot(id);
+            initializeBot(bc, id);
 
             res.send(`
             <div class="alert alert-success">

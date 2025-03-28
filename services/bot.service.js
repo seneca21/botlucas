@@ -135,8 +135,11 @@ function canAttemptVerification(telegramId) {
   }
 }
 
+// *** Alterações nas permissões de START e SELECT PLAN ***
+
+// Para o /start: dobramos o limite, de 5 para 10 starts permitidos
 const startLimits = new Map();
-const MAX_STARTS = 5;
+const MAX_STARTS = 10; // Antes era 5
 const START_WAIT_FIRST_MS = 5 * 60 * 1000;
 const START_WAIT_SECOND_MS = 24 * 60 * 60 * 1000;
 function canAttemptStart(telegramId) {
@@ -169,8 +172,9 @@ function canAttemptStart(telegramId) {
   }
 }
 
+// Para a seleção de plano: dobramos o limite, de 2 para 4 seleções permitidas
 const selectPlanLimits = new Map();
-const MAX_SELECT_PLAN_ATTEMPTS = 2;
+const MAX_SELECT_PLAN_ATTEMPTS = 4; // Antes era 2
 const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
 function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
@@ -207,6 +211,8 @@ function canAttemptSelectPlan(telegramId, planId) {
     return false;
   }
 }
+
+// Fim das alterações nas permissões
 
 const startFloodProtection = new Map();
 const START_FLOOD_LIMIT = 20;
