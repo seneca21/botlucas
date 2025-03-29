@@ -428,7 +428,7 @@ $(document).ready(function () {
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // Gráfico dos últimos 7 dias
+            // Gráfico dos últimos 7 dias (sempre fixo com base em hoje)
             const lineLabels = (data.stats7Days || []).map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[1]}`;
@@ -522,8 +522,8 @@ $(document).ready(function () {
                 lineComparisonChart.update();
             }
 
-            // “R$ 0 a 10K” barra
-            const revenue = data.statsAll.totalVendasConvertidas;
+            // “R$ 0 a 10K” barra: agora sempre usando statsTotal (todos os dados)
+            const revenue = data.statsTotal.totalVendasConvertidas;
             const percentage = Math.min((revenue / 10000) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 

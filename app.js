@@ -625,10 +625,11 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
         }));
 
-        // stats7Days
+        // ***** Atualização: Cálculo sempre com base nos ÚLTIMOS 7 dias *****
+        const today = makeDay(new Date());
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
-            const tempDate = new Date(startDate);
+            const tempDate = new Date(today);
             tempDate.setDate(tempDate.getDate() - i);
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
@@ -641,6 +642,9 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             });
         }
 
+        // ***** Novo: Calcular statsTotal com base em todo o período (desde 1970 até hoje) *****
+        const statsTotal = await getDetailedStats(new Date(0), new Date(), null, botFilters);
+
         res.json({
             statsAll,
             statsYesterday: {},
@@ -651,6 +655,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             botRanking,
             botDetails,
             stats7Days,
+            statsTotal, // novo campo para uso global
             lastMovements,
             totalMovements,
         });
