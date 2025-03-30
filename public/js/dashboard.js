@@ -522,9 +522,18 @@ $(document).ready(function () {
                 lineComparisonChart.update();
             }
 
-            // “R$ 0 a 10K” barra: agora sempre usando statsTotal (todos os dados)
+            // Atualização da barra de progresso:
+            // Se o faturamento for menor que 10K, meta = 10K; se atingir 10K ou mais, a meta passa a ser 50K.
             const revenue = data.statsTotal.totalVendasConvertidas;
-            const percentage = Math.min((revenue / 10000) * 100, 100);
+            let target;
+            if (revenue < 10000) {
+                target = 10000;
+                $('.revenue-text strong').text('R$ 0 a 10K');
+            } else {
+                target = 50000;
+                $('.revenue-text strong').text('R$ 0 a 50K');
+            }
+            const percentage = Math.min((revenue / target) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 
             // ULTIMAS TRANSAÇÕES (no Dashboard principal)
@@ -581,7 +590,6 @@ $(document).ready(function () {
                 } else if (mov.status === 'pending') {
                     statusHtml = '<div class="sale-status pending-status" style="background-color:#fff9c4;color:#f57f17;">Pendente</div>';
                 } else if (mov.status === 'cancelado') {
-                    // Alterado: exibe texto "Cancelado" com cor branca
                     statusHtml = '<div class="sale-status cancelado-status" style="color:#fff;font-weight:bold;">Cancelado</div>';
                 } else {
                     statusHtml = `<div class="sale-status">${mov.status}</div>`;

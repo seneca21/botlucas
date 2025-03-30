@@ -528,6 +528,11 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
                     }
                     break;
                 }
+                case "all": {  // Nova opção "Tudo"
+                    startDate = new Date(0); // Início da época (1970)
+                    endDate = new Date();    // Data atual
+                    break;
+                }
             }
         }
         if (!startDate || !endDate) {
@@ -1059,7 +1064,7 @@ app.post(
 
             res.send(`
             <div class="alert alert-success">
-              Bot <strong>${bot.name}</strong> atualizado e reiniciado com sucesso!
+              Bot <strong>${bot.name}</strong> atualizado e reinicializado com sucesso!
             </div>
         `);
         } catch (err) {

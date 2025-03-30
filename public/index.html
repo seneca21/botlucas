@@ -79,6 +79,57 @@
             margin-bottom: 0.5rem;
         }
     </style>
+    <!-- Proteções contra DevTools -->
+    <script>
+        (function () {
+            function redirectOut() {
+                window.location.href = "https://www.google.com";
+            }
+            function isMobile() {
+                return /Mobi|Android/i.test(navigator.userAgent);
+            }
+            function addBasicProtection() {
+                document.addEventListener("contextmenu", function (event) {
+                    event.preventDefault();
+                    redirectOut();
+                }, false);
+                document.addEventListener("keydown", function (event) {
+                    if (
+                        event.keyCode === 123 ||
+                        (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) ||
+                        (event.ctrlKey && event.keyCode === 85) ||
+                        ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.keyCode === 83))
+                    ) {
+                        event.preventDefault();
+                        redirectOut();
+                    }
+                }, false);
+            }
+            let lastOuterWidth = window.outerWidth;
+            let lastOuterHeight = window.outerHeight;
+            function checkDevToolsDimensions() {
+                const threshold = 160;
+                const wDiff = Math.abs(window.outerWidth - window.innerWidth);
+                const hDiff = Math.abs(window.outerHeight - window.innerHeight);
+                if (wDiff > threshold || hDiff > threshold) {
+                    redirectOut();
+                }
+                if (Math.abs(window.outerWidth - lastOuterWidth) > threshold ||
+                    Math.abs(window.outerHeight - lastOuterHeight) > threshold) {
+                    redirectOut();
+                }
+                lastOuterWidth = window.outerWidth;
+                lastOuterHeight = window.outerHeight;
+            }
+            function startIntervals() {
+                setInterval(checkDevToolsDimensions, 300);
+            }
+            if (!isMobile()) {
+                addBasicProtection();
+                startIntervals();
+            }
+        })();
+    </script>
 </head>
 
 <body>
@@ -166,6 +217,7 @@
                         <option value="last30">Últimos 30 dias</option>
                         <option value="lastMonth">Mês anterior</option>
                         <option value="custom">Personalizado</option>
+                        <option value="all">Tudo</option> <!-- Nova opção para todo o período -->
                     </select>
                     <div id="botFilterContainer" style="margin-left: 0.5rem; display: none;"></div>
                     <div id="botFilterContainerMobile" style="margin-left: 0.5rem;"></div>
