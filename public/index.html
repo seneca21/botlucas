@@ -41,8 +41,9 @@
             color: #1C4532 !important;
         }
 
-        body.dark-mode .card .card-text {
-            color: #40c987 !important;
+        /* Nos cards, em dark mode, os títulos devem ser brancos */
+        body.dark-mode .card-title {
+            color: #fff !important;
         }
 
         #dateFilterContainer {
@@ -56,6 +57,7 @@
             background-color: #fff;
             box-shadow: 0 2px 2px rgba(0, 0, 0, 0.06);
             margin-top: 0.5rem;
+            position: relative;
         }
 
         body.dark-mode .chart-box {
@@ -63,20 +65,37 @@
             border: 1px solid #555;
         }
 
+        /* Título dentro da box do gráfico (GRÁFICO DE FATURAMENTO) */
+        .chart-box-title {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: #666;
+            z-index: 2;
+        }
+
         /* Esconde em telas <= 768px */
         @media (max-width: 768px) {
             .remove-mobile {
                 display: none !important;
             }
-        }
 
-        /* Estilos para as abas internas de remarketing */
-        .remarketing-tabs {
-            margin-top: 1rem;
-        }
+            /* Diminuir o espaçamento entre os filtros */
+            #dateFilterContainer>* {
+                margin-left: 0.25rem !important;
+                margin-right: 0.25rem !important;
+            }
 
-        .remarketing-tabs .nav-tabs {
-            margin-bottom: 0.5rem;
+            /* Diminuir o espaço entre os indicadores do carousel */
+            .carousel-dots .line-indicator {
+                margin: 0 2px;
+            }
+
+            .carousel-dots {
+                margin-top: 5px;
+            }
         }
     </style>
     <!-- Proteções contra DevTools -->
@@ -198,11 +217,13 @@
                         <span class="line3"></span>
                     </button>
                 </div>
-                <div class="top-box-right ml-auto">
+                <div class="top-box-right ml-auto" style="position: relative;">
                     <div class="revenue-text"><strong>R$ 0 a 10K</strong></div>
                     <div class="revenue-progress">
                         <div class="progress-bar"></div>
                     </div>
+                    <!-- Tooltip / Mini Card para faturamento -->
+                    <div id="progressTooltip"></div>
                 </div>
             </div>
 
@@ -217,10 +238,19 @@
                         <option value="last30">Últimos 30 dias</option>
                         <option value="lastMonth">Mês anterior</option>
                         <option value="custom">Personalizado</option>
-                        <option value="all">Tudo</option> <!-- Nova opção para todo o período -->
+                        <option value="all">Tudo</option>
                     </select>
                     <div id="botFilterContainer" style="margin-left: 0.5rem; display: none;"></div>
                     <div id="botFilterContainerMobile" style="margin-left: 0.5rem;"></div>
+                    <!-- Filtro de Tipo de Compra -->
+                    <select id="purchaseFilter" class="form-control form-control-sm custom-select-arrow"
+                        style="margin-left: 0.5rem;">
+                        <option value="all" selected>Todas as Compras</option>
+                        <option value="main">Plano Principal</option>
+                        <option value="remarketing_all">Somente Remarketing</option>
+                        <option value="not_purchased">Remarketing – Não Comprados</option>
+                        <option value="purchased">Remarketing – Comprados</option>
+                    </select>
                 </div>
 
                 <!-- Seção Estatísticas do Dia -->
@@ -261,50 +291,64 @@
                             </div>
                         </div>
                     </div>
-
+                    <!-- Carousel Mobile -->
+                    <div class="card-carousel d-md-none">
+                        <div class="card-scroll">
+                            <div class="card shadow-sm card-hover">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Vendas Convertidas</h5>
+                                    <p class="card-text display-4 stats-display" id="totalUsersMobile">R$ 0.00</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm card-hover">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Total de Compras</h5>
+                                    <p class="card-text display-4 stats-display" id="totalPurchasesMobile">0</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm card-hover">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Taxa de Conversão</h5>
+                                    <p class="card-text display-4 stats-display" id="conversionRateMobile">0%</p>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm card-hover">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Tempo médio de pagamento</h5>
+                                    <p class="card-text display-4 stats-display" id="avgPaymentTimeTextMobile">0s</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="carousel-dots"></div>
+                    </div>
                     <!-- GRÁFICO DE FATURAMENTO e ÚLTIMAS TRANSAÇÕES (Desktop) -->
                     <div class="row my-4">
                         <!-- Gráfico (coluna esquerda) -->
                         <div class="col-md-8 mb-3 d-none d-md-block">
-                            <h4 class="chart-title text-center">GRÁFICO DE FATURAMENTO</h4>
                             <div class="chart-box">
+                                <div class="chart-box-title">GRÁFICO DE FATURAMENTO</div>
                                 <canvas id="lineComparisonChart" style="width:100%;"></canvas>
                             </div>
                         </div>
                         <!-- Últimas Transações (coluna direita) -->
                         <div class="col-md-4">
-                            <h4 class="chart-title text-center d-none d-md-block">ÚLTIMAS TRANSAÇÕES</h4>
                             <div id="lastTransactionsContainer">
                                 <table class="table table-bordered table-striped" id="lastTransactionsTable">
                                     <thead>
                                         <tr>
-                                            <th>ID do Lead</th>
+                                            <th class="remove-mobile">ID do Lead</th>
                                             <th>Bot</th>
                                             <th>Valor</th>
-                                            <th>Plano</th>
+                                            <th class="remove-mobile">Plano</th>
                                             <th>Data</th>
                                             <th>Status</th>
-                                            <th>Delay</th>
+                                            <th class="remove-mobile">Delay</th>
                                         </tr>
                                     </thead>
                                     <tbody id="lastMovementsBody"></tbody>
                                 </table>
                             </div>
-                            <div class="text-center mt-2">
-                                <button id="viewAllBtn" class="btn btn-link">Ver Todos</button>
-                            </div>
                         </div>
-                    </div>
-
-                    <!-- Paginação (Estatísticas do Dia) - OCULTADA -->
-                    <div class="d-flex align-items-center justify-content-center mb-3" style="display: none;">
-                        <div id="paginationContainer"></div>
-                        <select id="movPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
                     </div>
                 </section>
 
@@ -315,13 +359,13 @@
                         <table class="table table-bordered table-striped" id="allTransactionsTable">
                             <thead>
                                 <tr>
-                                    <th>ID do Lead</th>
+                                    <th class="remove-mobile">ID do Lead</th>
                                     <th>Bot</th>
                                     <th>Valor</th>
-                                    <th>Plano</th>
+                                    <th class="remove-mobile">Plano</th>
                                     <th>Data</th>
                                     <th>Status</th>
-                                    <th>Delay</th>
+                                    <th class="remove-mobile">Delay</th>
                                 </tr>
                             </thead>
                             <tbody id="allTransactionsBody"></tbody>
@@ -329,7 +373,6 @@
                     </div>
                     <div class="d-flex align-items-center justify-content-center mb-3">
                         <div id="allPaginationContainer"></div>
-
                         <!-- Filtro de status para "Todas as Transações" -->
                         <select id="movStatusFilterAll" class="form-control form-control-sm ml-3"
                             style="max-width: 150px;">
@@ -338,7 +381,6 @@
                             <option value="paid">Pagos</option>
                             <option value="cancelado">Cancelado</option>
                         </select>
-
                         <select id="allMovPerPage" class="form-control form-control-sm ml-3" style="max-width: 150px;">
                             <option value="10" selected>10</option>
                             <option value="20">20</option>
@@ -547,13 +589,11 @@
                             <table class="table table-bordered table-striped" id="existingBotsTable">
                                 <thead>
                                     <tr>
-                                        <!-- Removemos a coluna <th>ID</th> -->
                                         <th>Nome</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="existingBotsBody">
-                                    <!-- Ajustamos para colspan="2" -->
                                     <tr>
                                         <td colspan="2">Carregando...</td>
                                     </tr>

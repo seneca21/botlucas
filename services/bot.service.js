@@ -136,10 +136,8 @@ function canAttemptVerification(telegramId) {
 }
 
 // *** Alterações nas permissões de START e SELECT PLAN ***
-
-// Para o /start: dobramos o limite, de 5 para 10 starts permitidos
 const startLimits = new Map();
-const MAX_STARTS = 10; // Antes era 5
+const MAX_STARTS = 10; // antes era 5
 const START_WAIT_FIRST_MS = 5 * 60 * 1000;
 const START_WAIT_SECOND_MS = 24 * 60 * 60 * 1000;
 function canAttemptStart(telegramId) {
@@ -172,9 +170,8 @@ function canAttemptStart(telegramId) {
   }
 }
 
-// Para a seleção de plano: dobramos o limite, de 2 para 4 seleções permitidas
 const selectPlanLimits = new Map();
-const MAX_SELECT_PLAN_ATTEMPTS = 4; // Antes era 2
+const MAX_SELECT_PLAN_ATTEMPTS = 4; // antes era 2
 const SELECT_PLAN_BLOCK_TIME_MS = 24 * 60 * 60 * 1000;
 function canAttemptSelectPlan(telegramId, planId) {
   const now = Date.now();
@@ -211,8 +208,6 @@ function canAttemptSelectPlan(telegramId, planId) {
     return false;
   }
 }
-
-// Fim das alterações nas permissões
 
 const startFloodProtection = new Map();
 const START_FLOOD_LIMIT = 20;
@@ -385,6 +380,8 @@ function initializeBot(botConfig, botId) {
         },
       });
       if (!created) {
+        // Para usuários já existentes, opcionalmente podemos resetar remarketingSent
+        // user.remarketingSent = false;
         user.lastInteraction = new Date();
         user.botName = botConfig.name;
         await user.save();
@@ -393,14 +390,19 @@ function initializeBot(botConfig, botId) {
       // Dispara a automação de remarketing "not_purchased"
       if (botConfig.remarketing && botConfig.remarketing.not_purchased) {
         const delayNotPurchasedSec = botConfig.remarketing.not_purchased.delay || 0;
+        logger.info(`Agendando remarketing not purchased para ${telegramId} com delay ${delayNotPurchasedSec} segundos.`);
         setTimeout(async () => {
           try {
             const currentUser = await User.findOne({ where: { telegramId } });
-            if (currentUser && !currentUser.hasPurchased && !currentUser.remarketingSent) {
+            // Se o usuário não comprou, dispara o remarketing
+            if (currentUser && !currentUser.hasPurchased) {
               await sendRemarketingMessage(currentUser, "not_purchased");
+              // Atualiza para indicar que já foi enviado (opcional – ajuste conforme sua lógica)
               currentUser.remarketingSent = true;
               await currentUser.save();
               logger.info(`✅ Mensagem de remarketing (not purchased) enviada para ${telegramId}`);
+            } else {
+              logger.info(`Usuário ${telegramId} não qualificado para remarketing not purchased.`);
             }
           } catch (err) {
             logger.error(`Erro ao enviar remarketing para ${telegramId}:`, err);
@@ -414,13 +416,14 @@ function initializeBot(botConfig, botId) {
 
   /**
    * Envia a mensagem de remarketing (not_purchased ou purchased) conforme a config do bot.
+   * Para "not_purchased", se não houver vídeo ou o arquivo não for encontrado, envia uma mensagem de texto.
    */
   async function sendRemarketingMessage(user, condition) {
     try {
       if (!userSessions[user.telegramId]) {
         userSessions[user.telegramId] = {};
       }
-      userSessions[user.telegramId].remarketingCondition = condition;  // <--- Seta qual remarketing
+      userSessions[user.telegramId].remarketingCondition = condition; // Seta qual remarketing
       if (!botConfig.remarketing) {
         logger.error(`Sem configuração de remarketing no bot ${botConfig.name}`);
         return;
@@ -436,15 +439,18 @@ function initializeBot(botConfig, botId) {
         return;
       }
       let videoInput;
-      if (messageConfig.video && messageConfig.video.startsWith("http")) {
-        videoInput = { source: await getS3VideoStream(messageConfig.video) };
-      } else if (messageConfig.video) {
-        const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
-        if (!fs.existsSync(videoPath) || !fs.lstatSync(videoPath).isFile()) {
-          logger.error(`Vídeo do remarketing não encontrado ou não é um arquivo: ${videoPath}`);
-          return;
+      if (messageConfig.video) {
+        if (messageConfig.video.startsWith("http")) {
+          videoInput = { source: await getS3VideoStream(messageConfig.video) };
+        } else {
+          const videoPath = path.resolve(__dirname, `../src/videos/${messageConfig.video}`);
+          if (!fs.existsSync(videoPath) || !fs.lstatSync(videoPath).isFile()) {
+            logger.warn(`Vídeo do remarketing não encontrado ou não é um arquivo: ${videoPath}. Enviando apenas a mensagem.`);
+            videoInput = null;
+          } else {
+            videoInput = { source: fs.createReadStream(videoPath) };
+          }
         }
-        videoInput = { source: fs.createReadStream(videoPath) };
       } else {
         videoInput = null;
       }
@@ -452,11 +458,20 @@ function initializeBot(botConfig, botId) {
       const remarketingButtons = (messageConfig.buttons || []).map((btn) =>
         Markup.button.callback(btn.name, `remarketing_select_plan_${btn.value}`)
       );
-      await bot.telegram.sendVideo(user.telegramId, videoInput, {
-        caption: messageConfig.description,
-        parse_mode: "HTML",
-        ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
-      });
+
+      if (videoInput) {
+        await bot.telegram.sendVideo(user.telegramId, videoInput, {
+          caption: messageConfig.description,
+          parse_mode: "HTML",
+          ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
+        });
+      } else {
+        await bot.telegram.sendMessage(user.telegramId, messageConfig.description, {
+          parse_mode: "HTML",
+          ...Markup.inlineKeyboard(remarketingButtons, { columns: 1 }),
+        });
+      }
+      logger.info(`✅ Mensagem de remarketing (${condition}) enviada para ${user.telegramId}`);
     } catch (error) {
       logger.error(`Erro no remarketing (${condition}):`, error);
     }
@@ -717,7 +732,7 @@ function initializeBot(botConfig, botId) {
       }
       if (!userSessions[chatId]) userSessions[chatId] = {};
 
-      // *** CORREÇÃO: Verifica se remarketingCondition era 'not_purchased' ou 'purchased' ***
+      // Verifica a condição de remarketing previamente definida
       let originToUse = "main"; // default
       if (userSessions[chatId].remarketingCondition === "not_purchased") {
         originToUse = "not_purchased";
@@ -744,7 +759,6 @@ function initializeBot(botConfig, botId) {
         planName: plan.name,
         planValue: plan.value,
         botName: botConfig.name,
-        // Diferença principal => salvamos originCondition de "not_purchased" ou "purchased"
         originCondition: originToUse,
         pixGeneratedAt: new Date(),
         status: "pending",

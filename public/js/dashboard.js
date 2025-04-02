@@ -7,6 +7,7 @@ $(document).ready(function () {
     let totalMovementsCount = 0;
     let totalPages = 1;
     let selectedBots = [];
+    let currentRevenueValue = 0; // Valor atual do faturamento para o tooltip
 
     // Variáveis para a aba "Todas as Transações"
     let allCurrentPage = 1;
@@ -105,88 +106,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // PAGINAÇÃO (Estatísticas do Dia)
-    //------------------------------------------------------------
-    function renderPagination(total, page, perPage) {
-        totalPages = Math.ceil(total / perPage);
-        const paginationContainer = $('#paginationContainer');
-        paginationContainer.empty();
-        if (totalPages <= 1) return;
-
-        const group = $('<div class="btn-group btn-group-sm" role="group"></div>');
-        const doubleLeft = $('<button class="btn btn-light">&laquo;&laquo;</button>');
-        if (page > 10) {
-            doubleLeft.on('click', () => {
-                currentPage = Math.max(1, page - 10);
-                refreshDashboard();
-            });
-        } else {
-            doubleLeft.prop('disabled', true);
-        }
-        group.append(doubleLeft);
-
-        const singleLeft = $('<button class="btn btn-light">&laquo;</button>');
-        if (page > 1) {
-            singleLeft.on('click', () => {
-                currentPage = page - 1;
-                refreshDashboard();
-            });
-        } else {
-            singleLeft.prop('disabled', true);
-        }
-        group.append(singleLeft);
-
-        let startPage = page - 1;
-        let endPage = page + 1;
-        if (startPage < 1) {
-            startPage = 1;
-            endPage = 3;
-        }
-        if (endPage > totalPages) {
-            endPage = totalPages;
-            startPage = endPage - 2;
-            if (startPage < 1) startPage = 1;
-        }
-        for (let p = startPage; p <= endPage; p++) {
-            const btn = $(`<button class="btn btn-light">${p}</button>`);
-            if (p === page) {
-                btn.addClass('btn-primary');
-            } else {
-                btn.on('click', () => {
-                    currentPage = p;
-                    refreshDashboard();
-                });
-            }
-            group.append(btn);
-        }
-
-        const singleRight = $('<button class="btn btn-light">&raquo;</button>');
-        if (page < totalPages) {
-            singleRight.on('click', () => {
-                currentPage = page + 1;
-                refreshDashboard();
-            });
-        } else {
-            singleRight.prop('disabled', true);
-        }
-        group.append(singleRight);
-
-        const doubleRight = $('<button class="btn btn-light">&raquo;&raquo;</button>');
-        if (page + 10 <= totalPages) {
-            doubleRight.on('click', () => {
-                currentPage = Math.min(totalPages, page + 10);
-                refreshDashboard();
-            });
-        } else {
-            doubleRight.prop('disabled', true);
-        }
-        group.append(doubleRight);
-
-        paginationContainer.append(group);
-    }
-
-    //------------------------------------------------------------
-    // PAGINAÇÃO (Todas as Transações)
+    // PAGINAÇÃO (usada somente em "Todas as Transações")
     //------------------------------------------------------------
     function renderPaginationAll(total, page, perPage) {
         allTotalPages = Math.ceil(total / perPage);
@@ -279,7 +199,6 @@ $(document).ready(function () {
             .catch((err) => console.error('Erro ao carregar bots-list:', err));
     }
 
-    // Determina se chamamos "updateAllTransactions" ou "refreshDashboard" ao mudar filtros de bot
     function handleBotFilterChange() {
         currentPage = 1;
         allCurrentPage = 1;
@@ -316,7 +235,6 @@ $(document).ready(function () {
             handleBotFilterChange();
         });
         checkList.append(allItem);
-
         botNames.forEach(bot => {
             const safeId = 'bot_' + bot.replace('@', '_').replace(/\W/g, '_');
             const item = $(`
@@ -337,7 +255,6 @@ $(document).ready(function () {
             });
             checkList.append(item);
         });
-
         const dropDiv = $('<div class="dropdown-multi"></div>');
         dropDiv.append(toggleBtn).append(checkList);
         toggleBtn.on('click', function (e) {
@@ -400,35 +317,46 @@ $(document).ready(function () {
     async function updateDashboard(page, perPage) {
         try {
             const dr = getDateRangeParams();
-            const movStatus = $('#movStatusFilter').val() || ''; // Filtro de status (mobile) no dashboard principal
+            const movStatus = $('#movStatusFilter').val() || '';
             let botFilterParam = '';
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-
+            // Lê o valor do novo filtro de compra
+            let purchaseFilter = $('#purchaseFilter').val() || "all";
+            // Se estivermos na seção "Planos Detalhados", forçamos o filtro para "all"
+            if ($('#statsDetailedSection').is(':visible')) {
+                purchaseFilter = "all";
+            }
             let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
+            url += `&purchaseFilter=${purchaseFilter}`;
             if (dr.dateRange === 'custom') {
                 url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
             } else {
                 url += `&dateRange=${dr.dateRange}`;
             }
-
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
 
-            // Atualiza Cards “Estatísticas do Dia”
+            // Atualiza Cards Desktop
             $('#totalUsers').text("R$ " + data.statsAll.totalVendasConvertidas.toFixed(2));
             $('#totalPurchases').text(data.statsAll.totalPurchases);
             $('#conversionRate').text(data.statsAll.conversionRate.toFixed(2) + '%');
             const avgPayDelayMs = data.statsAll.averagePaymentDelayMs || 0;
             $('#avgPaymentTimeText').text(formatDuration(avgPayDelayMs));
 
-            // Gráfico dos últimos 7 dias (sempre fixo com base em hoje)
+            // Atualiza Cards Mobile
+            $('#totalUsersMobile').text("R$ " + data.statsAll.totalVendasConvertidas.toFixed(2));
+            $('#totalPurchasesMobile').text(data.statsAll.totalPurchases);
+            $('#conversionRateMobile').text(data.statsAll.conversionRate.toFixed(2) + '%');
+            $('#avgPaymentTimeTextMobile').text(formatDuration(avgPayDelayMs));
+
+            // Gráfico dos últimos 7 dias
             const lineLabels = (data.stats7Days || []).map(item => {
                 const parts = item.date.split('-');
                 return `${parts[2]}/${parts[1]}`;
@@ -440,7 +368,6 @@ $(document).ready(function () {
                     ? (item.totalVendasConvertidas / item.totalVendasGeradas) * 100
                     : 0;
             });
-
             const lineData = {
                 labels: lineLabels,
                 datasets: [
@@ -522,9 +449,9 @@ $(document).ready(function () {
                 lineComparisonChart.update();
             }
 
-            // Atualização da barra de progresso:
-            // Se o faturamento for menor que 10K, meta = 10K; se atingir 10K ou mais, a meta passa a ser 50K.
+            // Atualiza a barra de progresso: meta 10K ou 50K conforme faturamento
             const revenue = data.statsTotal.totalVendasConvertidas;
+            currentRevenueValue = revenue;
             let target;
             if (revenue < 10000) {
                 target = 10000;
@@ -536,40 +463,41 @@ $(document).ready(function () {
             const percentage = Math.min((revenue / target) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 
-            // ULTIMAS TRANSAÇÕES (no Dashboard principal)
+            // (1) Ajusta a altura do container de "Últimas Transações" para ser igual à altura da box do gráfico
+            var chartBoxHeight = $('.chart-box').height();
+            $('#lastTransactionsContainer').css('height', chartBoxHeight + 'px');
+
+            // Últimas Transações – reinserindo o título "ÚLTIMAS TRANSAÇÕES" dentro da box
             $('#lastTransactionsContainer').show();
             const container = $('#lastTransactionsContainer');
             container.empty();
             const headerDiv = $(`
                 <div class="last-transactions-header">
-                    <div class="last-transactions-title">ULTIMAS TRANSAÇÕES</div>
+                    <div class="last-transactions-title">ÚLTIMAS TRANSAÇÕES</div>
                     <div class="last-transactions-filter"></div>
                 </div>
             `);
             headerDiv.find('.last-transactions-filter').append(mobileStatusFilter);
             container.append(headerDiv);
-
-            // Ao mudar status aqui
             mobileStatusFilter.on('change', function () {
                 currentPage = 1;
                 refreshDashboard();
             });
-
-            // Exibir apenas as 7 últimas no dashboard principal
-            const last7 = (data.lastMovements || []).slice(0, 7);
-
-            last7.forEach(mov => {
+            // (2) Exibe apenas 6 transações
+            const lastMovs = data.lastMovements || [];
+            const displayCount = Math.min(lastMovs.length, 6);
+            for (let i = 0; i < displayCount; i++) {
+                const mov = lastMovs[i];
                 let arrowIcon = '';
                 if (mov.status === 'paid') {
                     arrowIcon = '<div class="status-icon paid"><i class="fas fa-arrow-up"></i></div>';
                 } else if (mov.status === 'pending') {
                     arrowIcon = '<div class="status-icon pending"><i class="fas fa-arrow-right"></i></div>';
                 } else if (mov.status === 'cancelado') {
-                    arrowIcon = '<div class="status-icon cancelado"><i class="fas fa-arrow-down"></i></div>';
+                    arrowIcon = '<div class="status-icon cancelado" style="background-color:#8B0000;"><i class="fas fa-arrow-down"></i></div>';
                 } else {
                     arrowIcon = '<div class="status-icon"><i class="fas fa-question"></i></div>';
                 }
-
                 const leadId = mov.User ? mov.User.telegramId : 'N/A';
                 const dateGenObj = mov.pixGeneratedAt ? new Date(mov.pixGeneratedAt) : null;
                 let dtGen = '';
@@ -581,20 +509,17 @@ $(document).ready(function () {
                     const minute = dateGenObj.getMinutes().toString().padStart(2, '0');
                     dtGen = `${day} ${month} ${hour}:${minute}`;
                 }
-
                 const value = mov.planValue.toFixed(2);
-
                 let statusHtml = '';
                 if (mov.status === 'paid') {
                     statusHtml = '<div class="sale-status paid-status">PAGO</div>';
                 } else if (mov.status === 'pending') {
                     statusHtml = '<div class="sale-status pending-status" style="background-color:#fff9c4;color:#f57f17;">Pendente</div>';
                 } else if (mov.status === 'cancelado') {
-                    statusHtml = '<div class="sale-status cancelado-status" style="color:#fff;font-weight:bold;">Cancelado</div>';
+                    statusHtml = '<div class="sale-status cancelado-status" style="background-color:#cc0000;color:#fff;font-weight:bold;">Cancelado</div>';
                 } else {
                     statusHtml = `<div class="sale-status">${mov.status}</div>`;
                 }
-
                 let payDelayHtml = '—';
                 if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                     const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
@@ -618,79 +543,19 @@ $(document).ready(function () {
                     </div>
                 `;
                 container.append(saleCard);
-            });
-
-            totalMovementsCount = data.totalMovements || 0;
-            renderPagination(totalMovementsCount, currentPage, currentPerPage);
-
-            // RANKING
-            const botRankingTbody = $('#botRanking');
-            botRankingTbody.empty();
-            if (data.botRanking && data.botRanking.length > 0) {
-                data.botRanking.forEach(bot => {
-                    botRankingTbody.append(`
-                        <tr>
-                          <td>${bot.botName || 'N/A'}</td>
-                          <td>${bot.vendas}</td>
-                        </tr>
-                    `);
-                });
-            } else {
-                botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
             }
-
-            // Dashboard Detalhado
-            const detailsTbody = $('#botDetailsBody');
-            detailsTbody.empty();
-            const detailed = data.botDetails || [];
-            if (detailed.length > 0) {
-                detailed.forEach(bot => {
-                    // Monta HTML dos “plans”
-                    let plansHtml = '';
-                    if (bot.plans && bot.plans.length > 0) {
-                        bot.plans.forEach(plan => {
-                            plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate}%)<br>`;
-                        });
-                    }
-                    detailsTbody.append(`
-                        <tr>
-                          <td>${bot.botName}</td>
-                          <td class="remove-mobile">R$${bot.valorGerado.toFixed(2)}</td>
-                          <td class="remove-mobile">${bot.totalPurchases}</td>
-                          <td class="remove-mobile">${plansHtml}</td>
-                          <td>${bot.conversionRate}%</td>
-                          <td class="remove-mobile">R$${bot.averageValue.toFixed(2)}</td>
-                        </tr>
-                    `);
+            // (3) Se houver mais de 6 transações, adiciona a "sale-card" com o botão "Ver Todos"
+            if (lastMovs.length > 6) {
+                const verTodosCard = `
+                    <div class="sale-card ver-todos-card" style="cursor:pointer; background: transparent; border: none;">
+                        <div class="sale-card-center" style="width:100%; text-align:center;">Ver Todos</div>
+                    </div>
+                `;
+                container.append(verTodosCard);
+                container.find('.ver-todos-card').on('click', function () {
+                    $('[data-section="allTransactionsSection"]').click();
                 });
-            } else {
-                detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
             }
-
-            // Cartões inferiores (Planos Detalhados)
-            $('#cardAllLeads').text(data.statsAll.totalUsers);
-            $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
-            $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
-            $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
-            $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
-
-            $('#cardMainLeads').text(data.statsMain.totalUsers);
-            $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
-            $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
-            $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
-            $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
-
-            $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
-            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
-            $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
-            $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
-            $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
-
-            $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
-            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
-            $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
-            $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
-            $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -702,56 +567,47 @@ $(document).ready(function () {
     async function updateAllTransactions(page, perPage) {
         try {
             const dr = getDateRangeParams();
-            // Pega o valor do filtro de status (para "Todas as Transações")
             const movStatusAll = $('#movStatusFilterAll').val() || '';
-
             let botFilterParam = '';
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-
+            const purchaseFilter = $('#purchaseFilter').val() || "all";
             let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatusAll) url += `&movStatus=${movStatusAll}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
+            url += `&purchaseFilter=${purchaseFilter}`;
             if (dr.dateRange === 'custom') {
                 url += `&dateRange=custom&startDate=${dr.startDate}&endDate=${dr.endDate}`;
             } else {
                 url += `&dateRange=${dr.dateRange}`;
             }
-
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error('Erro ao obter dados da API');
             }
             const data = await response.json();
-
             const movementsTbody = $('#allTransactionsBody');
             movementsTbody.empty();
-
             if (data.lastMovements && data.lastMovements.length > 0) {
                 data.lastMovements.forEach(mov => {
                     const leadId = mov.User ? mov.User.telegramId : 'N/A';
-
-                    // Lógica do "Plano" segundo originCondition
                     let planCol = 'N/A';
                     if (mov.originCondition === 'not_purchased') {
                         planCol = 'remarketing';
                     } else if (mov.originCondition === 'purchased') {
                         planCol = 'upsell';
                     } else {
-                        // originCondition === 'main' ou nulo
                         if (mov.planName && mov.planName.trim() !== '') {
                             planCol = mov.planName;
                         }
                     }
-
                     let displayDate = '';
                     if (mov.status === 'paid' && mov.purchasedAt) {
                         displayDate = new Date(mov.purchasedAt).toLocaleString('pt-BR');
                     } else if (mov.pixGeneratedAt) {
                         displayDate = new Date(mov.pixGeneratedAt).toLocaleString('pt-BR');
                     }
-
                     let statusHtml = '';
                     if (mov.status === 'paid') {
                         statusHtml = `<span style="color:green;font-weight:bold;">Paid</span>`;
@@ -762,7 +618,6 @@ $(document).ready(function () {
                     } else {
                         statusHtml = `<span style="font-weight:bold;">${mov.status}</span>`;
                     }
-
                     let payDelayHtml = '—';
                     if (mov.status === 'paid' && mov.purchasedAt && mov.pixGeneratedAt) {
                         const diffMs = new Date(mov.purchasedAt) - new Date(mov.pixGeneratedAt);
@@ -772,13 +627,13 @@ $(document).ready(function () {
                     }
                     movementsTbody.append(`
                         <tr>
-                            <td>${leadId}</td>
+                            <td class="remove-mobile">${leadId}</td>
                             <td>${mov.botName || 'N/A'}</td>
                             <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td>${planCol}</td>
+                            <td class="remove-mobile">${planCol}</td>
                             <td>${displayDate}</td>
                             <td>${statusHtml}</td>
-                            <td>${payDelayHtml}</td>
+                            <td class="remove-mobile">${payDelayHtml}</td>
                         </tr>
                     `);
                 });
@@ -789,9 +644,8 @@ $(document).ready(function () {
                     </tr>
                 `);
             }
-
             allTotalMovementsCount = data.totalMovements || 0;
-            renderPaginationAll(allTotalMovementsCount, page, perPage);
+            renderPaginationAll(allTotalMovementsCount, page, allCurrentPerPage);
         } catch (err) {
             console.error('Erro no updateAllTransactions:', err);
         }
@@ -805,29 +659,81 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
+    // Event Listener para o filtro de Tipo de Compra
+    //------------------------------------------------------------
+    $('#purchaseFilter').on("change", function () {
+        currentPage = 1;
+        allCurrentPage = 1;
+        if ($('#allTransactionsSection').is(':visible')) {
+            updateAllTransactions(allCurrentPage, allCurrentPerPage);
+        } else {
+            refreshDashboard();
+        }
+    });
+
+    //------------------------------------------------------------
+    // Tooltip na barra de progresso (mini card do faturamento)
+    //------------------------------------------------------------
+    $(document).on('mouseenter', '.revenue-progress', function () {
+        $('#progressTooltip')
+            .text("Faturamento Total: R$ " + currentRevenueValue.toFixed(2))
+            .css({
+                top: $(this).offset().top - 40,
+                left: $(this).offset().left + ($(this).width() / 2) - 50
+            })
+            .stop(true, true)
+            .fadeIn(200);
+    });
+    $(document).on('mouseleave', '.revenue-progress', function () {
+        $('#progressTooltip').stop(true, true).fadeOut(200);
+    });
+
+    //------------------------------------------------------------
+    // Carousel para Cards Mobile (Estatísticas do Dia)
+    //------------------------------------------------------------
+    function initCarouselDots() {
+        var $carousel = $('.card-scroll');
+        if ($carousel.length === 0) return;
+        var numCards = $carousel.find('.card').length;
+        var $dotsContainer = $('.carousel-dots');
+        $dotsContainer.empty();
+        for (var i = 0; i < numCards; i++) {
+            $dotsContainer.append('<span class="line-indicator"></span>');
+        }
+        updateCarouselDots();
+        $carousel.on('scroll', function () {
+            updateCarouselDots();
+        });
+    }
+    function updateCarouselDots() {
+        var $carousel = $('.card-scroll');
+        var scrollLeft = $carousel.scrollLeft();
+        var cardWidth = $carousel.find('.card').outerWidth(true);
+        var index = Math.round(scrollLeft / cardWidth);
+        $('.carousel-dots .line-indicator').removeClass('active');
+        $('.carousel-dots .line-indicator').eq(index).addClass('active');
+    }
+
+    //------------------------------------------------------------
     // EVENT LISTENERS GERAIS
     //------------------------------------------------------------
-    // Paginação do painel principal
     $('#movPerPage').on("change", function () {
         currentPerPage = parseInt($(this).val(), 10);
         currentPage = 1;
         refreshDashboard();
     });
 
-    // Paginação da aba "Todas as Transações"
     $('#allMovPerPage').on("change", function () {
         allCurrentPerPage = parseInt($(this).val(), 10);
         allCurrentPage = 1;
         updateAllTransactions(allCurrentPage, allCurrentPerPage);
     });
 
-    // Filtro de status em "Todas as Transações" -> atualiza automaticamente
     $('#movStatusFilterAll').on("change", function () {
         allCurrentPage = 1;
         updateAllTransactions(allCurrentPage, allCurrentPerPage);
     });
 
-    // Ao trocar o Range de datas
     $('#dateRangeSelector').on("change", function () {
         if ($(this).val() === "custom") {
             $('#customDateModal').modal("show");
@@ -852,27 +758,21 @@ $(document).ready(function () {
         }
     });
 
-    // Botão do sidebar (mobile)
     $('#toggleSidebarBtn').on("click", function () {
         $("#sidebar").toggleClass("collapsed");
         $("main[role='main']").toggleClass("expanded");
     });
 
-    // Olhinho para exibir token
     $(document).on("click", "#togglePushinToken", function () {
         const field = $('#pushinToken');
         const currentType = field.attr('type');
         field.attr('type', currentType === 'password' ? 'text' : 'password');
     });
 
-    // Botão "Ver Todos" -> vai para aba “Todas as Transações”
-    $('#viewAllBtn').on("click", function () {
-        $('[data-section="allTransactionsSection"]').click();
-    });
+    // Removemos o bloco extra de "Ver Todos" que estava fora da box,
+    // pois agora o botão é exibido dentro da área de Últimas Transações.
 
-    //------------------------------------------------------------
-    // Funções de “Gerenciar Bots”
-    //------------------------------------------------------------
+    // Funções de Gerenciar Bots permanecem inalteradas
     function loadExistingBots() {
         fetch('/admin/bots/list')
             .then(response => response.json())
@@ -921,12 +821,10 @@ $(document).ready(function () {
                 $("#editBotName").val(bot.name);
                 $("#editBotToken").val(bot.token);
                 $("#editBotDescription").val(bot.description || "");
-
                 let bjson = [];
                 try {
                     bjson = JSON.parse(bot.buttonsJson || "[]");
                 } catch (e) { }
-
                 if (bjson[0]) {
                     $("#editButtonName1").val(bjson[0].name);
                     $("#editButtonValue1").val(bjson[0].value);
@@ -954,7 +852,6 @@ $(document).ready(function () {
                     $("#editButtonValue3").val("");
                     $("#editButtonVipLink3").val("");
                 }
-
                 if (bot.remarketingJson) {
                     try {
                         const remarketing = JSON.parse(bot.remarketingJson);
@@ -965,7 +862,6 @@ $(document).ready(function () {
                             const npSec = npDelay % 60;
                             $("#edit_remarketing_not_purchased_delay_minutes").val(npMin);
                             $("#edit_remarketing_not_purchased_delay_seconds").val(npSec);
-
                             const npButtons = remarketing.not_purchased.buttons || [];
                             if (npButtons[0]) {
                                 $("#remarketing_not_purchased_buttonName1").val(npButtons[0].name);
@@ -990,7 +886,6 @@ $(document).ready(function () {
                             const pSec = pDelay % 60;
                             $("#edit_remarketing_purchased_delay_minutes").val(pMin);
                             $("#edit_remarketing_purchased_delay_seconds").val(pSec);
-
                             const pButtons = remarketing.purchased.buttons || [];
                             if (pButtons[0]) {
                                 $("#remarketing_purchased_buttonName1").val(pButtons[0].name);
@@ -1012,7 +907,6 @@ $(document).ready(function () {
                         console.error("Erro ao parse remarketingJson", e);
                     }
                 }
-
                 $('#editBotArea').removeClass("d-none");
             })
             .catch(err => {
@@ -1116,10 +1010,8 @@ $(document).ready(function () {
         $(this).addClass('active clicked');
         $('#statsSection, #rankingSimplesSection, #rankingDetalhadoSection, #statsDetailedSection, #manageBotsSection, #paymentSection, #allTransactionsSection')
             .addClass('d-none');
-
         const targetSection = $(this).data('section');
         $(`#${targetSection}`).removeClass('d-none');
-
         if (targetSection === 'manageBotsSection') {
             loadExistingBots();
         } else if (targetSection === 'paymentSection') {
@@ -1129,13 +1021,17 @@ $(document).ready(function () {
         } else {
             refreshDashboard();
         }
-
         if (targetSection === 'manageBotsSection' || targetSection === 'paymentSection') {
             $('#dateFilterContainer').hide();
         } else {
             $('#dateFilterContainer').show();
         }
-
+        // Se a seção for "Planos Detalhados", esconda o filtro de planos
+        if (targetSection === 'statsDetailedSection') {
+            $('#purchaseFilter').hide();
+        } else {
+            $('#purchaseFilter').show();
+        }
         if (targetSection === 'statsSection'
             || targetSection === 'statsDetailedSection'
             || targetSection === 'allTransactionsSection'
@@ -1198,14 +1094,40 @@ $(document).ready(function () {
     });
 
     //------------------------------------------------------------
+    // Carousel para Cards Mobile (Estatísticas do Dia)
+    //------------------------------------------------------------
+    function initCarouselDots() {
+        var $carousel = $('.card-scroll');
+        if ($carousel.length === 0) return;
+        var numCards = $carousel.find('.card').length;
+        var $dotsContainer = $('.carousel-dots');
+        $dotsContainer.empty();
+        for (var i = 0; i < numCards; i++) {
+            $dotsContainer.append('<span class="line-indicator"></span>');
+        }
+        updateCarouselDots();
+        $carousel.on('scroll', function () {
+            updateCarouselDots();
+        });
+    }
+    function updateCarouselDots() {
+        var $carousel = $('.card-scroll');
+        var scrollLeft = $carousel.scrollLeft();
+        var cardWidth = $carousel.find('.card').outerWidth(true);
+        var index = Math.round(scrollLeft / cardWidth);
+        $('.carousel-dots .line-indicator').removeClass('active');
+        $('.carousel-dots .line-indicator').eq(index).addClass('active');
+    }
+
+    //------------------------------------------------------------
     // Inicialização
     //------------------------------------------------------------
     loadBotList();
     refreshDashboard();
-
     if ($(window).width() < 768) {
         $('#botFilterContainer').hide();
         $('#botFilterContainerMobile').show();
+        initCarouselDots();
     } else {
         $('#botFilterContainer').show();
         $('#botFilterContainerMobile').hide();

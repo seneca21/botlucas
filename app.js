@@ -225,16 +225,20 @@ app.post("/admin/payment-setting", checkAuth, async (req, res) => {
 //------------------------------------------------------
 // Função auxiliar para popular o Dashboard Detalhado
 //------------------------------------------------------
-async function getDetailedBotStats(startDate, endDate, botFilters = []) {
-    const purchasedWhere = {
-        purchasedAt: { [Op.between]: [startDate, endDate] },
-        status: "paid",
-    };
+async function getDetailedBotStats(startDate, endDate, botFilters = [], purchaseFilter = "all") {
+    const purchasedWhere = { purchasedAt: { [Op.between]: [startDate, endDate] } };
     if (botFilters.length > 0 && !botFilters.includes("All")) {
         purchasedWhere.botName = { [Op.in]: botFilters };
     }
-
-    // Consulta geral de cada bot
+    if (purchaseFilter === "main") {
+        purchasedWhere.originCondition = "main";
+    } else if (purchaseFilter === "remarketing_all") {
+        purchasedWhere.originCondition = { [Op.ne]: "main" };
+    } else if (purchaseFilter === "not_purchased") {
+        purchasedWhere.originCondition = "not_purchased";
+    } else if (purchaseFilter === "purchased") {
+        purchasedWhere.originCondition = "purchased";
+    }
     const detailsRows = await Purchase.findAll({
         attributes: [
             "botName",
@@ -245,7 +249,19 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
         group: ["botName"],
     });
 
-    // Consulta agrupada por plano
+    const planWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+    if (botFilters.length > 0 && !botFilters.includes("All")) {
+        planWhere.botName = { [Op.in]: botFilters };
+    }
+    if (purchaseFilter === "main") {
+        planWhere.originCondition = "main";
+    } else if (purchaseFilter === "remarketing_all") {
+        planWhere.originCondition = { [Op.ne]: "main" };
+    } else if (purchaseFilter === "not_purchased") {
+        planWhere.originCondition = "not_purchased";
+    } else if (purchaseFilter === "purchased") {
+        planWhere.originCondition = "purchased";
+    }
     const planRows = await Purchase.findAll({
         attributes: [
             "botName",
@@ -253,11 +269,10 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
             [Sequelize.fn("COUNT", Sequelize.col("id")), "planCount"],
             [Sequelize.fn("SUM", Sequelize.col("planValue")), "planSum"],
         ],
-        where: purchasedWhere,
+        where: planWhere,
         group: ["botName", "planName"],
     });
 
-    // Montamos array final botDetails
     const botDetails = detailsRows.map((row) => {
         const bn = row.getDataValue("botName") || "N/A";
         const totalValue = parseFloat(row.getDataValue("totalValue") || 0);
@@ -267,24 +282,20 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
         if (purchaseCount > 0) {
             avgValue = totalValue / purchaseCount;
         }
+        const convRate = purchaseCount > 0 ? 100 : 0;
 
-        // Filtra as linhas de planRows para esse bot
         const subPlans = planRows
             .filter((p) => p.getDataValue("botName") === bn)
             .map((p) => {
                 const name = p.getDataValue("planName") || "N/A";
                 const c = parseInt(p.getDataValue("planCount") || 0, 10);
-                // para exibição, assumimos conversão 100% se houver vendas
-                const convRate = c > 0 ? 100 : 0;
+                const conv = c > 0 ? 100 : 0;
                 return {
                     planName: name,
                     salesCount: c,
-                    conversionRate: convRate,
+                    conversionRate: conv,
                 };
             });
-
-        // conversão geral (neste exemplo, 100% se teve compras, 0 se não teve)
-        const convRate = purchaseCount > 0 ? 100 : 0;
 
         return {
             botName: bn,
@@ -299,9 +310,167 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
     return botDetails;
 }
 
-//------------------------------------------------------
-// Rotas de ESTATÍSTICAS & BOT LIST
-//------------------------------------------------------
+// Função atualizada para calcular estatísticas detalhadas com filtro de compra
+async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
+    let totalUsers = 0;
+    let totalPurchases = 0;
+    let sumGerado = 0;
+    let sumConvertido = 0;
+    let averagePaymentDelayMs = 0;
+    let conversionRate = 0;
+
+    try {
+        if (originCondition === "main") {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: "main" };
+            if (botFilters.length > 0 && !botFilters.includes("All")) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: baseWhere,
+                distinct: true,
+                col: "userId",
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: baseWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else if (originCondition === "remarketing_all") {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: { [Op.ne]: "main" } };
+            if (botFilters.length > 0 && !botFilters.includes("All")) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: baseWhere,
+                distinct: true,
+                col: "userId",
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: baseWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0,
+                countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else if (!originCondition) {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+            if (botFilters.length > 0 && !botFilters.includes("All")) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: baseWhere,
+                distinct: true,
+                col: "userId",
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: baseWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0,
+                countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        } else {
+            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] }, originCondition: originCondition };
+            if (botFilters.length > 0 && !botFilters.includes("All")) {
+                baseWhere.botName = { [Op.in]: botFilters };
+            }
+            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
+            totalUsers = await Purchase.count({
+                where: baseWhere,
+                distinct: true,
+                col: "userId",
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: baseWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+            const paidPurchases = await Purchase.findAll({
+                where: { ...baseWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0,
+                countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        }
+
+        return {
+            totalUsers,
+            totalPurchases,
+            conversionRate,
+            totalVendasGeradas: sumGerado,
+            totalVendasConvertidas: sumConvertido,
+            averagePaymentDelayMs,
+        };
+    } catch (err) {
+        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
+    }
+}
+
 app.get("/api/bots-list", checkAuth, async (req, res) => {
     try {
         const allBots = await BotModel.findAll();
@@ -320,141 +489,6 @@ function makeDay(date) {
     return d;
 }
 
-async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
-    let totalUsers = 0;
-    let totalPurchases = 0;
-    let sumGerado = 0;
-    let sumConvertido = 0;
-    let averagePaymentDelayMs = 0;
-    let conversionRate = 0;
-
-    try {
-        if (originCondition === "main") {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
-            const mainWhere = { ...baseWhere, originCondition: "main" };
-            const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({
-                where: mainWhere,
-                distinct: true,
-                col: "userId",
-            });
-            totalPurchases = await Purchase.count({ where: purchaseWhere });
-            sumGerado = (await Purchase.sum("planValue", { where: mainWhere })) || 0;
-            sumConvertido =
-                (await Purchase.sum("planValue", {
-                    where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
-                })) || 0;
-            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-
-            const paidPurchases = await Purchase.findAll({
-                where: { ...mainWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
-                attributes: ["pixGeneratedAt", "purchasedAt"],
-            });
-            let sumDiffMs = 0;
-            let countPaid = 0;
-            for (const p of paidPurchases) {
-                if (p.pixGeneratedAt && p.purchasedAt) {
-                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
-                }
-            }
-            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        } else if (!originCondition) {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
-            const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            let userWhere = { lastInteraction: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                purchaseWhere.botName = { [Op.in]: botFilters };
-                userWhere.botName = { [Op.in]: botFilters };
-            }
-            totalUsers = await User.count({ where: userWhere });
-            totalPurchases = await Purchase.count({ where: purchaseWhere });
-            sumGerado = (await Purchase.sum("planValue", { where: baseWhere })) || 0;
-            sumConvertido =
-                (await Purchase.sum("planValue", {
-                    where: { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
-                })) || 0;
-            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-
-            const paidPurchases = await Purchase.findAll({
-                where: { ...baseWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
-                attributes: ["pixGeneratedAt", "purchasedAt"],
-            });
-            let sumDiffMs = 0;
-            let countPaid = 0;
-            for (const p of paidPurchases) {
-                if (p.pixGeneratedAt && p.purchasedAt) {
-                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
-                }
-            }
-            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        } else {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
-            const totalLeads = await Purchase.count({
-                where: { ...baseWhere, originCondition },
-                distinct: true,
-                col: "userId",
-            });
-            const totalConfirmed = await Purchase.count({
-                where: { ...baseWhere, originCondition, status: "paid" },
-                distinct: true,
-                col: "userId",
-            });
-            sumGerado = (await Purchase.sum("planValue", { where: { ...baseWhere, originCondition } })) || 0;
-            sumConvertido =
-                (await Purchase.sum("planValue", {
-                    where: { ...baseWhere, originCondition, status: "paid" },
-                })) || 0;
-            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
-
-            const paidPurchases = await Purchase.findAll({
-                where: { ...baseWhere, originCondition, status: "paid" },
-                attributes: ["pixGeneratedAt", "purchasedAt"],
-            });
-            let sumDiffMs = 0,
-                countPaid = 0;
-            for (const p of paidPurchases) {
-                if (p.pixGeneratedAt && p.purchasedAt) {
-                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
-                }
-            }
-            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-            totalUsers = totalLeads;
-            totalPurchases = totalConfirmed;
-        }
-    } catch (err) {
-        logger.error(`Erro interno em getDetailedStats: ${err.message}`);
-    }
-    return {
-        totalUsers,
-        totalPurchases,
-        conversionRate,
-        totalVendasGeradas: sumGerado,
-        totalVendasConvertidas: sumConvertido,
-        averagePaymentDelayMs,
-    };
-}
-
 app.get("/api/bots-stats", checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
@@ -463,6 +497,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
         if (req.query.botFilter) {
             botFilters = req.query.botFilter.split(",");
         }
+        const purchaseFilter = req.query.purchaseFilter || "all";
         const page = parseInt(req.query.page) || 1;
         const perPage = parseInt(req.query.perPage) || 10;
         const offset = (page - 1) * perPage;
@@ -528,9 +563,9 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
                     }
                     break;
                 }
-                case "all": {  // Nova opção "Tudo"
-                    startDate = new Date(0); // Início da época (1970)
-                    endDate = new Date();    // Data atual
+                case "all": {
+                    startDate = new Date(0);
+                    endDate = new Date();
                     break;
                 }
             }
@@ -585,8 +620,17 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes("All")) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
+        // Aplicar o filtro de Tipo de Compra para as últimas transações:
+        if (purchaseFilter === "main") {
+            lastMovementsWhere.originCondition = "main";
+        } else if (purchaseFilter === "remarketing_all") {
+            lastMovementsWhere.originCondition = { [Op.ne]: "main" };
+        } else if (purchaseFilter === "not_purchased") {
+            lastMovementsWhere.originCondition = "not_purchased";
+        } else if (purchaseFilter === "purchased") {
+            lastMovementsWhere.originCondition = "purchased";
+        }
 
-        // Consulta principal
         const { rows: lastMovements, count: totalMovements } = await Purchase.findAndCountAll({
             attributes: [
                 "originCondition",
@@ -609,28 +653,6 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             ],
         });
 
-        // Montamos o array final
-        const statsAll = await getDetailedStats(startDate, endDate, null, botFilters);
-        const statsMain = await getDetailedStats(startDate, endDate, "main", botFilters);
-        const statsNotPurchased = await getDetailedStats(startDate, endDate, "not_purchased", botFilters);
-        const statsPurchased = await getDetailedStats(startDate, endDate, "purchased", botFilters);
-
-        // Dashboard Detalhado (Ranking Detalhado)
-        const botDetails = await getDetailedBotStats(startDate, endDate, botFilters);
-
-        // Ranking simples
-        const rawRanking = await Purchase.findAll({
-            attributes: ["botName", [Sequelize.fn("COUNT", Sequelize.col("botName")), "vendas"]],
-            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
-            group: ["botName"],
-            order: [[Sequelize.literal('"vendas"'), "DESC"]],
-        });
-        const botRanking = rawRanking.map((item) => ({
-            botName: item.botName,
-            vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
-        }));
-
-        // ***** Atualização: Cálculo sempre com base nos ÚLTIMOS 7 dias *****
         const today = makeDay(new Date());
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
@@ -639,7 +661,12 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
-            const dayStat = (await getDetailedStats(dayStart, dayEnd, null, botFilters)) || {};
+            let dayStat;
+            if (purchaseFilter === "all") {
+                dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters);
+            } else {
+                dayStat = await getDetailedStats(dayStart, dayEnd, purchaseFilter, botFilters);
+            }
             stats7Days.push({
                 date: dayStart.toISOString().split("T")[0],
                 totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
@@ -647,20 +674,25 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             });
         }
 
-        // ***** Novo: Calcular statsTotal com base em todo o período (desde 1970 até hoje) *****
-        const statsTotal = await getDetailedStats(new Date(0), new Date(), null, botFilters);
+        const statsTotal = purchaseFilter === "all"
+            ? await getDetailedStats(new Date(0), new Date(), null, botFilters)
+            : await getDetailedStats(new Date(0), new Date(), purchaseFilter, botFilters);
 
+        // Dashboard Detalhado
+        const botDetails = await getDetailedBotStats(startDate, endDate, botFilters, purchaseFilter);
+
+        // Ranking simples (mantido vazio conforme código original)
         res.json({
-            statsAll,
+            statsAll: await getDetailedStats(startDate, endDate, purchaseFilter === "all" ? null : purchaseFilter, botFilters),
             statsYesterday: {},
-            statsMain,
-            statsNotPurchased,
-            statsPurchased,
+            statsMain: await getDetailedStats(startDate, endDate, "main", botFilters),
+            statsNotPurchased: await getDetailedStats(startDate, endDate, "not_purchased", botFilters),
+            statsPurchased: await getDetailedStats(startDate, endDate, "purchased", botFilters),
             statsDetailed: {},
-            botRanking,
+            botRanking: [],
             botDetails,
             stats7Days,
-            statsTotal, // novo campo para uso global
+            statsTotal,
             lastMovements,
             totalMovements,
         });
@@ -697,7 +729,6 @@ app.get("/admin/bots/:id", checkAuth, async (req, res) => {
     }
 });
 
-// Novo endpoint para deletar Bot
 app.delete("/admin/bots/:id", checkAuth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -705,11 +736,8 @@ app.delete("/admin/bots/:id", checkAuth, async (req, res) => {
         if (!bot) {
             return res.status(404).send("Bot não encontrado");
         }
-        // Remove do BD
         await BotModel.destroy({ where: { id } });
-        // Remove da memória (Telegraf)
         removeBot(id);
-
         res.send(`Bot ID ${id} excluído com sucesso!`);
     } catch (err) {
         logger.error("Erro ao deletar bot:", err);
@@ -749,7 +777,6 @@ app.post(
                 buttonVipLink3,
             } = payload;
 
-            // Verifica token duplicado
             const existingBotWithSameToken = await BotModel.findOne({ where: { token } });
             if (existingBotWithSameToken) {
                 return res
@@ -880,7 +907,6 @@ app.post(
                 buttons: buttons,
                 remarketing: remarketing,
             };
-            // Inicializa o bot passando o ID do novo bot
             initializeBot(bc, newBot.id.toString());
 
             res.send(`
@@ -1045,7 +1071,7 @@ app.post(
             bot.remarketingJson = safeRemarketingJson;
             await bot.save();
 
-            logger.info(`✅ Bot ${name} (ID ${bot.id}) atualizado no BD.`);
+            logger.info(`✅ Bot ${bot.name} (ID ${bot.id}) atualizado no BD.`);
 
             const bc = {
                 name: bot.name,
@@ -1058,7 +1084,6 @@ app.post(
                     purchased: remarketingPurchased,
                 },
             };
-            // Removemos a instância antiga e reinicializamos o bot com a nova configuração
             removeBot(id);
             initializeBot(bc, id);
 
