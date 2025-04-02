@@ -571,33 +571,6 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             }
         }
         if (!startDate || !endDate) {
-            let dateArray;
-            if (date && date.includes(",")) {
-                dateArray = date.split(",").map((d) => d.trim()).filter((d) => d);
-            } else if (date) {
-                dateArray = [date.trim()];
-            } else {
-                const todayStart = makeDay(new Date());
-                startDate = todayStart;
-                endDate = new Date(todayStart);
-                endDate.setHours(23, 59, 59, 999);
-            }
-            if (!startDate || !endDate) {
-                if (dateArray && dateArray.length === 1) {
-                    startDate = makeDay(new Date(dateArray[0]));
-                    endDate = new Date(startDate);
-                    endDate.setHours(23, 59, 59, 999);
-                } else if (dateArray && dateArray.length > 1) {
-                    const dateObjs = dateArray.map((d) => new Date(d));
-                    const minDate = new Date(Math.min(...dateObjs));
-                    const maxDate = new Date(Math.max(...dateObjs));
-                    startDate = makeDay(minDate);
-                    endDate = makeDay(maxDate);
-                    endDate.setHours(23, 59, 59, 999);
-                }
-            }
-        }
-        if (!startDate || !endDate) {
             const todayStart = makeDay(new Date());
             startDate = todayStart;
             endDate = new Date(todayStart);
@@ -610,7 +583,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             { where: { status: "pending", pixGeneratedAt: { [Op.lt]: new Date(Date.now() - 15 * 60 * 1000) } } }
         );
 
-        // Filtro de status (movStatus)
+        // Filtro para Últimas Transações
         const lastMovementsWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
         if (movStatus === "pending") {
             lastMovementsWhere.status = "pending";
@@ -620,7 +593,6 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
         if (botFilters.length > 0 && !botFilters.includes("All")) {
             lastMovementsWhere.botName = { [Op.in]: botFilters };
         }
-        // Aplicar o filtro de Tipo de Compra para as últimas transações:
         if (purchaseFilter === "main") {
             lastMovementsWhere.originCondition = "main";
         } else if (purchaseFilter === "remarketing_all") {
@@ -645,28 +617,19 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             order: [["pixGeneratedAt", "DESC"]],
             limit: perPage,
             offset: offset,
-            include: [
-                {
-                    model: User,
-                    attributes: ["telegramId"],
-                },
-            ],
+            include: [{ model: User, attributes: ["telegramId"] }],
         });
 
-        const today = makeDay(new Date());
+        // Stats dos últimos 7 dias
         const stats7Days = [];
+        const today = makeDay(new Date());
         for (let i = 6; i >= 0; i--) {
             const tempDate = new Date(today);
             tempDate.setDate(tempDate.getDate() - i);
             const dayStart = makeDay(tempDate);
             const dayEnd = new Date(dayStart);
             dayEnd.setHours(23, 59, 59, 999);
-            let dayStat;
-            if (purchaseFilter === "all") {
-                dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters);
-            } else {
-                dayStat = await getDetailedStats(dayStart, dayEnd, purchaseFilter, botFilters);
-            }
+            const dayStat = await getDetailedStats(dayStart, dayEnd, purchaseFilter === "all" ? null : purchaseFilter, botFilters);
             stats7Days.push({
                 date: dayStart.toISOString().split("T")[0],
                 totalVendasConvertidas: dayStat.totalVendasConvertidas || 0,
@@ -674,22 +637,32 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             });
         }
 
+        // Stats Total (todo o período)
         const statsTotal = purchaseFilter === "all"
             ? await getDetailedStats(new Date(0), new Date(), null, botFilters)
             : await getDetailedStats(new Date(0), new Date(), purchaseFilter, botFilters);
 
-        // Dashboard Detalhado
-        const botDetails = await getDetailedBotStats(startDate, endDate, botFilters, purchaseFilter);
+        // Dashboard Detalhado (Planos Detalhados)
+        const botDetails = await getDetailedBotStats(startDate, endDate, botFilters);
 
-        // Ranking simples (mantido vazio conforme código original)
+        // Ranking simples (calculado a partir de compras confirmadas)
+        const rawRanking = await Purchase.findAll({
+            attributes: ["botName", [Sequelize.fn("COUNT", Sequelize.col("botName")), "vendas"]],
+            where: { purchasedAt: { [Op.between]: [startDate, endDate] } },
+            group: ["botName"],
+            order: [[Sequelize.literal('"vendas"'), "DESC"]],
+        });
+        const botRanking = rawRanking.map((item) => ({
+            botName: item.botName,
+            vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
+        }));
+
         res.json({
             statsAll: await getDetailedStats(startDate, endDate, purchaseFilter === "all" ? null : purchaseFilter, botFilters),
-            statsYesterday: {},
             statsMain: await getDetailedStats(startDate, endDate, "main", botFilters),
             statsNotPurchased: await getDetailedStats(startDate, endDate, "not_purchased", botFilters),
             statsPurchased: await getDetailedStats(startDate, endDate, "purchased", botFilters),
-            statsDetailed: {},
-            botRanking: [],
+            botRanking,
             botDetails,
             stats7Days,
             statsTotal,
