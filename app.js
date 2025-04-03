@@ -314,6 +314,14 @@ app.get("/api/bots-list", checkAuth, async (req, res) => {
     }
 });
 
+/**
+ * Obtém estatísticas de acordo com o "originCondition" e botFilters.
+ *   - null => tudo
+ *   - "main" => apenas as originCondition = "main"
+ *   - "not_purchased" => ...
+ *   - "purchased" => ...
+ *   - "remarketing_all" => { [Op.ne]: "main" }
+ */
 async function getDetailedStats(startDate, endDate, originCondition, botFilters = []) {
     let totalUsers = 0;
     let totalPurchases = 0;
@@ -323,47 +331,14 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     let conversionRate = 0;
 
     try {
-        if (originCondition === "main") {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
-            const mainWhere = { ...baseWhere, originCondition: "main" };
-            const purchaseWhere = { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
-            totalUsers = await Purchase.count({
-                where: mainWhere,
-                distinct: true,
-                col: "userId",
-            });
-            totalPurchases = await Purchase.count({ where: purchaseWhere });
-            sumGerado = (await Purchase.sum("planValue", { where: mainWhere })) || 0;
-            sumConvertido =
-                (await Purchase.sum("planValue", {
-                    where: { ...mainWhere, purchasedAt: { [Op.between]: [startDate, endDate] }, status: "paid" },
-                })) || 0;
-            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+        const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
+        // Se filtrar bots
+        if (botFilters.length > 0 && !botFilters.includes("All")) {
+            baseWhere.botName = { [Op.in]: botFilters };
+        }
 
-            const paidPurchases = await Purchase.findAll({
-                where: { ...mainWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
-                attributes: ["pixGeneratedAt", "purchasedAt"],
-            });
-            let sumDiffMs = 0;
-            let countPaid = 0;
-            for (const p of paidPurchases) {
-                if (p.pixGeneratedAt && p.purchasedAt) {
-                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
-                    if (diff >= 0) {
-                        sumDiffMs += diff;
-                        countPaid++;
-                    }
-                }
-            }
-            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        } else if (!originCondition) {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
+        if (!originCondition) {
+            // == tudo
             const purchaseWhere = { ...baseWhere, purchasedAt: { [Op.between]: [startDate, endDate] } };
             totalUsers = await Purchase.count({
                 where: baseWhere,
@@ -394,34 +369,109 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
                 }
             }
             averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
-        } else {
-            const baseWhere = { pixGeneratedAt: { [Op.between]: [startDate, endDate] } };
-            if (botFilters.length > 0 && !botFilters.includes("All")) {
-                baseWhere.botName = { [Op.in]: botFilters };
-            }
-            const totalLeads = await Purchase.count({
-                where: { ...baseWhere, originCondition },
+        } else if (originCondition === "main") {
+            // Somente main
+            const mainWhere = { ...baseWhere, originCondition: "main" };
+            const purchaseWhere = {
+                ...mainWhere,
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+            };
+            totalUsers = await Purchase.count({
+                where: mainWhere,
                 distinct: true,
                 col: "userId",
             });
-            const totalConfirmed = await Purchase.count({
-                where: { ...baseWhere, originCondition, status: "paid" },
-                distinct: true,
-                col: "userId",
-            });
-            sumGerado = (await Purchase.sum("planValue", { where: { ...baseWhere, originCondition } })) || 0;
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: mainWhere })) || 0;
             sumConvertido =
                 (await Purchase.sum("planValue", {
-                    where: { ...baseWhere, originCondition, status: "paid" },
+                    where: { ...mainWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
                 })) || 0;
             conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
 
             const paidPurchases = await Purchase.findAll({
-                where: { ...baseWhere, originCondition, status: "paid" },
+                where: { ...mainWhere, status: "paid", purchasedAt: { [Op.between]: [startDate, endDate] } },
                 attributes: ["pixGeneratedAt", "purchasedAt"],
             });
             let sumDiffMs = 0,
                 countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        }
+        // >>>>>>>>>>> ADICIONADO para "somente remarketing" (not_purchased + purchased)
+        else if (originCondition === "remarketing_all") {
+            // Tudo que não é main
+            const remarketingWhere = { ...baseWhere, originCondition: { [Op.ne]: "main" } };
+            const purchaseWhere = {
+                ...remarketingWhere,
+                purchasedAt: { [Op.between]: [startDate, endDate] },
+            };
+            totalUsers = await Purchase.count({
+                where: remarketingWhere,
+                distinct: true,
+                col: "userId",
+            });
+            totalPurchases = await Purchase.count({ where: purchaseWhere });
+            sumGerado = (await Purchase.sum("planValue", { where: remarketingWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...remarketingWhere, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            const paidPurchases = await Purchase.findAll({
+                where: { ...remarketingWhere, status: "paid" },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0,
+                countPaid = 0;
+            for (const p of paidPurchases) {
+                if (p.pixGeneratedAt && p.purchasedAt) {
+                    const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
+                    if (diff >= 0) {
+                        sumDiffMs += diff;
+                        countPaid++;
+                    }
+                }
+            }
+            averagePaymentDelayMs = countPaid > 0 ? Math.round(sumDiffMs / countPaid) : 0;
+        }
+        // <<<< fim do "remarketing_all"
+
+        else {
+            // "not_purchased" ou "purchased" (já existia)
+            const condWhere = { ...baseWhere, originCondition };
+            const totalLeads = await Purchase.count({
+                where: condWhere,
+                distinct: true,
+                col: "userId",
+            });
+            const totalConfirmed = await Purchase.count({
+                where: { ...condWhere, status: "paid" },
+                distinct: true,
+                col: "userId",
+            });
+            sumGerado = (await Purchase.sum("planValue", { where: condWhere })) || 0;
+            sumConvertido =
+                (await Purchase.sum("planValue", {
+                    where: { ...condWhere, status: "paid" },
+                })) || 0;
+            conversionRate = sumGerado > 0 ? (sumConvertido / sumGerado) * 100 : 0;
+
+            const paidPurchases = await Purchase.findAll({
+                where: { ...condWhere, status: "paid" },
+                attributes: ["pixGeneratedAt", "purchasedAt"],
+            });
+            let sumDiffMs = 0;
+            let countPaid = 0;
             for (const p of paidPurchases) {
                 if (p.pixGeneratedAt && p.purchasedAt) {
                     const diff = p.purchasedAt.getTime() - p.pixGeneratedAt.getTime();
@@ -448,6 +498,9 @@ async function getDetailedStats(startDate, endDate, originCondition, botFilters 
     };
 }
 
+//------------------------------------------------------
+// /api/bots-stats
+//------------------------------------------------------
 app.get("/api/bots-stats", checkAuth, async (req, res) => {
     try {
         const { dateRange, startDate: customStart, endDate: customEnd, movStatus } = req.query;
@@ -612,6 +665,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             ],
         });
 
+        // Estatísticas dos últimos 7 dias (para o gráfico)
         const today = makeDay(new Date());
         const stats7Days = [];
         for (let i = 6; i >= 0; i--) {
@@ -624,7 +678,11 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             if (purchaseFilter === "all") {
                 dayStat = await getDetailedStats(dayStart, dayEnd, null, botFilters);
             } else {
-                dayStat = await getDetailedStats(dayStart, dayEnd, purchaseFilter, botFilters);
+                if (purchaseFilter === "remarketing_all") {
+                    dayStat = await getDetailedStats(dayStart, dayEnd, "remarketing_all", botFilters);
+                } else {
+                    dayStat = await getDetailedStats(dayStart, dayEnd, purchaseFilter, botFilters);
+                }
             }
             stats7Days.push({
                 date: dayStart.toISOString().split("T")[0],
@@ -633,9 +691,17 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             });
         }
 
-        const statsTotal = purchaseFilter === "all"
-            ? await getDetailedStats(new Date(0), new Date(), null, botFilters)
-            : await getDetailedStats(new Date(0), new Date(), purchaseFilter, botFilters);
+        // >>>>>>>>>> Ajuste 2: a barra de progresso "R$ 0 a 10K" sempre pega TUDO:
+        // Sempre busca de 1970 até agora, originCondition = null (todos), e sem filtro de bots.
+        const statsTotal = await getDetailedStats(new Date(0), new Date(), null, []);
+
+        // Monta statsAll, statsMain etc. normal, levando em conta o purchaseFilter e botFilter
+        const statsAll = purchaseFilter === "all"
+            ? await getDetailedStats(startDate, endDate, null, botFilters)
+            : (purchaseFilter === "remarketing_all"
+                ? await getDetailedStats(startDate, endDate, "remarketing_all", botFilters)
+                : await getDetailedStats(startDate, endDate, purchaseFilter, botFilters)
+            );
 
         // Dashboard Detalhado
         const botDetails = await getDetailedBotStats(startDate, endDate, botFilters);
@@ -652,12 +718,17 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             vendas: parseInt(item.getDataValue("vendas"), 10) || 0,
         }));
 
+        // Também geramos "statsMain", "statsNotPurchased", "statsPurchased" para uso no front
+        const statsMain = await getDetailedStats(startDate, endDate, "main", botFilters);
+        const statsNotPurchased = await getDetailedStats(startDate, endDate, "not_purchased", botFilters);
+        const statsPurchased = await getDetailedStats(startDate, endDate, "purchased", botFilters);
+
         res.json({
-            statsAll: await getDetailedStats(startDate, endDate, purchaseFilter === "all" ? null : purchaseFilter, botFilters),
+            statsAll,
             statsYesterday: {},
-            statsMain: await getDetailedStats(startDate, endDate, "main", botFilters),
-            statsNotPurchased: await getDetailedStats(startDate, endDate, "not_purchased", botFilters),
-            statsPurchased: await getDetailedStats(startDate, endDate, "purchased", botFilters),
+            statsMain,
+            statsNotPurchased,
+            statsPurchased,
             statsDetailed: {},
             botRanking,
             botDetails,
@@ -852,11 +923,10 @@ app.post(
                 req.body.remarketing_purchased_buttonValue3,
                 req.body.remarketing_purchased_buttonLink3
             );
-            const remarketing = {
+            const remarketingJson = JSON.stringify({
                 not_purchased: remarketingNotPurchased,
                 purchased: remarketingPurchased,
-            };
-            const remarketingJson = JSON.stringify(remarketing);
+            });
 
             const newBot = await BotModel.create({
                 name,
@@ -874,7 +944,7 @@ app.post(
                 description: newBot.description,
                 video: newBot.video,
                 buttons: buttons,
-                remarketing: remarketing,
+                remarketing: remarketingJson,
             };
             initializeBot(bc, newBot.id.toString());
 
