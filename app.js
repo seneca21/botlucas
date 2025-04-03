@@ -226,7 +226,6 @@ app.post("/admin/payment-setting", checkAuth, async (req, res) => {
 // Função auxiliar para popular o Dashboard Detalhado
 //------------------------------------------------------
 async function getDetailedBotStats(startDate, endDate, botFilters = []) {
-    // Consulta para vendas pagas (convertidas) para cada bot
     const purchasedWhere = {
         purchasedAt: { [Op.between]: [startDate, endDate] },
         status: "paid",
@@ -293,11 +292,12 @@ async function getDetailedBotStats(startDate, endDate, botFilters = []) {
     return botDetails;
 }
 
-// Função para fixar data no começo do dia
+// Função para fixar data no começo do dia (usando horário de Brasília)
 function makeDay(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const dateStr = new Intl.DateTimeFormat('en-US', options).format(new Date(date));
+    const [month, day, year] = dateStr.split('/');
+    return new Date(`${year}-${month}-${day}T00:00:00-03:00`);
 }
 
 //------------------------------------------------------
@@ -659,7 +659,7 @@ app.get("/api/bots-stats", checkAuth, async (req, res) => {
             statsNotPurchased: await getDetailedStats(startDate, endDate, "not_purchased", botFilters),
             statsPurchased: await getDetailedStats(startDate, endDate, "purchased", botFilters),
             statsDetailed: {},
-            botRanking, // agora enviado corretamente
+            botRanking,
             botDetails,
             stats7Days,
             statsTotal,

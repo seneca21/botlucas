@@ -18,11 +18,11 @@ $(document).ready(function () {
     // Cria o seletor de status (usado em "Últimas Transações" no dashboard principal)
     let mobileStatusFilter = $(
         `<select id="movStatusFilter" class="form-control form-control-sm" style="max-width: 150px;">
-            <option value="">Todos</option>
-            <option value="pending">Pendentes</option>
-            <option value="paid">Pagos</option>
-            <option value="cancelado">Cancelado</option>
-        </select>`
+        <option value="">Todos</option>
+        <option value="pending">Pendentes</option>
+        <option value="paid">Pagos</option>
+        <option value="cancelado">Cancelado</option>
+    </select>`
     );
 
     //------------------------------------------------------------
@@ -322,10 +322,9 @@ $(document).ready(function () {
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
+            // **Alteração:** Removido o trecho que forçava purchaseFilter para "all"
             let purchaseFilter = $('#purchaseFilter').val() || "all";
-            if ($('#statsDetailedSection').is(':visible')) {
-                purchaseFilter = "all";
-            }
+
             let url = `/api/bots-stats?page=${page}&perPage=${perPage}`;
             if (movStatus) url += `&movStatus=${movStatus}`;
             if (botFilterParam) url += `&botFilter=${botFilterParam}`;
@@ -461,18 +460,18 @@ $(document).ready(function () {
             const percentage = Math.min((revenue / target) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 
-            // Últimas Transações
+            // Últimas Transações – Ajuste para mobile (contorno corrigido)
             var chartBoxHeight = $('.chart-box').height();
             $('#lastTransactionsContainer').css('height', chartBoxHeight + 'px');
             $('#lastTransactionsContainer').show();
             const container = $('#lastTransactionsContainer');
             container.empty();
             const headerDiv = $(`
-                <div class="last-transactions-header">
-                    <div class="last-transactions-title">ÚLTIMAS TRANSAÇÕES</div>
-                    <div class="last-transactions-filter"></div>
-                </div>
-            `);
+          <div class="last-transactions-header">
+              <div class="last-transactions-title">ÚLTIMAS TRANSAÇÕES</div>
+              <div class="last-transactions-filter"></div>
+          </div>
+      `);
             headerDiv.find('.last-transactions-filter').append(mobileStatusFilter);
             container.append(headerDiv);
             mobileStatusFilter.on('change', function () {
@@ -523,28 +522,28 @@ $(document).ready(function () {
                     }
                 }
                 const saleCard = `
-                    <div class="sale-card">
-                        <div class="sale-card-left">
-                            ${arrowIcon}
-                        </div>
-                        <div class="sale-card-center">
-                            <div class="sale-lead-id"><strong>${leadId}</strong></div>
-                            <div class="sale-date">${dtGen}</div>
-                        </div>
-                        <div class="sale-card-right">
-                            <div class="sale-value">R$ ${value}</div>
-                            ${statusHtml}
-                        </div>
-                    </div>
-                `;
+          <div class="sale-card">
+              <div class="sale-card-left">
+                  ${arrowIcon}
+              </div>
+              <div class="sale-card-center">
+                  <div class="sale-lead-id"><strong>${leadId}</strong></div>
+                  <div class="sale-date">${dtGen}</div>
+              </div>
+              <div class="sale-card-right">
+                  <div class="sale-value">R$ ${value}</div>
+                  ${statusHtml}
+              </div>
+          </div>
+        `;
                 container.append(saleCard);
             }
             if (lastMovs.length > 6) {
                 const verTodosCard = `
-                    <div class="sale-card ver-todos-card" style="cursor:pointer; background: transparent; border: none;">
-                        <div class="sale-card-center" style="width:100%; text-align:center;">Ver Todos</div>
-                    </div>
-                `;
+          <div class="sale-card ver-todos-card" style="cursor:pointer; background: transparent; border: none;">
+              <div class="sale-card-center" style="width:100%; text-align:center;">Ver Todos</div>
+          </div>
+        `;
                 container.append(verTodosCard);
                 container.find('.ver-todos-card').on('click', function () {
                     $('[data-section="allTransactionsSection"]').click();
@@ -557,11 +556,11 @@ $(document).ready(function () {
             if (data.botRanking && data.botRanking.length > 0) {
                 data.botRanking.forEach(bot => {
                     botRankingTbody.append(`
-                        <tr>
-                          <td>${bot.botName || 'N/A'}</td>
-                          <td>${bot.vendas}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName || 'N/A'}</td>
+              <td>${bot.vendas}</td>
+            </tr>
+          `);
                 });
             } else {
                 botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
@@ -580,15 +579,15 @@ $(document).ready(function () {
                         });
                     }
                     detailsTbody.append(`
-                        <tr>
-                          <td>${bot.botName}</td>
-                          <td class="remove-mobile">R$${bot.valorGerado.toFixed(2)}</td>
-                          <td class="remove-mobile">${bot.totalPurchases}</td>
-                          <td class="remove-mobile">${plansHtml}</td>
-                          <td>${bot.conversionRate}%</td>
-                          <td class="remove-mobile">R$${bot.averageValue.toFixed(2)}</td>
-                        </tr>
-                    `);
+            <tr>
+              <td>${bot.botName}</td>
+              <td class="remove-mobile">R$${bot.valorGerado.toFixed(2)}</td>
+              <td class="remove-mobile">${bot.totalPurchases}</td>
+              <td class="remove-mobile">${plansHtml}</td>
+              <td>${bot.conversionRate}%</td>
+              <td class="remove-mobile">R$${bot.averageValue.toFixed(2)}</td>
+            </tr>
+          `);
                 });
             } else {
                 detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
@@ -688,23 +687,23 @@ $(document).ready(function () {
                         }
                     }
                     movementsTbody.append(`
-                        <tr>
-                            <td class="remove-mobile">${leadId}</td>
-                            <td>${mov.botName || 'N/A'}</td>
-                            <td>R$ ${mov.planValue.toFixed(2)}</td>
-                            <td class="remove-mobile">${planCol}</td>
-                            <td>${displayDate}</td>
-                            <td>${statusHtml}</td>
-                            <td class="remove-mobile">${payDelayHtml}</td>
-                        </tr>
-                    `);
+            <tr>
+                <td class="remove-mobile">${leadId}</td>
+                <td>${mov.botName || 'N/A'}</td>
+                <td>R$ ${mov.planValue.toFixed(2)}</td>
+                <td class="remove-mobile">${planCol}</td>
+                <td>${displayDate}</td>
+                <td>${statusHtml}</td>
+                <td class="remove-mobile">${payDelayHtml}</td>
+            </tr>
+          `);
                 });
             } else {
                 movementsTbody.append(`
-                    <tr>
-                        <td colspan="7">Nenhuma movimentação encontrada</td>
-                    </tr>
-                `);
+          <tr>
+              <td colspan="7">Nenhuma movimentação encontrada</td>
+          </tr>
+        `);
             }
             allTotalMovementsCount = data.totalMovements || 0;
             renderPaginationAll(allTotalMovementsCount, page, allCurrentPerPage);
@@ -791,16 +790,16 @@ $(document).ready(function () {
                 } else {
                     bots.forEach(bot => {
                         tbody.append(`
-                            <tr>
-                                <td>${bot.name}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
-                                    <button class="btn btn-sm btn-danger ml-2" data-delete-bot="${bot.id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `);
+              <tr>
+                <td>${bot.name}</td>
+                <td>
+                  <button class="btn btn-sm btn-info" data-edit-bot="${bot.id}">Editar</button>
+                  <button class="btn btn-sm btn-danger ml-2" data-delete-bot="${bot.id}">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            `);
                     });
                 }
             })
