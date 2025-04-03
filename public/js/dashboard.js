@@ -106,7 +106,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // PAGINAÇÃO (usada somente em "Todas as Transações")
+    // PAGINAÇÃO (Todas as Transações)
     //------------------------------------------------------------
     function renderPaginationAll(total, page, perPage) {
         allTotalPages = Math.ceil(total / perPage);
@@ -312,7 +312,7 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // ATUALIZAR DASHBOARD (Estatísticas do Dia)
+    // ATUALIZAR DASHBOARD (Estatísticas do Dia) e atualizar abas detalhadas
     //------------------------------------------------------------
     async function updateDashboard(page, perPage) {
         try {
@@ -322,9 +322,7 @@ $(document).ready(function () {
             if (selectedBots.length > 0) {
                 botFilterParam = selectedBots.join(',');
             }
-            // Lê o valor do novo filtro de compra
             let purchaseFilter = $('#purchaseFilter').val() || "all";
-            // Se estivermos na seção "Planos Detalhados", forçamos o filtro para "all"
             if ($('#statsDetailedSection').is(':visible')) {
                 purchaseFilter = "all";
             }
@@ -463,11 +461,9 @@ $(document).ready(function () {
             const percentage = Math.min((revenue / target) * 100, 100);
             $('.revenue-progress .progress-bar').css('width', percentage + '%');
 
-            // (1) Ajusta a altura do container de "Últimas Transações" para ser igual à altura da box do gráfico
+            // Últimas Transações
             var chartBoxHeight = $('.chart-box').height();
             $('#lastTransactionsContainer').css('height', chartBoxHeight + 'px');
-
-            // Últimas Transações – reinserindo o título "ÚLTIMAS TRANSAÇÕES" dentro da box
             $('#lastTransactionsContainer').show();
             const container = $('#lastTransactionsContainer');
             container.empty();
@@ -483,7 +479,6 @@ $(document).ready(function () {
                 currentPage = 1;
                 refreshDashboard();
             });
-            // (2) Exibe apenas 6 transações
             const lastMovs = data.lastMovements || [];
             const displayCount = Math.min(lastMovs.length, 6);
             for (let i = 0; i < displayCount; i++) {
@@ -544,7 +539,6 @@ $(document).ready(function () {
                 `;
                 container.append(saleCard);
             }
-            // (3) Se houver mais de 6 transações, adiciona a "sale-card" com o botão "Ver Todos"
             if (lastMovs.length > 6) {
                 const verTodosCard = `
                     <div class="sale-card ver-todos-card" style="cursor:pointer; background: transparent; border: none;">
@@ -556,6 +550,74 @@ $(document).ready(function () {
                     $('[data-section="allTransactionsSection"]').click();
                 });
             }
+
+            // Atualiza Ranking
+            const botRankingTbody = $('#botRanking');
+            botRankingTbody.empty();
+            if (data.botRanking && data.botRanking.length > 0) {
+                data.botRanking.forEach(bot => {
+                    botRankingTbody.append(`
+                        <tr>
+                          <td>${bot.botName || 'N/A'}</td>
+                          <td>${bot.vendas}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                botRankingTbody.append(`<tr><td colspan="2">Nenhum dado encontrado</td></tr>`);
+            }
+
+            // Atualiza Dashboard Detalhado (Tabela)
+            const detailsTbody = $('#botDetailsBody');
+            detailsTbody.empty();
+            const detailed = data.botDetails || [];
+            if (detailed.length > 0) {
+                detailed.forEach(bot => {
+                    let plansHtml = '';
+                    if (bot.plans && bot.plans.length > 0) {
+                        bot.plans.forEach(plan => {
+                            plansHtml += `${plan.planName}: ${plan.salesCount} vendas (${plan.conversionRate}%)<br>`;
+                        });
+                    }
+                    detailsTbody.append(`
+                        <tr>
+                          <td>${bot.botName}</td>
+                          <td class="remove-mobile">R$${bot.valorGerado.toFixed(2)}</td>
+                          <td class="remove-mobile">${bot.totalPurchases}</td>
+                          <td class="remove-mobile">${plansHtml}</td>
+                          <td>${bot.conversionRate}%</td>
+                          <td class="remove-mobile">R$${bot.averageValue.toFixed(2)}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                detailsTbody.append(`<tr><td colspan="6">Nenhum dado encontrado</td></tr>`);
+            }
+
+            // Atualiza os cartões de Planos Detalhados
+            $('#cardAllLeads').text(data.statsAll.totalUsers);
+            $('#cardAllPaymentsConfirmed').text(data.statsAll.totalPurchases);
+            $('#cardAllConversionRateDetailed').text(`${data.statsAll.conversionRate.toFixed(2)}%`);
+            $('#cardAllTotalVolume').text(`R$ ${data.statsAll.totalVendasGeradas.toFixed(2)}`);
+            $('#cardAllTotalPaidVolume').text(`R$ ${data.statsAll.totalVendasConvertidas.toFixed(2)}`);
+
+            $('#cardMainLeads').text(data.statsMain.totalUsers);
+            $('#cardMainPaymentsConfirmed').text(data.statsMain.totalPurchases);
+            $('#cardMainConversionRateDetailed').text(`${data.statsMain.conversionRate.toFixed(2)}%`);
+            $('#cardMainTotalVolume').text(`R$ ${data.statsMain.totalVendasGeradas.toFixed(2)}`);
+            $('#cardMainTotalPaidVolume').text(`R$ ${data.statsMain.totalVendasConvertidas.toFixed(2)}`);
+
+            $('#cardNotPurchasedLeads').text(data.statsNotPurchased.totalUsers);
+            $('#cardNotPurchasedPaymentsConfirmed').text(data.statsNotPurchased.totalPurchases);
+            $('#cardNotPurchasedConversionRateDetailed').text(`${data.statsNotPurchased.conversionRate.toFixed(2)}%`);
+            $('#cardNotPurchasedTotalVolume').text(`R$ ${data.statsNotPurchased.totalVendasGeradas.toFixed(2)}`);
+            $('#cardNotPurchasedTotalPaidVolume').text(`R$ ${data.statsNotPurchased.totalVendasConvertidas.toFixed(2)}`);
+
+            $('#cardPurchasedLeads').text(data.statsPurchased.totalUsers);
+            $('#cardPurchasedPaymentsConfirmed').text(data.statsPurchased.totalPurchases);
+            $('#cardPurchasedConversionRateDetailed').text(`${data.statsPurchased.conversionRate.toFixed(2)}%`);
+            $('#cardPurchasedTotalVolume').text(`R$ ${data.statsPurchased.totalVendasGeradas.toFixed(2)}`);
+            $('#cardPurchasedTotalPaidVolume').text(`R$ ${data.statsPurchased.totalVendasConvertidas.toFixed(2)}`);
         } catch (err) {
             console.error('Erro no updateDashboard:', err);
         }
@@ -659,62 +721,6 @@ $(document).ready(function () {
     }
 
     //------------------------------------------------------------
-    // Event Listener para o filtro de Tipo de Compra
-    //------------------------------------------------------------
-    $('#purchaseFilter').on("change", function () {
-        currentPage = 1;
-        allCurrentPage = 1;
-        if ($('#allTransactionsSection').is(':visible')) {
-            updateAllTransactions(allCurrentPage, allCurrentPerPage);
-        } else {
-            refreshDashboard();
-        }
-    });
-
-    //------------------------------------------------------------
-    // Tooltip na barra de progresso (mini card do faturamento)
-    //------------------------------------------------------------
-    $(document).on('mouseenter', '.revenue-progress', function () {
-        $('#progressTooltip')
-            .text("Faturamento Total: R$ " + currentRevenueValue.toFixed(2))
-            .css({
-                top: $(this).offset().top - 40,
-                left: $(this).offset().left + ($(this).width() / 2) - 50
-            })
-            .stop(true, true)
-            .fadeIn(200);
-    });
-    $(document).on('mouseleave', '.revenue-progress', function () {
-        $('#progressTooltip').stop(true, true).fadeOut(200);
-    });
-
-    //------------------------------------------------------------
-    // Carousel para Cards Mobile (Estatísticas do Dia)
-    //------------------------------------------------------------
-    function initCarouselDots() {
-        var $carousel = $('.card-scroll');
-        if ($carousel.length === 0) return;
-        var numCards = $carousel.find('.card').length;
-        var $dotsContainer = $('.carousel-dots');
-        $dotsContainer.empty();
-        for (var i = 0; i < numCards; i++) {
-            $dotsContainer.append('<span class="line-indicator"></span>');
-        }
-        updateCarouselDots();
-        $carousel.on('scroll', function () {
-            updateCarouselDots();
-        });
-    }
-    function updateCarouselDots() {
-        var $carousel = $('.card-scroll');
-        var scrollLeft = $carousel.scrollLeft();
-        var cardWidth = $carousel.find('.card').outerWidth(true);
-        var index = Math.round(scrollLeft / cardWidth);
-        $('.carousel-dots .line-indicator').removeClass('active');
-        $('.carousel-dots .line-indicator').eq(index).addClass('active');
-    }
-
-    //------------------------------------------------------------
     // EVENT LISTENERS GERAIS
     //------------------------------------------------------------
     $('#movPerPage').on("change", function () {
@@ -769,8 +775,9 @@ $(document).ready(function () {
         field.attr('type', currentType === 'password' ? 'text' : 'password');
     });
 
-    // Removemos o bloco extra de "Ver Todos" que estava fora da box,
-    // pois agora o botão é exibido dentro da área de Últimas Transações.
+    $('#viewAllBtn').on("click", function () {
+        $('[data-section="allTransactionsSection"]').click();
+    });
 
     // Funções de Gerenciar Bots permanecem inalteradas
     function loadExistingBots() {
@@ -1026,7 +1033,6 @@ $(document).ready(function () {
         } else {
             $('#dateFilterContainer').show();
         }
-        // Se a seção for "Planos Detalhados", esconda o filtro de planos
         if (targetSection === 'statsDetailedSection') {
             $('#purchaseFilter').hide();
         } else {
