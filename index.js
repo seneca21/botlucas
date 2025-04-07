@@ -3,13 +3,13 @@
 const { Sequelize } = require('sequelize');
 const logger = require('./logger'); // se necessário
 
-// Cria a conexão com o banco de dados com as credenciais fornecidas
+// Cria a conexão com o banco de dados com as novas credenciais
 const sequelize = new Sequelize(
-  'deefe35i9plvl7',          // Nome do DB
-  'ucahdtofln6o1c',          // Usuário
-  'p5091a792840333d7cb39c5cf8461d5c9b2a223f6db70b93287977e0ba152229b', // Senha
+  'd1kbv3l1itftpt',          // Nome do DB
+  'u32sfehh2v583e',          // Usuário
+  'p7411665fb1a40f39bee7369be09645902018271140295b5a0a2b42042940362e', // Senha
   {
-    host: 'c3nv2ev86aje4j.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
+    host: 'cb5ajfjosdpmil.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com',
     port: 5432,
     dialect: 'postgres',
     logging: false,
@@ -25,7 +25,7 @@ const sequelize = new Sequelize(
 // Importa os modelos
 const User = require('../models/User')(sequelize, Sequelize.DataTypes);
 const Purchase = require('../models/Purchase')(sequelize, Sequelize.DataTypes);
-const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes); // <-- Importação do Bot
+const BotModel = require('../models/Bot')(sequelize, Sequelize.DataTypes);
 const PaymentSetting = require('../models/PaymentSetting')(sequelize, Sequelize.DataTypes); // <-- Novo modelo PaymentSetting
 
 // Relações, se houver
