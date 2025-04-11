@@ -154,8 +154,8 @@ app.get("/login", (req, res) => {
 
 app.post("/login", (req, res) => {
     const { username, password } = req.body;
-    const ADMIN_USER = "lucas";
-    const ADMIN_PASS = "lucas123";
+    const ADMIN_USER = "eusougay";
+    const ADMIN_PASS = "felipe123";
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         req.session.loggedIn = true;
